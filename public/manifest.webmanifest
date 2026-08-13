@@ -1,0 +1,32 @@
+{
+  "name": "PDV Posto — Modulo Info",
+  "short_name": "PDV Posto",
+  "description": "Sistema de ponto de venda para posto de combustível — Modulo Info",
+  "start_url": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#ffffff",
+  "theme_color": "#1d6fd8",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/brand/modulo-info.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/modulo-info.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/modulo-info.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

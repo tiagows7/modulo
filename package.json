@@ -6,19 +6,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "gateway": "node server/pdv-gateway.mjs",
+    "cbc-bridge": "node server/cbc-bridge.mjs",
+    "tef-bridge": "node server/tef-bridge.mjs",
+    "tef-bridge:live": "set TEF_MODE=live&& node server/tef-bridge.mjs",
+    "fiscal-bridge": "node server/fiscal-bridge.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",
     "next": "16.2.11",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

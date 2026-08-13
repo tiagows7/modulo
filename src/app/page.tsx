@@ -176,7 +176,9 @@ export default function LoginPage() {
     await new Promise((r) => setTimeout(r, 1200));
 
     if (username === "admin" && password === "admin") {
-      router.push("/dashboard");
+      router.push("/administrativo");
+    } else if (username === "pdv" && password === "pdv") {
+      router.push("/pdv");
     } else {
       setLoading(false);
       setError("Usuário ou senha incorretos.");
@@ -348,7 +350,7 @@ export default function LoginPage() {
 
             {/* Hint */}
             <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
-              Acesso demo: <strong style={{ color: "var(--blue-light)" }}>admin</strong> / <strong style={{ color: "var(--blue-light)" }}>admin</strong>
+              Acesso: <strong style={{ color: "var(--blue-light)" }}>admin</strong> ou <strong style={{ color: "var(--blue-light)" }}>pdv</strong> (senha igual ao usuário)
             </p>
 
             {/* Submit */}
