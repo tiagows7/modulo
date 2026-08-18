@@ -41,22 +41,11 @@ const BackgroundOrbs = () => (
   </div>
 );
 
-// Logo animated component
+/** Logo visível no SSR — sem opacity:0 (evita tela preta se o JS atrasar). */
 const Logo = () => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.8, y: -20 }}
-    animate={{ opacity: 1, scale: 1, y: 0 }}
-    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}
-  >
-    {/* Logo icon — two overlapping squares mimicking the Módulo Info logo */}
-    {/* 3 squares: dark + light at same top level, medium below-center */}
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
     <div style={{ position: "relative", width: 96, height: 72 }}>
-      {/* Square 1 — darkest navy, TOP-LEFT, z:1 (behind everything) */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.25, duration: 0.5 }}
+      <div
         style={{
           position: "absolute", left: 0, top: 0,
           width: 44, height: 44, borderRadius: 10,
@@ -64,11 +53,7 @@ const Logo = () => (
           zIndex: 1,
         }}
       />
-      {/* Square 2 — medium blue, CENTER-BOTTOM, z:2 (covers bottom-right of dark) */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.38, duration: 0.5 }}
+      <div
         style={{
           position: "absolute", left: 24, top: 28,
           width: 44, height: 44, borderRadius: 10,
@@ -76,11 +61,7 @@ const Logo = () => (
           zIndex: 2,
         }}
       />
-      {/* Square 3 — lightest blue, TOP-RIGHT (same height as dark), z:3 (front) */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.51, duration: 0.5 }}
+      <div
         style={{
           position: "absolute", left: 52, top: 0,
           width: 44, height: 44, borderRadius: 10,
@@ -90,12 +71,8 @@ const Logo = () => (
       />
     </div>
 
-    {/* Title */}
     <div style={{ textAlign: "center" }}>
-      <motion.h1
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.5 }}
+      <h1
         style={{
           fontFamily: "'Outfit', sans-serif",
           fontSize: 32,
@@ -107,11 +84,8 @@ const Logo = () => (
         }}
       >
         Módulo Info
-      </motion.h1>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.65, duration: 0.5 }}
+      </h1>
+      <p
         style={{
           fontFamily: "'Inter', sans-serif",
           fontSize: 11,
@@ -122,21 +96,15 @@ const Logo = () => (
         }}
       >
         Automação Comercial
-      </motion.p>
-      <motion.div
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
+      </p>
+      <div
         style={{
           height: 2,
           background: "linear-gradient(90deg, transparent, #F5C518, transparent)",
           marginTop: 8,
         }}
       />
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.9, duration: 0.5 }}
+      <p
         style={{
           fontFamily: "'Outfit', sans-serif",
           fontSize: 18,
@@ -150,9 +118,9 @@ const Logo = () => (
         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "2px", color: "#D4A817" }}>
           FLEXIBILIZADAS
         </span>
-      </motion.p>
+      </p>
     </div>
-  </motion.div>
+  </div>
 );
 
 export default function LoginPage() {
@@ -214,10 +182,7 @@ export default function LoginPage() {
     >
       <BackgroundOrbs />
 
-      <motion.div
-        initial={{ opacity: 0, y: 40, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+      <div
         style={{
           width: "100%",
           maxWidth: 440,
@@ -228,14 +193,9 @@ export default function LoginPage() {
           gap: 32,
         }}
       >
-        {/* Logo */}
         <Logo />
 
-        {/* Login card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.6 }}
+        <div
           className="glass"
           style={{
             borderRadius: 20,
@@ -346,11 +306,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
+            {error ? (
+              <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
@@ -360,8 +317,8 @@ export default function LoginPage() {
               >
                 <AlertCircle size={15} />
                 {error}
-              </motion.div>
-            )}
+              </div>
+            ) : null}
 
             {/* Hint */}
             <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
@@ -408,13 +365,9 @@ export default function LoginPage() {
               )}
             </motion.button>
           </form>
-        </motion.div>
+        </div>
 
-        {/* Footer */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.1, duration: 0.5 }}
+        <p
           style={{
             textAlign: "center", fontSize: 11,
             color: "var(--text-disabled)",
@@ -422,8 +375,8 @@ export default function LoginPage() {
           }}
         >
           © 2025 Módulo Info — Automação Comercial. Todos os direitos reservados.
-        </motion.p>
-      </motion.div>
+        </p>
+      </div>
     </div>
   );
 }
