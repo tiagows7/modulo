@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Fuel, Lock, User, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 // Animated background orbs
 const BackgroundOrbs = () => (
@@ -172,16 +173,30 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    // Simulate auth — replace with Supabase later
-    await new Promise((r) => setTimeout(r, 1200));
+    
+    // Check local mock for pdv if we want to keep it, but let's try Supabase for admin
+    // The username field acts as email if it has @, otherwise let's just append @modulo.com for convenience,
+    // or just use it as email directly.
+    const email = username.includes('@') ? username : `${username}@modulo.com`;
 
-    if (username === "admin" && password === "admin") {
-      router.push("/administrativo");
-    } else if (username === "pdv" && password === "pdv") {
-      router.push("/pdv");
-    } else {
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (authError) {
       setLoading(false);
       setError("Usuário ou senha incorretos.");
+      return;
+    }
+
+    // Check user role from metadata to decide where to route
+    const role = data.user?.user_metadata?.role || 'admin'; // Defaulting to admin for now if not set
+
+    if (role === "pdv") {
+      router.push("/pdv");
+    } else {
+      router.push("/administrativo");
     }
   };
 
