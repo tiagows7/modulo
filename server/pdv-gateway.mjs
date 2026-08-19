@@ -1,13 +1,12 @@
 /**
  * Gateway do PDV na porta 8765.
  *
- * - Se o Vite (:8766) estiver no ar → faz proxy
- * - Se estiver offline → mostra "Conectando ao servidor…" / "Sem conexão"
- *   (em vez da página de erro do navegador)
+ * Proxy para Next (:8766). Sem health-check HEAD em toda request
+ * (isso sobrecarregava o Next e fazia o login cair na splash /?#).
  *
  * Uso:
  *   npm run gateway
- *   npm run dev          (Vite em :8766)
+ *   npx next dev -p 8766
  */
 import http from 'node:http'
 
@@ -16,7 +15,15 @@ const VITE_PORT = Number(process.env.PDV_VITE_PORT || 8766)
 const VITE_HOST = '127.0.0.1'
 const STARTUP_ATTEMPTS = 8
 
-function checkVite(timeoutMs = 900) {
+/** Cache curto só para /__pdv_health (splash). */
+let healthCache = { ok: false, checkedAt: 0 }
+const HEALTH_TTL_MS = 2000
+
+function checkVite(timeoutMs = 2500) {
+  const now = Date.now()
+  if (now - healthCache.checkedAt < HEALTH_TTL_MS) {
+    return Promise.resolve(healthCache.ok)
+  }
   return new Promise((resolve) => {
     const req = http.request(
       {
@@ -28,16 +35,41 @@ function checkVite(timeoutMs = 900) {
       },
       (res) => {
         res.resume()
+        healthCache = { ok: true, checkedAt: Date.now() }
         resolve(true)
       },
     )
-    req.on('error', () => resolve(false))
+    req.on('error', () => {
+      healthCache = { ok: false, checkedAt: Date.now() }
+      resolve(false)
+    })
     req.on('timeout', () => {
       req.destroy()
+      healthCache = { ok: false, checkedAt: Date.now() }
       resolve(false)
     })
     req.end()
   })
+}
+
+function pathOnly(url) {
+  return String(url || '/').split('?')[0]
+}
+
+/** Splash só para navegação de documento HTML — nunca para API/_next. */
+function shouldShowSplash(req) {
+  const path = pathOnly(req.url)
+  if (path.startsWith('/api/')) return false
+  if (path.startsWith('/_next/')) return false
+  if (path.startsWith('/__pdv_health')) return false
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false
+  const accept = String(req.headers.accept || '')
+  if (path.includes('.')) {
+    if (/\.(js|mjs|css|map|png|jpg|jpeg|svg|ico|webp|woff2?|ttf|json|webmanifest)$/i.test(path)) {
+      return false
+    }
+  }
+  return accept.includes('text/html') || accept === '' || accept.includes('*/*')
 }
 
 function splashHtml() {
@@ -157,23 +189,15 @@ function splashHtml() {
 </html>`
 }
 
-function wantsHtml(req) {
-  const accept = String(req.headers.accept || '')
-  const url = String(req.url || '/')
-  if (url.startsWith('/@') || url.startsWith('/src/') || url.startsWith('/node_modules/')) {
-    return false
-  }
-  if (url.includes('.')) {
-    // arquivo estático (js/css/png…) — sem splash HTML
-    const pathOnly = url.split('?')[0]
-    if (/\.(js|mjs|css|map|png|jpg|jpeg|svg|ico|webp|woff2?|ttf|json|webmanifest)$/i.test(pathOnly)) {
-      return false
-    }
-  }
-  return accept.includes('text/html') || accept === '' || accept.includes('*/*')
+function sendSplash(res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+  })
+  res.end(splashHtml())
 }
 
-function proxyToVite(req, res) {
+function proxyToNext(req, res) {
   const headers = { ...req.headers, host: `${VITE_HOST}:${VITE_PORT}` }
   const proxyReq = http.request(
     {
@@ -184,18 +208,19 @@ function proxyToVite(req, res) {
       headers,
     },
     (proxyRes) => {
+      healthCache = { ok: true, checkedAt: Date.now() }
       res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
       proxyRes.pipe(res)
     },
   )
-  proxyReq.on('error', async () => {
-    if (wantsHtml(req)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
-      res.end(splashHtml())
+  proxyReq.on('error', () => {
+    healthCache = { ok: false, checkedAt: Date.now() }
+    if (shouldShowSplash(req)) {
+      sendSplash(res)
       return
     }
     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ ok: false, error: 'Vite offline' }))
+    res.end(JSON.stringify({ ok: false, error: 'Next offline' }))
   })
   req.pipe(proxyReq)
 }
@@ -203,7 +228,7 @@ function proxyToVite(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = req.url || '/'
 
-  if (url.startsWith('/__pdv_health')) {
+  if (pathOnly(url).startsWith('/__pdv_health')) {
     const ok = await checkVite()
     res.writeHead(ok ? 200 : 503, {
       'Content-Type': 'application/json; charset=utf-8',
@@ -214,22 +239,8 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  const up = await checkVite()
-  if (!up) {
-    if (wantsHtml(req) || req.method === 'GET') {
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-      })
-      res.end(splashHtml())
-      return
-    }
-    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ ok: false, error: 'Servidor PDV offline' }))
-    return
-  }
-
-  proxyToVite(req, res)
+  // Sempre tenta proxy (sem HEAD prévio). Splash só se a conexão falhar.
+  proxyToNext(req, res)
 })
 
 server.listen(GATEWAY_PORT, '0.0.0.0', () => {
