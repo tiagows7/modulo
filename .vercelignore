@@ -1,0 +1,6 @@
+# Local build artifacts / native bridges (not for Vercel)
+dist
+server/clisitef64
+supabase/.temp
+*.dll
+.env*.local
