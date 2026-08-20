@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { ReactNode, useState } from "react";
-import { Search, Plus, Filter, Download } from "lucide-react";
+import { Search, Plus, Filter, Download, ArrowLeft } from "lucide-react";
 
 interface Column {
   key: string;
@@ -17,6 +18,7 @@ interface ModulePageProps {
   columns: Column[];
   rows: Record<string, ReactNode>[];
   addLabel?: string;
+  backUrl?: string;
 }
 
 const fadeUp = {
@@ -34,6 +36,7 @@ export function ModulePage({
   columns,
   rows,
   addLabel = "Novo",
+  backUrl,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
 
@@ -52,6 +55,24 @@ export function ModulePage({
         style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {backUrl && (
+            <Link href={backUrl} style={{ textDecoration: "none" }}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                <ArrowLeft size={20} />
+              </motion.button>
+            </Link>
+          )}
           <div
             style={{
               width: 46, height: 46, borderRadius: 12,
