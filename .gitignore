@@ -19,6 +19,14 @@
 
 # production
 /build
+/dist
+
+# TEF native DLLs (local bridges only)
+/server/clisitef64/*.dll
+/server/clisitef64/files/
+
+# Supabase CLI temp
+/supabase/.temp/
 
 # misc
 .DS_Store

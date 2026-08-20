@@ -88,7 +88,7 @@ const alerts = [
 // =====================
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 1, y: 0 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
@@ -148,7 +148,7 @@ function KpiCard({ card, index }: { card: typeof kpiCards[0]; index: number }) {
       </div>
 
       <div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Outfit', sans-serif", lineHeight: 1 }}>
+        <div style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-display)", lineHeight: 1 }}>
           {card.value}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
@@ -239,7 +239,7 @@ export default function DashboardPage() {
 
       {/* Page header */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
@@ -247,7 +247,7 @@ export default function DashboardPage() {
         <div>
           <h1
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: "var(--font-display)",
               fontSize: 26,
               fontWeight: 800,
               color: "var(--text-primary)",
@@ -282,7 +282,7 @@ export default function DashboardPage() {
         {alerts.map((alert, i) => (
           <motion.div
             key={alert.id}
-            initial={{ opacity: 0, x: -20 }}
+            initial={false}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.08, duration: 0.35 }}
             style={{
@@ -404,7 +404,7 @@ export default function DashboardPage() {
               {recentMovements.map((m, i) => (
                 <motion.tr
                   key={m.id}
-                  initial={{ opacity: 0, x: 20 }}
+                  initial={false}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
                 >

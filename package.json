@@ -11,7 +11,8 @@
     "cbc-bridge": "node server/cbc-bridge.mjs",
     "tef-bridge": "node server/tef-bridge.mjs",
     "tef-bridge:live": "set TEF_MODE=live&& node server/tef-bridge.mjs",
-    "fiscal-bridge": "node server/fiscal-bridge.mjs"
+    "fiscal-bridge": "node server/fiscal-bridge.mjs",
+    "smartpos-bridge": "node server/smartpos-bridge.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

@@ -2,11 +2,8 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Fuel, Lock, User, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff, Fuel, Lock, User } from "lucide-react";
 
-// Animated background orbs
 const BackgroundOrbs = () => (
   <div style={{ position: "fixed", inset: 0, overflow: "hidden", zIndex: 0, pointerEvents: "none" }}>
     <motion.div
@@ -36,12 +33,10 @@ const BackgroundOrbs = () => (
         background: "radial-gradient(circle, rgba(245,197,24,0.08) 0%, transparent 70%)",
       }}
     />
-    {/* Grid overlay */}
     <div className="bg-grid" style={{ position: "absolute", inset: 0, opacity: 0.5 }} />
   </div>
 );
 
-/** Logo visível no SSR — sem opacity:0 (evita tela preta se o JS atrasar). */
 const Logo = () => (
   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
     <div style={{ position: "relative", width: 96, height: 72 }}>
@@ -124,49 +119,8 @@ const Logo = () => (
 );
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (!username || !password) {
-      setError("Preencha todos os campos.");
-      return;
-    }
-
-    setLoading(true);
-    
-    // Check local mock for pdv if we want to keep it, but let's try Supabase for admin
-    // The username field acts as email if it has @, otherwise let's just append @modulo.com for convenience,
-    // or just use it as email directly.
-    const email = username.includes('@') ? username : `${username}@modulo.com`;
-
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-
-    if (authError) {
-      setLoading(false);
-      setError("Usuário ou senha incorretos.");
-      return;
-    }
-
-    // Check user role from metadata to decide where to route
-    const role = data.user?.user_metadata?.role || 'admin'; // Defaulting to admin for now if not set
-
-    if (role === "pdv") {
-      router.push("/pdv");
-    } else {
-      router.push("/administrativo");
-    }
-  };
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <div
@@ -218,10 +172,16 @@ export default function LoginPage() {
             Acesse o sistema com suas credenciais
           </p>
 
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Username */}
+          {/* POST nativo: funciona mesmo se o React não hidratar (evita /?#). */}
+          <form
+            method="post"
+            action="/api/auth/login-form"
+            onSubmit={() => setSubmitting(true)}
+            style={{ display: "flex", flexDirection: "column", gap: 16 }}
+          >
             <div style={{ position: "relative" }}>
               <label
+                htmlFor="username"
                 style={{
                   display: "block",
                   fontSize: 12,
@@ -244,20 +204,20 @@ export default function LoginPage() {
                 />
                 <input
                   id="username"
+                  name="username"
                   type="text"
                   placeholder="Digite seu usuário"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
                   className="input-base"
                   style={{ paddingLeft: 40 }}
                   autoComplete="username"
+                  required
                 />
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label
+                htmlFor="password"
                 style={{
                   display: "block",
                   fontSize: 12,
@@ -280,13 +240,13 @@ export default function LoginPage() {
                 />
                 <input
                   id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Digite sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   className="input-base"
                   style={{ paddingLeft: 40, paddingRight: 44 }}
                   autoComplete="current-password"
+                  required
                 />
                 <button
                   type="button"
@@ -306,26 +266,11 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {error ? (
-              <div
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-                  borderRadius: 8, padding: "10px 14px",
-                  color: "#EF4444", fontSize: 13,
-                }}
-              >
-                <AlertCircle size={15} />
-                {error}
-              </div>
-            ) : null}
-
-            {/* Hint */}
             <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
-              Acesso: <strong style={{ color: "var(--blue-light)" }}>admin</strong> ou <strong style={{ color: "var(--blue-light)" }}>pdv</strong> (senha igual ao usuário)
+              Acesso: <strong style={{ color: "var(--blue-light)" }}>admin</strong> ou{" "}
+              <strong style={{ color: "var(--blue-light)" }}>pdv</strong> (senha igual ao usuário)
             </p>
 
-            {/* Submit */}
             <motion.button
               type="submit"
               id="btn-login"
@@ -342,9 +287,9 @@ export default function LoginPage() {
                 justifyContent: "center",
                 gap: 10,
               }}
-              disabled={loading}
+              disabled={submitting}
             >
-              {loading ? (
+              {submitting ? (
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
