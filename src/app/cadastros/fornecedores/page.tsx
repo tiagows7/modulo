@@ -1,52 +1,711 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Truck } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Pencil, Trash2, Truck, X } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
+import { useDbStatus } from "@/components/DbStatusProvider";
 import { supabase } from "@/lib/supabase";
+
+type Fornecedor = {
+  id: string;
+  codigo: string;
+  razao_social: string;
+  fantasia: string | null;
+  cnpj: string | null;
+  cpf: string | null;
+  cep: string | null;
+  endereco: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  telefone1: string | null;
+  telefone2: string | null;
+  telefone3: string | null;
+  inscricao_estadual: string | null;
+  inscricao_municipal: string | null;
+  contato: string | null;
+  email: string | null;
+  status: string | null;
+};
+
+type FornecedorForm = {
+  razao_social: string;
+  fantasia: string;
+  cnpj: string;
+  cpf: string;
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  telefone1: string;
+  telefone2: string;
+  telefone3: string;
+  inscricao_estadual: string;
+  inscricao_municipal: string;
+  contato: string;
+  email: string;
+};
+
+const emptyForm: FornecedorForm = {
+  razao_social: "",
+  fantasia: "",
+  cnpj: "",
+  cpf: "",
+  cep: "",
+  endereco: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "",
+  telefone1: "",
+  telefone2: "",
+  telefone3: "",
+  inscricao_estadual: "",
+  inscricao_municipal: "",
+  contato: "",
+  email: "",
+};
 
 const columns = [
   { key: "codigo", label: "Código" },
-  { key: "nome", label: "Razão Social" },
-  { key: "cpfCnpj", label: "CNPJ" },
+  { key: "razao", label: "Razão Social" },
+  { key: "fantasia", label: "Fantasia" },
+  { key: "cnpj", label: "CNPJ" },
   { key: "cidade", label: "Cidade" },
+  { key: "uf", label: "UF", align: "center" as const },
   { key: "telefone", label: "Telefone" },
   { key: "status", label: "Status", align: "center" as const },
+  { key: "acoes", label: "Ações", align: "center" as const },
 ];
 
+const fieldStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const labelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)",
+};
+
+async function nextCodigo() {
+  const { data } = await supabase
+    .from("fornecedores")
+    .select("codigo")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  let max = 0;
+  for (const row of data ?? []) {
+    const match = String(row.codigo ?? "").match(/(\d+)/);
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `FOR-${String(max + 1).padStart(3, "0")}`;
+}
+
+function toForm(item: Fornecedor): FornecedorForm {
+  return {
+    razao_social: item.razao_social ?? "",
+    fantasia: item.fantasia ?? "",
+    cnpj: item.cnpj ?? "",
+    cpf: item.cpf ?? "",
+    cep: item.cep ?? "",
+    endereco: item.endereco ?? "",
+    numero: item.numero ?? "",
+    complemento: item.complemento ?? "",
+    bairro: item.bairro ?? "",
+    cidade: item.cidade ?? "",
+    uf: item.uf ?? "",
+    telefone1: item.telefone1 ?? "",
+    telefone2: item.telefone2 ?? "",
+    telefone3: item.telefone3 ?? "",
+    inscricao_estadual: item.inscricao_estadual ?? "",
+    inscricao_municipal: item.inscricao_municipal ?? "",
+    contato: item.contato ?? "",
+    email: item.email ?? "",
+  };
+}
+
+function toPayload(form: FornecedorForm) {
+  const blank = (v: string) => {
+    const t = v.trim();
+    return t ? t : null;
+  };
+  return {
+    razao_social: form.razao_social.trim(),
+    fantasia: blank(form.fantasia),
+    cnpj: blank(form.cnpj),
+    cpf: blank(form.cpf),
+    cep: blank(form.cep),
+    endereco: blank(form.endereco),
+    numero: blank(form.numero),
+    complemento: blank(form.complemento),
+    bairro: blank(form.bairro),
+    cidade: blank(form.cidade),
+    uf: blank(form.uf)?.toUpperCase() ?? null,
+    telefone1: blank(form.telefone1),
+    telefone2: blank(form.telefone2),
+    telefone3: blank(form.telefone3),
+    inscricao_estadual: blank(form.inscricao_estadual),
+    inscricao_municipal: blank(form.inscricao_municipal),
+    contato: blank(form.contato),
+    email: blank(form.email),
+  };
+}
+
 export default function FornecedoresPage() {
-  const [rows, setRows] = useState<any[]>([]);
+  const { busy, pesquisar, gravar } = useDbStatus();
+  const [items, setItems] = useState<Fornecedor[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Fornecedor | null>(null);
+  const [deleting, setDeleting] = useState<Fornecedor | null>(null);
+  const [form, setForm] = useState<FornecedorForm>(emptyForm);
+  const [formError, setFormError] = useState("");
+
+  const loadData = useCallback(async () => {
+    await pesquisar(async () => {
+      setLoadError("");
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select(
+          "id, codigo, razao_social, fantasia, cnpj, cpf, cep, endereco, numero, complemento, bairro, cidade, uf, telefone1, telefone2, telefone3, inscricao_estadual, inscricao_municipal, contato, email, status",
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setLoadError(error.message);
+        setItems([]);
+        return;
+      }
+      setItems((data ?? []) as Fornecedor[]);
+    });
+  }, [pesquisar]);
 
   useEffect(() => {
-    async function loadData() {
-      const { data, error } = await supabase
-        .from('fornecedores')
-        .select('*')
-        .order('created_at', { ascending: false });
+    void loadData();
+  }, [loadData]);
 
-      if (data) {
-        setRows(data.map(item => ({
-          codigo: item.codigo,
-          nome: item.razao_social,
-          cpfCnpj: item.cnpj || "-",
-          cidade: item.cidade || "-",
-          telefone: item.telefone || "-",
-          status: <span className={`badge ${item.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>{item.status}</span>
-        })));
-      }
+  const updateField = (key: keyof FornecedorForm, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setFormError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (item: Fornecedor) => {
+    setEditing(item);
+    setForm(toForm(item));
+    setFormError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const openDelete = (item: Fornecedor) => {
+    setDeleting(item);
+    setActionError("");
+  };
+
+  const closeModal = () => {
+    if (busy) return;
+    setModalOpen(false);
+    setEditing(null);
+    setFormError("");
+  };
+
+  const closeDelete = () => {
+    if (busy) return;
+    setDeleting(null);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!form.razao_social.trim()) {
+      setFormError("Informe a razão social.");
+      return;
     }
-    loadData();
-  }, []);
+
+    setFormError("");
+    const payload = toPayload(form);
+
+    try {
+      await gravar(async () => {
+        if (editing) {
+          const { error } = await supabase
+            .from("fornecedores")
+            .update(payload)
+            .eq("id", editing.id);
+          if (error) throw new Error(error.message);
+        } else {
+          const codigo = await nextCodigo();
+          const { error } = await supabase.from("fornecedores").insert({
+            ...payload,
+            codigo,
+            status: "ativo",
+          });
+          if (error) throw new Error(error.message);
+        }
+      });
+
+      setModalOpen(false);
+      setEditing(null);
+      setForm(emptyForm);
+      await loadData();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setActionError("");
+    try {
+      await gravar(async () => {
+        const { error } = await supabase
+          .from("fornecedores")
+          .delete()
+          .eq("id", deleting.id);
+        if (error) throw new Error(error.message);
+      });
+      setDeleting(null);
+      await loadData();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Falha ao excluir.");
+    }
+  };
+
+  const rows = items.map((item) => ({
+    codigo: item.codigo,
+    razao: item.razao_social,
+    fantasia: item.fantasia || "—",
+    cnpj: item.cnpj || "—",
+    cidade: item.cidade || "—",
+    uf: item.uf || "—",
+    telefone: item.telefone1 || "—",
+    status: (
+      <span className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}>
+        {item.status || "—"}
+      </span>
+    ),
+    acoes: (
+      <div style={{ display: "inline-flex", gap: 8, justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={() => openEdit(item)}
+          disabled={busy}
+          title="Editar"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--border-default)",
+            background: "var(--bg-elevated)",
+            color: "var(--blue-light)",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Pencil size={13} />
+          Editar
+        </button>
+        <button
+          type="button"
+          onClick={() => openDelete(item)}
+          disabled={busy}
+          title="Excluir"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: "1px solid rgba(239,68,68,0.35)",
+            background: "rgba(239,68,68,0.08)",
+            color: "#EF4444",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Trash2 size={13} />
+          Excluir
+        </button>
+      </div>
+    ),
+  }));
 
   return (
-    <ModulePage
-      title="Fornecedores"
-      description="Gerenciamento de fornecedores"
-      icon={<Truck size={22} />}
-      columns={columns}
-      rows={rows}
-      addLabel="Novo Fornecedor"
-      backUrl="/cadastros"
-    />
+    <>
+      {loadError ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#EF4444",
+            fontSize: 13,
+          }}
+        >
+          Erro ao carregar fornecedores: {loadError}
+        </div>
+      ) : null}
+
+      {actionError && !deleting ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#EF4444",
+            fontSize: 13,
+          }}
+        >
+          {actionError}
+        </div>
+      ) : null}
+
+      <ModulePage
+        title="Fornecedores"
+        description="Gerenciamento de fornecedores"
+        icon={<Truck size={22} />}
+        columns={columns}
+        rows={rows}
+        addLabel="Novo Fornecedor"
+        backUrl="/cadastros"
+        onAdd={busy ? undefined : openCreate}
+      />
+
+      {modalOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fornecedor-title"
+          onClick={closeModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "rgba(6, 13, 26, 0.72)",
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            overflowY: "auto",
+          }}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleSubmit}
+            style={{
+              width: "min(820px, 100%)",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-default)",
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
+              margin: "24px 0",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <h2
+                  id="fornecedor-title"
+                  style={{
+                    margin: 0,
+                    fontFamily: "var(--font-display)",
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {editing ? "Editar Fornecedor" : "Novo Fornecedor"}
+                </h2>
+                {editing ? (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                    Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                aria-label="Fechar"
+                disabled={busy}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  display: "flex",
+                  padding: 4,
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
+                <label htmlFor="razao_social" style={labelStyle}>Razão Social *</label>
+                <input
+                  id="razao_social"
+                  className="input-base"
+                  value={form.razao_social}
+                  onChange={(e) => updateField("razao_social", e.target.value)}
+                  required
+                  disabled={busy}
+                  autoFocus
+                />
+              </div>
+
+              <div style={fieldStyle}>
+                <label htmlFor="fantasia" style={labelStyle}>Fantasia</label>
+                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cnpj" style={labelStyle}>CNPJ</label>
+                <input id="cnpj" className="input-base" value={form.cnpj} onChange={(e) => updateField("cnpj", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cpf" style={labelStyle}>CPF</label>
+                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="inscricao_estadual" style={labelStyle}>Inscrição Estadual</label>
+                <input id="inscricao_estadual" className="input-base" value={form.inscricao_estadual} onChange={(e) => updateField("inscricao_estadual", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="inscricao_municipal" style={labelStyle}>Inscrição Municipal</label>
+                <input id="inscricao_municipal" className="input-base" value={form.inscricao_municipal} onChange={(e) => updateField("inscricao_municipal", e.target.value)} disabled={busy} />
+              </div>
+
+              <div style={fieldStyle}>
+                <label htmlFor="cep" style={labelStyle}>CEP</label>
+                <input id="cep" className="input-base" value={form.cep} onChange={(e) => updateField("cep", e.target.value)} disabled={busy} />
+              </div>
+              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
+                <label htmlFor="endereco" style={labelStyle}>Endereço</label>
+                <input id="endereco" className="input-base" value={form.endereco} onChange={(e) => updateField("endereco", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="numero" style={labelStyle}>Número</label>
+                <input id="numero" className="input-base" value={form.numero} onChange={(e) => updateField("numero", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="complemento" style={labelStyle}>Complemento</label>
+                <input id="complemento" className="input-base" value={form.complemento} onChange={(e) => updateField("complemento", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="bairro" style={labelStyle}>Bairro</label>
+                <input id="bairro" className="input-base" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cidade" style={labelStyle}>Cidade</label>
+                <input id="cidade" className="input-base" value={form.cidade} onChange={(e) => updateField("cidade", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="uf" style={labelStyle}>UF</label>
+                <input id="uf" className="input-base" value={form.uf} maxLength={2} onChange={(e) => updateField("uf", e.target.value.toUpperCase())} disabled={busy} />
+              </div>
+
+              <div style={fieldStyle}>
+                <label htmlFor="telefone1" style={labelStyle}>Telefone 1</label>
+                <input id="telefone1" className="input-base" value={form.telefone1} onChange={(e) => updateField("telefone1", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="telefone2" style={labelStyle}>Telefone 2</label>
+                <input id="telefone2" className="input-base" value={form.telefone2} onChange={(e) => updateField("telefone2", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="telefone3" style={labelStyle}>Telefone 3</label>
+                <input id="telefone3" className="input-base" value={form.telefone3} onChange={(e) => updateField("telefone3", e.target.value)} disabled={busy} />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="contato" style={labelStyle}>Contato</label>
+                <input id="contato" className="input-base" value={form.contato} onChange={(e) => updateField("contato", e.target.value)} disabled={busy} />
+              </div>
+              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
+                <label htmlFor="email" style={labelStyle}>E-mail</label>
+                <input id="email" type="email" className="input-base" value={form.email} onChange={(e) => updateField("email", e.target.value)} disabled={busy} />
+              </div>
+            </div>
+
+            {formError ? (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  color: "#EF4444",
+                  fontSize: 13,
+                }}
+              >
+                {formError}
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={busy}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-elevated)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? "Aguarde..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {deleting ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fornecedor-delete-title"
+          onClick={closeDelete}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "rgba(6, 13, 26, 0.72)",
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(420px, 100%)",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-default)",
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <h2
+              id="fornecedor-delete-title"
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-display)",
+                fontSize: 18,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+              }}
+            >
+              Excluir fornecedor
+            </h2>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              Confirma a exclusão de{" "}
+              <strong style={{ color: "var(--text-primary)" }}>
+                {deleting.codigo} — {deleting.razao_social}
+              </strong>
+              ?
+            </p>
+            {actionError ? (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  color: "#EF4444",
+                  fontSize: 13,
+                }}
+              >
+                {actionError}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={busy}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-elevated)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={busy}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#EF4444",
+                  color: "white",
+                  cursor: busy ? "wait" : "pointer",
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
+                {busy ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
