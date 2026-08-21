@@ -43,6 +43,15 @@ type Cliente = {
   email2: string | null;
   contato: string | null;
   observacao: string | null;
+  restricoes: string | null;
+  mensagem: string | null;
+  obriga_placa_venda: boolean | null;
+  libera_veiculo_nao_cadastrado: boolean | null;
+  obriga_km: boolean | null;
+  controla_frota: boolean | null;
+  obriga_autorizacao: boolean | null;
+  envia_nfce_venda: boolean | null;
+  obriga_motorista: boolean | null;
   status: string | null;
 };
 
@@ -78,6 +87,15 @@ type ClienteForm = {
   email2: string;
   contato: string;
   observacao: string;
+  restricoes: string;
+  mensagem: string;
+  obriga_placa_venda: boolean;
+  libera_veiculo_nao_cadastrado: boolean;
+  obriga_km: boolean;
+  controla_frota: boolean;
+  obriga_autorizacao: boolean;
+  envia_nfce_venda: boolean;
+  obriga_motorista: boolean;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -105,6 +123,15 @@ const emptyForm: ClienteForm = {
   email2: "",
   contato: "",
   observacao: "",
+  restricoes: "",
+  mensagem: "",
+  obriga_placa_venda: false,
+  libera_veiculo_nao_cadastrado: false,
+  obriga_km: false,
+  controla_frota: false,
+  obriga_autorizacao: false,
+  envia_nfce_venda: false,
+  obriga_motorista: false,
 };
 
 const emptyVeiculo = (): VeiculoForm => ({
@@ -175,6 +202,15 @@ function toForm(item: Cliente): ClienteForm {
     email2: item.email2 ?? "",
     contato: item.contato ?? "",
     observacao: item.observacao ?? "",
+    restricoes: item.restricoes ?? "",
+    mensagem: item.mensagem ?? "",
+    obriga_placa_venda: Boolean(item.obriga_placa_venda),
+    libera_veiculo_nao_cadastrado: Boolean(item.libera_veiculo_nao_cadastrado),
+    obriga_km: Boolean(item.obriga_km),
+    controla_frota: Boolean(item.controla_frota),
+    obriga_autorizacao: Boolean(item.obriga_autorizacao),
+    envia_nfce_venda: Boolean(item.envia_nfce_venda),
+    obriga_motorista: Boolean(item.obriga_motorista),
   };
 }
 
@@ -201,6 +237,15 @@ function toClientePayload(form: ClienteForm) {
     email2: blank(form.email2),
     contato: blank(form.contato),
     observacao: blank(form.observacao),
+    restricoes: blank(form.restricoes),
+    mensagem: blank(form.mensagem)?.slice(0, 200) ?? null,
+    obriga_placa_venda: form.obriga_placa_venda,
+    libera_veiculo_nao_cadastrado: form.libera_veiculo_nao_cadastrado,
+    obriga_km: form.obriga_km,
+    controla_frota: form.controla_frota,
+    obriga_autorizacao: form.obriga_autorizacao,
+    envia_nfce_venda: form.envia_nfce_venda,
+    obriga_motorista: form.obriga_motorista,
   };
 }
 
@@ -267,7 +312,7 @@ export default function ClientesPage() {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, observacao, status",
+          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, observacao, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, status",
         )
         .order("created_at", { ascending: false });
 
@@ -338,6 +383,10 @@ export default function ClientesPage() {
   }, [form.uf]);
 
   const updateField = (key: keyof ClienteForm, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateFlag = (key: keyof ClienteForm, value: boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -837,6 +886,32 @@ export default function ClientesPage() {
                     disabled={busy}
                   />
                 </CadastroField>
+                <CadastroField label="Restrições" htmlFor="restricoes" span="full">
+                  <textarea
+                    id="restricoes"
+                    className="input-base input-compact"
+                    value={form.restricoes}
+                    onChange={(e) => updateField("restricoes", e.target.value)}
+                    disabled={busy}
+                    rows={3}
+                    style={{ resize: "vertical", minHeight: 64 }}
+                  />
+                </CadastroField>
+                <CadastroField label="Mensagem" htmlFor="mensagem" span="full">
+                  <textarea
+                    id="mensagem"
+                    className="input-base input-compact"
+                    value={form.mensagem}
+                    onChange={(e) => updateField("mensagem", e.target.value.slice(0, 200))}
+                    disabled={busy}
+                    rows={3}
+                    maxLength={200}
+                    style={{ resize: "vertical", minHeight: 64 }}
+                  />
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
+                    {form.mensagem.length}/200
+                  </div>
+                </CadastroField>
                 <CadastroField label="Observação" htmlFor="observacao" span="full">
                   <textarea
                     id="observacao"
@@ -844,11 +919,38 @@ export default function ClientesPage() {
                     value={form.observacao}
                     onChange={(e) => updateField("observacao", e.target.value)}
                     disabled={busy}
-                    rows={5}
-                    style={{ resize: "vertical", minHeight: 96 }}
+                    rows={3}
+                    style={{ resize: "vertical", minHeight: 64 }}
                   />
                 </CadastroField>
               </CadastroFormGrid>
+
+              <div className="cadastro-options-panel">
+                <div className="cadastro-options-title">Opções na venda</div>
+                <div className="cadastro-options-grid">
+                  {(
+                    [
+                      ["obriga_placa_venda", "Obrigatório informar placa na venda"],
+                      ["libera_veiculo_nao_cadastrado", "Libera veículo não cadastrado"],
+                      ["obriga_km", "Obrigatório informar KM"],
+                      ["controla_frota", "Controla frota"],
+                      ["obriga_autorizacao", "Obrigatório informar autorização"],
+                      ["envia_nfce_venda", "Envia NFC-e na venda"],
+                      ["obriga_motorista", "Obrigatório informar motorista"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="cadastro-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form[key])}
+                        onChange={(e) => updateFlag(key, e.target.checked)}
+                        disabled={busy}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
