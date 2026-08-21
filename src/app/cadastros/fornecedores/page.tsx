@@ -529,7 +529,7 @@ export default function FornecedoresPage() {
                 <button
                   type="button"
                   className="cadastro-btn-edit"
-                  style={{ padding: "0 12px", fontSize: 10 }}
+                  style={{ padding: "0 12px", fontSize: 11 }}
                   onClick={() => void preencherPorCnpj(form.cnpj, true)}
                   disabled={busy}
                   title="Consultar CNPJ na Receita (publica.cnpj.ws)"
@@ -651,7 +651,7 @@ export default function FornecedoresPage() {
             />
           }
         >
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Confirma a exclusão de{" "}
             <strong style={{ color: "var(--text-primary)" }}>
               {deleting.codigo} — {deleting.razao_social}

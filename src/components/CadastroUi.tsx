@@ -27,7 +27,7 @@ export function CadastroRowActions({
         disabled={disabled}
         title="Editar"
       >
-        <Pencil size={11} />
+        <Pencil size={12} />
         Editar
       </button>
       <button
@@ -37,7 +37,7 @@ export function CadastroRowActions({
         disabled={disabled}
         title="Excluir"
       >
-        <Trash2 size={11} />
+        <Trash2 size={12} />
         Excluir
       </button>
     </div>

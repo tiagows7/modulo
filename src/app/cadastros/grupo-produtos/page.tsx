@@ -261,7 +261,7 @@ export default function GrupoProdutosPage() {
             />
           }
         >
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Confirma a exclusão de{" "}
             <strong style={{ color: "var(--text-primary)" }}>
               {deleting.codigo} — {deleting.descricao}
