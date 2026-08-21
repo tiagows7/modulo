@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Layers, Pencil, X } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { supabase } from "@/lib/supabase";
@@ -181,40 +182,99 @@ export default function GrupoProdutosPage() {
 
   return (
     <>
-      {statusLabel ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "rgba(26,111,216,0.12)",
-            border: "1px solid rgba(74,159,232,0.35)",
-            color: "var(--blue-light)",
-            fontSize: 13,
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <span
-            aria-hidden
+      <AnimatePresence>
+        {statusLabel ? (
+          <motion.div
+            key={dbStatus}
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             style={{
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              border: "2px solid rgba(74,159,232,0.35)",
-              borderTopColor: "var(--blue-light)",
-              animation: "spin 0.8s linear infinite",
-              display: "inline-block",
+              position: "fixed",
+              inset: 0,
+              zIndex: 120,
+              background: "rgba(6, 13, 26, 0.72)",
+              backdropFilter: "blur(4px)",
+              display: "grid",
+              placeItems: "center",
+              padding: 20,
             }}
-          />
-          {statusLabel}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      ) : null}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                width: "min(360px, 100%)",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-default)",
+                borderRadius: 18,
+                padding: "28px 24px",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: "50%",
+                  border: "3px solid rgba(74,159,232,0.25)",
+                  borderTopColor: "var(--blue-light)",
+                }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 17,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {dbStatus === "pesquisando" ? "Pesquisando" : "Gravando"}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  {statusLabel}
+                </div>
+              </div>
+              <motion.div
+                style={{
+                  width: "100%",
+                  height: 4,
+                  borderRadius: 999,
+                  background: "rgba(74,159,232,0.15)",
+                  overflow: "hidden",
+                }}
+              >
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                  style={{
+                    width: "45%",
+                    height: "100%",
+                    borderRadius: 999,
+                    background: "linear-gradient(90deg, transparent, var(--blue-light), transparent)",
+                  }}
+                />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {loadError ? (
         <div
@@ -339,22 +399,6 @@ export default function GrupoProdutosPage() {
                 disabled={dbStatus === "gravando"}
               />
             </div>
-
-            {dbStatus === "gravando" ? (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "rgba(26,111,216,0.12)",
-                  border: "1px solid rgba(74,159,232,0.35)",
-                  color: "var(--blue-light)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                Gravando no banco de dados…
-              </div>
-            ) : null}
 
             {formError ? (
               <div
