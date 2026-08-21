@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Users } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
@@ -13,6 +13,12 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
+import {
+  formatCpfCnpj,
+  isValidCnpj,
+  onlyDigits,
+} from "@/components/barrapdv/services/document/documentValidator";
 
 type Cliente = {
   id: string;
@@ -211,8 +217,32 @@ function toVeiculoPayload(v: VeiculoForm, clienteId: string) {
   };
 }
 
+async function resolverCidadeIbge(nome: string, uf: string): Promise<string> {
+  const nomeLimpo = nome.trim();
+  const ufLimpa = uf.trim().toUpperCase();
+  if (!nomeLimpo || !ufLimpa) return "";
+
+  const { data: exact } = await supabase
+    .from("cidades")
+    .select("codigo")
+    .eq("uf", ufLimpa)
+    .ilike("descricao", nomeLimpo)
+    .limit(1)
+    .maybeSingle();
+  if (exact?.codigo != null) return String(exact.codigo);
+
+  const { data: partial } = await supabase
+    .from("cidades")
+    .select("codigo")
+    .eq("uf", ufLimpa)
+    .ilike("descricao", `%${nomeLimpo}%`)
+    .limit(1)
+    .maybeSingle();
+  return partial?.codigo != null ? String(partial.codigo) : "";
+}
+
 export default function ClientesPage() {
-  const { busy, pesquisar, gravar } = useDbStatus();
+  const { busy, pesquisar, gravar, consultar } = useDbStatus();
   const [items, setItems] = useState<Cliente[]>([]);
   const [cidadeNomes, setCidadeNomes] = useState<Record<string, string>>({});
   const [ufs, setUfs] = useState<UfRow[]>([]);
@@ -228,6 +258,8 @@ export default function ClientesPage() {
   const [editingVeiculoKey, setEditingVeiculoKey] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [tab, setTab] = useState<TabId>("geral");
+  const lastConsultedCnpj = useRef("");
+  const consultingRef = useRef(false);
 
   const loadData = useCallback(async () => {
     await pesquisar(async () => {
@@ -318,6 +350,66 @@ export default function ClientesPage() {
     }));
   };
 
+  const preencherPorCnpj = useCallback(async (rawCnpj: string, force = false) => {
+    const digits = onlyDigits(rawCnpj);
+    if (digits.length === 11) {
+      setFormError("A consulta automática funciona com CNPJ (14 dígitos).");
+      return;
+    }
+    if (digits.length !== 14 || !isValidCnpj(digits)) {
+      setFormError("Informe um CNPJ válido com 14 dígitos para consultar.");
+      return;
+    }
+    if (consultingRef.current) return;
+    if (!force && lastConsultedCnpj.current === digits) return;
+
+    consultingRef.current = true;
+    setFormError("");
+    try {
+      await consultar(async () => {
+        const data = await consultarCnpj(digits);
+        lastConsultedCnpj.current = digits;
+        const uf = (data.uf || "").toUpperCase();
+        const cidadeCodigo = await resolverCidadeIbge(data.city, uf);
+        setForm((prev) => ({
+          ...prev,
+          cpf_cnpj: formatCpfCnpj(data.cnpj),
+          nome: data.razaoSocial || data.name || prev.nome,
+          nome_fantasia: data.fantasia || prev.nome_fantasia,
+          cep: data.cep || prev.cep,
+          endereco: data.address || prev.endereco,
+          numero: data.number || prev.numero,
+          complemento: data.complemento || prev.complemento,
+          bairro: data.neighborhood || prev.bairro,
+          uf: uf || prev.uf,
+          cidade: cidadeCodigo || prev.cidade,
+          fone1: data.phone || prev.fone1,
+          inscricao_estadual: data.stateRegistration || prev.inscricao_estadual,
+          email: data.email || prev.email,
+        }));
+      });
+    } catch (err) {
+      lastConsultedCnpj.current = "";
+      setFormError(
+        err instanceof Error ? err.message : "Não foi possível consultar o CNPJ.",
+      );
+    } finally {
+      consultingRef.current = false;
+    }
+  }, [consultar]);
+
+  const onCpfCnpjChange = (value: string) => {
+    const formatted = formatCpfCnpj(value);
+    const digits = onlyDigits(formatted);
+    if (digits !== lastConsultedCnpj.current) {
+      lastConsultedCnpj.current = "";
+    }
+    updateField("cpf_cnpj", formatted);
+    if (digits.length === 14 && isValidCnpj(digits)) {
+      void preencherPorCnpj(digits);
+    }
+  };
+
   const resetVeiculoDraft = () => {
     setVeiculoDraft(emptyVeiculo());
     setEditingVeiculoKey(null);
@@ -330,6 +422,7 @@ export default function ClientesPage() {
     resetVeiculoDraft();
     setFormError("");
     setActionError("");
+    lastConsultedCnpj.current = "";
     setTab("geral");
     setModalOpen(true);
   };
@@ -339,6 +432,7 @@ export default function ClientesPage() {
     setForm(toForm(item));
     setFormError("");
     setActionError("");
+    lastConsultedCnpj.current = onlyDigits(item.cpf_cnpj ?? "");
     setTab("geral");
     resetVeiculoDraft();
     setModalOpen(true);
@@ -605,6 +699,36 @@ export default function ClientesPage() {
           {tab === "geral" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
+                <CadastroField label="CPF / CNPJ" htmlFor="cpf_cnpj" span="full">
+                  <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                    <input
+                      id="cpf_cnpj"
+                      className="input-base input-compact"
+                      value={form.cpf_cnpj}
+                      onChange={(e) => onCpfCnpjChange(e.target.value)}
+                      onBlur={() => {
+                        const digits = onlyDigits(form.cpf_cnpj);
+                        if (digits.length === 14) void preencherPorCnpj(digits);
+                      }}
+                      placeholder="00.000.000/0000-00"
+                      disabled={busy}
+                      autoFocus
+                      inputMode="numeric"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="cadastro-btn-edit"
+                      style={{ padding: "0 12px", fontSize: 11 }}
+                      onClick={() => void preencherPorCnpj(form.cpf_cnpj, true)}
+                      disabled={busy}
+                      title="Consultar CNPJ na Receita (publica.cnpj.ws)"
+                    >
+                      Consultar
+                    </button>
+                  </div>
+                </CadastroField>
+
                 <CadastroField label="Nome / Razão Social *" htmlFor="nome" span="full">
                   <input
                     id="nome"
@@ -613,7 +737,6 @@ export default function ClientesPage() {
                     onChange={(e) => updateField("nome", e.target.value)}
                     required
                     disabled={busy}
-                    autoFocus
                   />
                 </CadastroField>
                 <CadastroField label="Nome Fantasia" htmlFor="nome_fantasia" span={2}>
@@ -622,15 +745,6 @@ export default function ClientesPage() {
                     className="input-base input-compact"
                     value={form.nome_fantasia}
                     onChange={(e) => updateField("nome_fantasia", e.target.value)}
-                    disabled={busy}
-                  />
-                </CadastroField>
-                <CadastroField label="CPF / CNPJ" htmlFor="cpf_cnpj">
-                  <input
-                    id="cpf_cnpj"
-                    className="input-base input-compact"
-                    value={form.cpf_cnpj}
-                    onChange={(e) => updateField("cpf_cnpj", e.target.value)}
                     disabled={busy}
                   />
                 </CadastroField>
