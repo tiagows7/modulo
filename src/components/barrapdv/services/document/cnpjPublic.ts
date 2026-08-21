@@ -2,7 +2,10 @@ import { isValidCnpj, onlyDigits } from './documentValidator'
 
 export type CnpjLookupResult = {
   cnpj: string
+  /** Nome comercial ou razão social (compatível com o PDV). */
   name: string
+  razaoSocial: string
+  fantasia: string
   address: string
   number: string
   neighborhood: string
@@ -11,6 +14,8 @@ export type CnpjLookupResult = {
   cep: string
   stateRegistration: string
   phone: string
+  email: string
+  complemento: string
 }
 
 type IeEntry = { ie: string; uf: string; ativo: boolean }
@@ -116,6 +121,8 @@ function parseCnpjResponse(
   return {
     cnpj,
     name: nomeFantasia || razaoSocial,
+    razaoSocial,
+    fantasia: nomeFantasia,
     address,
     number: String(estabelecimento?.numero ?? '').trim(),
     neighborhood: String(estabelecimento?.bairro ?? '').trim(),
@@ -124,6 +131,8 @@ function parseCnpjResponse(
     cep,
     stateRegistration: ie,
     phone,
+    email: String(estabelecimento?.email ?? '').trim(),
+    complemento: String(estabelecimento?.complemento ?? '').trim(),
   }
 }
 

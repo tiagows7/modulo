@@ -1,10 +1,16 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Pencil, Trash2, Truck, X } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
 import { supabase } from "@/lib/supabase";
+import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
+import {
+  formatCpfCnpj,
+  isValidCnpj,
+  onlyDigits,
+} from "@/components/barrapdv/services/document/documentValidator";
 
 type Fornecedor = {
   id: string;
@@ -173,6 +179,9 @@ export default function FornecedoresPage() {
   const [deleting, setDeleting] = useState<Fornecedor | null>(null);
   const [form, setForm] = useState<FornecedorForm>(emptyForm);
   const [formError, setFormError] = useState("");
+  const [consultingCnpj, setConsultingCnpj] = useState(false);
+  const lastConsultedCnpj = useRef("");
+  const consultingRef = useRef(false);
 
   const loadData = useCallback(async () => {
     await pesquisar(async () => {
@@ -201,11 +210,66 @@ export default function FornecedoresPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const preencherPorCnpj = useCallback(async (rawCnpj: string, force = false) => {
+    const digits = onlyDigits(rawCnpj);
+    if (digits.length !== 14 || !isValidCnpj(digits)) {
+      setFormError("Informe um CNPJ válido com 14 dígitos para consultar.");
+      return;
+    }
+    if (consultingRef.current) return;
+    if (!force && lastConsultedCnpj.current === digits) return;
+
+    consultingRef.current = true;
+    setConsultingCnpj(true);
+    setFormError("");
+    try {
+      const data = await consultarCnpj(digits);
+      lastConsultedCnpj.current = digits;
+      setForm((prev) => ({
+        ...prev,
+        cnpj: formatCpfCnpj(data.cnpj),
+        razao_social: data.razaoSocial || data.name || prev.razao_social,
+        fantasia: data.fantasia || prev.fantasia,
+        cep: data.cep || prev.cep,
+        endereco: data.address || prev.endereco,
+        numero: data.number || prev.numero,
+        complemento: data.complemento || prev.complemento,
+        bairro: data.neighborhood || prev.bairro,
+        cidade: data.city || prev.cidade,
+        uf: data.uf || prev.uf,
+        telefone1: data.phone || prev.telefone1,
+        inscricao_estadual: data.stateRegistration || prev.inscricao_estadual,
+        email: data.email || prev.email,
+      }));
+    } catch (err) {
+      lastConsultedCnpj.current = "";
+      setFormError(
+        err instanceof Error ? err.message : "Não foi possível consultar o CNPJ.",
+      );
+    } finally {
+      consultingRef.current = false;
+      setConsultingCnpj(false);
+    }
+  }, []);
+
+  const onCnpjChange = (value: string) => {
+    const formatted = formatCpfCnpj(value);
+    const digits = onlyDigits(formatted);
+    if (digits !== lastConsultedCnpj.current) {
+      lastConsultedCnpj.current = "";
+    }
+    updateField("cnpj", formatted);
+    if (digits.length === 14 && isValidCnpj(digits)) {
+      void preencherPorCnpj(digits);
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
     setFormError("");
     setActionError("");
+    lastConsultedCnpj.current = "";
     setModalOpen(true);
   };
 
@@ -214,6 +278,7 @@ export default function FornecedoresPage() {
     setForm(toForm(item));
     setFormError("");
     setActionError("");
+    lastConsultedCnpj.current = onlyDigits(item.cnpj ?? "");
     setModalOpen(true);
   };
 
@@ -479,6 +544,50 @@ export default function FornecedoresPage() {
               }}
             >
               <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
+                <label htmlFor="cnpj" style={labelStyle}>CNPJ</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                  <input
+                    id="cnpj"
+                    className="input-base"
+                    value={form.cnpj}
+                    onChange={(e) => onCnpjChange(e.target.value)}
+                    onBlur={() => {
+                      const digits = onlyDigits(form.cnpj);
+                      if (digits.length === 14) void preencherPorCnpj(digits);
+                    }}
+                    placeholder="00.000.000/0000-00"
+                    disabled={busy || consultingCnpj}
+                    autoFocus
+                    inputMode="numeric"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void preencherPorCnpj(form.cnpj, true)}
+                    disabled={busy || consultingCnpj}
+                    title="Consultar CNPJ na Receita (publica.cnpj.ws)"
+                    style={{
+                      padding: "0 16px",
+                      borderRadius: 10,
+                      border: "1px solid var(--border-default)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--blue-light)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: busy || consultingCnpj ? "wait" : "pointer",
+                      opacity: busy || consultingCnpj ? 0.6 : 1,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {consultingCnpj ? "Consultando…" : "Consultar"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  Ao informar o CNPJ válido, os dados são buscados automaticamente.
+                </div>
+              </div>
+
+              <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
                 <label htmlFor="razao_social" style={labelStyle}>Razão Social *</label>
                 <input
                   id="razao_social"
@@ -486,22 +595,17 @@ export default function FornecedoresPage() {
                   value={form.razao_social}
                   onChange={(e) => updateField("razao_social", e.target.value)}
                   required
-                  disabled={busy}
-                  autoFocus
+                  disabled={busy || consultingCnpj}
                 />
               </div>
 
               <div style={fieldStyle}>
                 <label htmlFor="fantasia" style={labelStyle}>Fantasia</label>
-                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="cnpj" style={labelStyle}>CNPJ</label>
-                <input id="cnpj" className="input-base" value={form.cnpj} onChange={(e) => updateField("cnpj", e.target.value)} disabled={busy} />
+                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy || consultingCnpj} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cpf" style={labelStyle}>CPF</label>
-                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy} />
+                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy || consultingCnpj} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="inscricao_estadual" style={labelStyle}>Inscrição Estadual</label>
