@@ -3,9 +3,26 @@ CREATE TABLE IF NOT EXISTS public.clientes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
     nome VARCHAR(255) NOT NULL,
+    nome_fantasia VARCHAR(255),
     cpf_cnpj VARCHAR(20) UNIQUE,
-    cidade VARCHAR(100),
+    cep VARCHAR(12),
+    endereco VARCHAR(255),
+    numero VARCHAR(30),
+    complemento VARCHAR(100),
+    bairro VARCHAR(120),
+    cidade INTEGER,
+    uf VARCHAR(2),
     telefone VARCHAR(20),
+    fone1 VARCHAR(20),
+    fone2 VARCHAR(20),
+    fone3 VARCHAR(20),
+    inscricao_estadual VARCHAR(30),
+    identidade VARCHAR(30),
+    inscricao_municipal VARCHAR(30),
+    email VARCHAR(180),
+    email2 VARCHAR(180),
+    contato VARCHAR(120),
+    observacao TEXT,
     status VARCHAR(20) DEFAULT 'ativo',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -155,6 +172,24 @@ CREATE TABLE IF NOT EXISTS public.documentos_caixa (
 CREATE INDEX IF NOT EXISTS idx_documentos_caixa_descricao
   ON public.documentos_caixa (descricao);
 
+-- Criação da tabela de Veículos (por cliente)
+CREATE TABLE IF NOT EXISTS public.veiculos (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
+    placa VARCHAR(10) NOT NULL,
+    descricao VARCHAR(120),
+    frota VARCHAR(60),
+    ultima_km NUMERIC(12, 1),
+    obrigado_km BOOLEAN NOT NULL DEFAULT false,
+    obrigado_autorizacao BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (cliente_id, placa)
+);
+
+CREATE INDEX IF NOT EXISTS idx_veiculos_cliente ON public.veiculos (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_veiculos_placa ON public.veiculos (placa);
+
 -- Funções e Triggers para atualização do 'updated_at'
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -200,6 +235,10 @@ CREATE TRIGGER update_documentos_caixa_modtime
     BEFORE UPDATE ON public.documentos_caixa
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+CREATE TRIGGER update_veiculos_modtime
+    BEFORE UPDATE ON public.veiculos
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 -- Políticas de Segurança (Row Level Security - Opcional, caso você queira proteger os dados)
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fornecedores ENABLE ROW LEVEL SECURITY;
@@ -210,6 +249,7 @@ ALTER TABLE public.bicos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.uf ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cidades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documentos_caixa ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.veiculos ENABLE ROW LEVEL SECURITY;
 
 -- Exemplo: Permitir leitura e escrita para todos os usuários logados (autenticados)
 CREATE POLICY "Permitir acesso autenticado - clientes" ON public.clientes FOR ALL USING (auth.role() = 'authenticated');
@@ -224,3 +264,5 @@ CREATE POLICY "Permitir acesso autenticado - cidades" ON public.cidades FOR ALL 
 CREATE POLICY "Permitir leitura anon - cidades" ON public.cidades FOR SELECT USING (true);
 CREATE POLICY "Permitir acesso autenticado - documentos_caixa" ON public.documentos_caixa FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Permitir leitura anon - documentos_caixa" ON public.documentos_caixa FOR SELECT USING (true);
+CREATE POLICY "Permitir acesso autenticado - veiculos" ON public.veiculos FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir leitura anon - veiculos" ON public.veiculos FOR SELECT USING (true);
