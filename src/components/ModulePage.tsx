@@ -19,6 +19,7 @@ interface ModulePageProps {
   rows: Record<string, ReactNode>[];
   addLabel?: string;
   backUrl?: string;
+  onAdd?: () => void;
 }
 
 const fadeUp = {
@@ -42,6 +43,7 @@ export function ModulePage({
   rows,
   addLabel = "Novo",
   backUrl,
+  onAdd,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
 
@@ -55,7 +57,7 @@ export function ModulePage({
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}
       >
@@ -90,7 +92,7 @@ export function ModulePage({
             {icon}
           </div>
           <div>
-            <h1 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 24, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1 }}>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1 }}>
               {title}
             </h1>
             <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{description}</p>
@@ -114,11 +116,13 @@ export function ModulePage({
             <Download size={14} /> Exportar
           </motion.button>
           <motion.button
+            type="button"
             id={`btn-add-${title.toLowerCase().replace(/\s/g, "-")}`}
             whileHover={{ scale: 1.03, y: -1 }}
             whileTap={{ scale: 0.97 }}
             className="btn-primary"
             style={{ display: "flex", alignItems: "center", gap: 6 }}
+            onClick={onAdd}
           >
             <Plus size={15} /> {addLabel}
           </motion.button>
