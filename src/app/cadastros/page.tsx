@@ -8,7 +8,8 @@ import {
   Package, 
   Layers, 
   Database, 
-  Fuel 
+  Fuel,
+  WalletCards,
 } from "lucide-react";
 
 const submenus = [
@@ -16,6 +17,7 @@ const submenus = [
   { href: "/cadastros/fornecedores", label: "Fornecedores", icon: Truck, description: "Gestão de fornecedores" },
   { href: "/cadastros/produtos", label: "Produtos", icon: Package, description: "Cadastro de produtos e itens" },
   { href: "/cadastros/grupo-produtos", label: "Grupo de Produtos", icon: Layers, description: "Categorias e grupos" },
+  { href: "/cadastros/documentos-caixa", label: "Documentos de Caixa", icon: WalletCards, description: "Dinheiro, cartão, PIX e outros" },
   { href: "/cadastros/tanques", label: "Tanques", icon: Database, description: "Gestão de tanques de combustível" },
   { href: "/cadastros/bicos", label: "Bicos", icon: Fuel, description: "Configuração de bicos de bombas" },
 ];

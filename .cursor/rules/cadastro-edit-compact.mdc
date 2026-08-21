@@ -1,30 +1,48 @@
 ---
-description: Padrão compacto de edits/modais em cadastros administrativos
-globs: src/app/cadastros/**/*.tsx,src/components/CadastroUi.tsx
+description: Padrão de tipografia e UI dos edits/modais em cadastros
+globs: src/app/cadastros/**/*.tsx,src/components/CadastroUi.tsx,src/app/globals.css
 alwaysApply: false
 ---
 
-# Cadastros — padrão de edit compacto
+# Cadastros — padrão oficial de edit
 
-Ao criar ou alterar telas de cadastro (`src/app/cadastros/**`), use o padrão visual compacto já adotado em fornecedores/grupo de produtos.
+Este é o **tamanho padrão** para novos e existentes edits de cadastro. Não inventar tipografia maior/menor.
 
-## Obrigatório
+## Componentes (obrigatório)
 
-- Use os componentes de `@/components/CadastroUi`:
-  - `CadastroRowActions` — botões Editar/Excluir na grade
-  - `CadastroModal` — modal de novo/editar/excluir
-  - `CadastroField` / `CadastroFormGrid` — campos e grid
-  - `CadastroFormError` / `CadastroFormActions` — erro e rodapé
-- Inputs e selects: `className="input-base input-compact"`
-- Status de banco: `useDbStatus` (`pesquisar` / `gravar` / `consultar`) — não inventar overlays paralelos
-- Tipografia compacta via CSS (`.cadastro-*`, `.input-compact`, `.btn-compact`); não voltar para font 13–14px nos edits
+Use `@/components/CadastroUi`:
+
+- `CadastroRowActions` — Editar/Excluir na grade
+- `CadastroModal` — modal novo/editar/excluir
+- `CadastroField` / `CadastroFormGrid`
+- `CadastroFormError` / `CadastroFormActions`
+
+Inputs/selects: `className="input-base input-compact"`  
+Status de banco: `useDbStatus` (`pesquisar` / `gravar` / `consultar`)
+
+## Tipografia padrão (não alterar sem pedido explícito)
+
+Definida em `src/app/globals.css` (classes `.cadastro-*`, `.input-compact`, `.btn-compact`):
+
+| Elemento | Tamanho |
+|----------|---------|
+| Campos (input/select) | **12px** |
+| Labels | **10px** |
+| Título do modal | **15px** |
+| Subtítulo (código etc.) | **11px** |
+| Botões Editar/Excluir (grade) | **11px** |
+| Cancelar / Salvar / Excluir (modal) | **12px** |
+| Erros / textos de confirmação | **12–13px** |
+
+Ajuste de tamanho deve ser feito **só no CSS global**, para refletir em todos os cadastros.
 
 ## Evitar
 
-- Botões Editar/Excluir grandes com `fontSize: 12` e padding `6px 10px`
-- Modais com padding 24px / título 18px / inputs 14px
-- Estilos inline duplicando o padrão (preferir as classes/componentes)
+- Estilos inline de `fontSize`/`padding` duplicando o padrão
+- Voltar ao `input-base` sem `input-compact` nos forms de cadastro
+- Modais “grandes” (título 18px, input 14px, padding 24px)
+- Overlays de loading próprios — usar `DbStatusProvider`
 
 ## Consultas externas (ex.: CNPJ)
 
-Envolver em `consultar(...)` do `DbStatusProvider` para exibir o overlay “Consultando”.
+Envolver em `consultar(...)` para o overlay “Consultando”.

@@ -142,6 +142,19 @@ CREATE TABLE IF NOT EXISTS public.cidades (
 CREATE INDEX IF NOT EXISTS idx_cidades_uf ON public.cidades (uf);
 CREATE INDEX IF NOT EXISTS idx_cidades_descricao ON public.cidades (descricao);
 
+-- Criação da tabela de Documentos de Caixa
+CREATE TABLE IF NOT EXISTS public.documentos_caixa (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    descricao VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'ativo',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_documentos_caixa_descricao
+  ON public.documentos_caixa (descricao);
+
 -- Funções e Triggers para atualização do 'updated_at'
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -183,6 +196,10 @@ CREATE TRIGGER update_cidades_modtime
     BEFORE UPDATE ON public.cidades
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+CREATE TRIGGER update_documentos_caixa_modtime
+    BEFORE UPDATE ON public.documentos_caixa
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 -- Políticas de Segurança (Row Level Security - Opcional, caso você queira proteger os dados)
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fornecedores ENABLE ROW LEVEL SECURITY;
@@ -192,6 +209,7 @@ ALTER TABLE public.tanques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bicos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.uf ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cidades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documentos_caixa ENABLE ROW LEVEL SECURITY;
 
 -- Exemplo: Permitir leitura e escrita para todos os usuários logados (autenticados)
 CREATE POLICY "Permitir acesso autenticado - clientes" ON public.clientes FOR ALL USING (auth.role() = 'authenticated');
@@ -204,3 +222,5 @@ CREATE POLICY "Permitir acesso autenticado - uf" ON public.uf FOR ALL USING (aut
 CREATE POLICY "Permitir leitura anon - uf" ON public.uf FOR SELECT USING (true);
 CREATE POLICY "Permitir acesso autenticado - cidades" ON public.cidades FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Permitir leitura anon - cidades" ON public.cidades FOR SELECT USING (true);
+CREATE POLICY "Permitir acesso autenticado - documentos_caixa" ON public.documentos_caixa FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir leitura anon - documentos_caixa" ON public.documentos_caixa FOR SELECT USING (true);
