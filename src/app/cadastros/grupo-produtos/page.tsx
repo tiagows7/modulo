@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Layers, X } from "lucide-react";
+import { Layers, Pencil, X } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { supabase } from "@/lib/supabase";
 
@@ -12,23 +12,14 @@ type GrupoProduto = {
   status: string | null;
 };
 
+type DbStatus = "idle" | "pesquisando" | "gravando";
+
 const columns = [
   { key: "codigo", label: "Código" },
   { key: "descricao", label: "Descrição do Grupo" },
   { key: "status", label: "Status", align: "center" as const },
+  { key: "acoes", label: "Ações", align: "center" as const },
 ];
-
-function mapRows(data: GrupoProduto[]) {
-  return data.map((item) => ({
-    codigo: item.codigo,
-    descricao: item.descricao,
-    status: (
-      <span className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}>
-        {item.status || "—"}
-      </span>
-    ),
-  }));
-}
 
 async function nextCodigo() {
   const { data } = await supabase
@@ -46,16 +37,18 @@ async function nextCodigo() {
 }
 
 export default function GrupoProdutosPage() {
-  const [rows, setRows] = useState<ReturnType<typeof mapRows>>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<GrupoProduto[]>([]);
+  const [dbStatus, setDbStatus] = useState<DbStatus>("pesquisando");
   const [loadError, setLoadError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<GrupoProduto | null>(null);
   const [descricao, setDescricao] = useState("");
-  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
+  const busy = dbStatus !== "idle";
+
   const loadData = useCallback(async () => {
-    setLoading(true);
+    setDbStatus("pesquisando");
     setLoadError("");
     const { data, error } = await supabase
       .from("grupo_produtos")
@@ -64,26 +57,35 @@ export default function GrupoProdutosPage() {
 
     if (error) {
       setLoadError(error.message);
-      setRows([]);
+      setItems([]);
     } else {
-      setRows(mapRows((data ?? []) as GrupoProduto[]));
+      setItems((data ?? []) as GrupoProduto[]);
     }
-    setLoading(false);
+    setDbStatus("idle");
   }, []);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  const openModal = () => {
+  const openCreate = () => {
+    setEditing(null);
     setDescricao("");
     setFormError("");
     setModalOpen(true);
   };
 
+  const openEdit = (item: GrupoProduto) => {
+    setEditing(item);
+    setDescricao(item.descricao);
+    setFormError("");
+    setModalOpen(true);
+  };
+
   const closeModal = () => {
-    if (saving) return;
+    if (dbStatus === "gravando") return;
     setModalOpen(false);
+    setEditing(null);
     setFormError("");
   };
 
@@ -95,35 +97,125 @@ export default function GrupoProdutosPage() {
       return;
     }
 
-    setSaving(true);
+    setDbStatus("gravando");
     setFormError("");
 
     try {
-      const codigo = await nextCodigo();
-      const { error } = await supabase.from("grupo_produtos").insert({
-        codigo,
-        descricao: desc,
-        status: "ativo",
-      });
+      if (editing) {
+        const { error } = await supabase
+          .from("grupo_produtos")
+          .update({ descricao: desc })
+          .eq("id", editing.id);
 
-      if (error) {
-        setFormError(error.message);
-        setSaving(false);
-        return;
+        if (error) {
+          setFormError(error.message);
+          setDbStatus("idle");
+          return;
+        }
+      } else {
+        const codigo = await nextCodigo();
+        const { error } = await supabase.from("grupo_produtos").insert({
+          codigo,
+          descricao: desc,
+          status: "ativo",
+        });
+
+        if (error) {
+          setFormError(error.message);
+          setDbStatus("idle");
+          return;
+        }
       }
 
       setModalOpen(false);
+      setEditing(null);
       setDescricao("");
       await loadData();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Falha ao salvar.");
-    } finally {
-      setSaving(false);
+      setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
+      setDbStatus("idle");
     }
   };
 
+  const rows = items.map((item) => ({
+    codigo: item.codigo,
+    descricao: item.descricao,
+    status: (
+      <span className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}>
+        {item.status || "—"}
+      </span>
+    ),
+    acoes: (
+      <button
+        type="button"
+        onClick={() => openEdit(item)}
+        disabled={busy}
+        title="Editar"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 10px",
+          borderRadius: 8,
+          border: "1px solid var(--border-default)",
+          background: "var(--bg-elevated)",
+          color: "var(--blue-light)",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: busy ? "wait" : "pointer",
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        <Pencil size={13} />
+        Editar
+      </button>
+    ),
+  }));
+
+  const statusLabel =
+    dbStatus === "pesquisando"
+      ? "Pesquisando no banco de dados…"
+      : dbStatus === "gravando"
+        ? "Gravando no banco de dados…"
+        : "";
+
   return (
     <>
+      {statusLabel ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(26,111,216,0.12)",
+            border: "1px solid rgba(74,159,232,0.35)",
+            color: "var(--blue-light)",
+            fontSize: 13,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              border: "2px solid rgba(74,159,232,0.35)",
+              borderTopColor: "var(--blue-light)",
+              animation: "spin 0.8s linear infinite",
+              display: "inline-block",
+            }}
+          />
+          {statusLabel}
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : null}
+
       {loadError ? (
         <div
           style={{
@@ -142,17 +234,13 @@ export default function GrupoProdutosPage() {
 
       <ModulePage
         title="Grupo de Produtos"
-        description={
-          loading
-            ? "Carregando grupos..."
-            : "Gerenciamento de categorias e grupos"
-        }
+        description="Gerenciamento de categorias e grupos"
         icon={<Layers size={22} />}
         columns={columns}
         rows={rows}
         addLabel="Novo Grupo"
         backUrl="/cadastros"
-        onAdd={openModal}
+        onAdd={busy ? undefined : openCreate}
       />
 
       {modalOpen ? (
@@ -197,12 +285,13 @@ export default function GrupoProdutosPage() {
                   color: "var(--text-primary)",
                 }}
               >
-                Novo Grupo de Produtos
+                {editing ? "Editar Grupo de Produtos" : "Novo Grupo de Produtos"}
               </h2>
               <button
                 type="button"
                 onClick={closeModal}
                 aria-label="Fechar"
+                disabled={dbStatus === "gravando"}
                 style={{
                   background: "transparent",
                   border: "none",
@@ -215,6 +304,12 @@ export default function GrupoProdutosPage() {
                 <X size={18} />
               </button>
             </div>
+
+            {editing ? (
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
+              </div>
+            ) : null}
 
             <div>
               <label
@@ -241,8 +336,25 @@ export default function GrupoProdutosPage() {
                 autoFocus
                 maxLength={100}
                 required
+                disabled={dbStatus === "gravando"}
               />
             </div>
+
+            {dbStatus === "gravando" ? (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(26,111,216,0.12)",
+                  border: "1px solid rgba(74,159,232,0.35)",
+                  color: "var(--blue-light)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Gravando no banco de dados…
+              </div>
+            ) : null}
 
             {formError ? (
               <div
@@ -263,7 +375,7 @@ export default function GrupoProdutosPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                disabled={saving}
+                disabled={dbStatus === "gravando"}
                 style={{
                   padding: "10px 16px",
                   borderRadius: 8,
@@ -277,8 +389,8 @@ export default function GrupoProdutosPage() {
               >
                 Cancelar
               </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? "Salvando..." : "Salvar"}
+              <button type="submit" className="btn-primary" disabled={dbStatus === "gravando"}>
+                {dbStatus === "gravando" ? "Gravando..." : "Salvar"}
               </button>
             </div>
           </form>
