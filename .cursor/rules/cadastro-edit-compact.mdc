@@ -1,0 +1,30 @@
+---
+description: Padrão compacto de edits/modais em cadastros administrativos
+globs: src/app/cadastros/**/*.tsx,src/components/CadastroUi.tsx
+alwaysApply: false
+---
+
+# Cadastros — padrão de edit compacto
+
+Ao criar ou alterar telas de cadastro (`src/app/cadastros/**`), use o padrão visual compacto já adotado em fornecedores/grupo de produtos.
+
+## Obrigatório
+
+- Use os componentes de `@/components/CadastroUi`:
+  - `CadastroRowActions` — botões Editar/Excluir na grade
+  - `CadastroModal` — modal de novo/editar/excluir
+  - `CadastroField` / `CadastroFormGrid` — campos e grid
+  - `CadastroFormError` / `CadastroFormActions` — erro e rodapé
+- Inputs e selects: `className="input-base input-compact"`
+- Status de banco: `useDbStatus` (`pesquisar` / `gravar` / `consultar`) — não inventar overlays paralelos
+- Tipografia compacta via CSS (`.cadastro-*`, `.input-compact`, `.btn-compact`); não voltar para font 13–14px nos edits
+
+## Evitar
+
+- Botões Editar/Excluir grandes com `fontSize: 12` e padding `6px 10px`
+- Modais com padding 24px / título 18px / inputs 14px
+- Estilos inline duplicando o padrão (preferir as classes/componentes)
+
+## Consultas externas (ex.: CNPJ)
+
+Envolver em `consultar(...)` do `DbStatusProvider` para exibir o overlay “Consultando”.

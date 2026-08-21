@@ -10,7 +10,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-export type DbStatus = "idle" | "pesquisando" | "gravando";
+export type DbStatus = "idle" | "pesquisando" | "gravando" | "consultando";
 
 type DbStatusContextValue = {
   status: DbStatus;
@@ -20,6 +20,8 @@ type DbStatusContextValue = {
   pesquisar: <T>(fn: () => Promise<T>) => Promise<T>;
   /** Exibe "Gravando…" enquanto executa a função. */
   gravar: <T>(fn: () => Promise<T>) => Promise<T>;
+  /** Exibe "Consultando…" enquanto executa a função. */
+  consultar: <T>(fn: () => Promise<T>) => Promise<T>;
 };
 
 const DbStatusContext = createContext<DbStatusContextValue | null>(null);
@@ -35,6 +37,12 @@ function statusCopy(status: DbStatus) {
     return {
       title: "Gravando",
       message: "Gravando no banco de dados…",
+    };
+  }
+  if (status === "consultando") {
+    return {
+      title: "Consultando",
+      message: "Consultando CNPJ…",
     };
   }
   return null;
@@ -166,6 +174,11 @@ export function DbStatusProvider({ children }: { children: ReactNode }) {
     [runWithStatus],
   );
 
+  const consultar = useCallback(
+    <T,>(fn: () => Promise<T>) => runWithStatus("consultando", fn),
+    [runWithStatus],
+  );
+
   const value = useMemo<DbStatusContextValue>(
     () => ({
       status,
@@ -173,8 +186,9 @@ export function DbStatusProvider({ children }: { children: ReactNode }) {
       setStatus,
       pesquisar,
       gravar,
+      consultar,
     }),
-    [status, pesquisar, gravar],
+    [status, pesquisar, gravar, consultar],
   );
 
   return (

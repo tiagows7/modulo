@@ -1,9 +1,16 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Layers, Pencil, Trash2, X } from "lucide-react";
+import { Layers } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
+import {
+  CadastroField,
+  CadastroFormActions,
+  CadastroFormError,
+  CadastroModal,
+  CadastroRowActions,
+} from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 
 type GrupoProduto = {
@@ -109,9 +116,7 @@ export default function GrupoProdutosPage() {
       await loadData();
     } catch (err) {
       setActionError(
-        err instanceof Error
-          ? err.message
-          : "Falha ao excluir o grupo.",
+        err instanceof Error ? err.message : "Falha ao excluir o grupo.",
       );
     }
   };
@@ -170,89 +175,22 @@ export default function GrupoProdutosPage() {
       </span>
     ),
     acoes: (
-      <div style={{ display: "inline-flex", gap: 8, justifyContent: "center" }}>
-        <button
-          type="button"
-          onClick={() => openEdit(item)}
-          disabled={busy}
-          title="Editar"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 10px",
-            borderRadius: 8,
-            border: "1px solid var(--border-default)",
-            background: "var(--bg-elevated)",
-            color: "var(--blue-light)",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <Pencil size={13} />
-          Editar
-        </button>
-        <button
-          type="button"
-          onClick={() => openDelete(item)}
-          disabled={busy}
-          title="Excluir"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 10px",
-            borderRadius: 8,
-            border: "1px solid rgba(239,68,68,0.35)",
-            background: "rgba(239,68,68,0.08)",
-            color: "#EF4444",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <Trash2 size={13} />
-          Excluir
-        </button>
-      </div>
+      <CadastroRowActions
+        disabled={busy}
+        onEdit={() => openEdit(item)}
+        onDelete={() => openDelete(item)}
+      />
     ),
   }));
 
   return (
     <>
       {loadError ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            color: "#EF4444",
-            fontSize: 13,
-          }}
-        >
-          Erro ao carregar grupo_produtos: {loadError}
-        </div>
+        <div className="cadastro-alert">Erro ao carregar grupo_produtos: {loadError}</div>
       ) : null}
 
       {actionError && !deleting ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            color: "#EF4444",
-            fontSize: 13,
-          }}
-        >
-          {actionError}
-        </div>
+        <div className="cadastro-alert">{actionError}</div>
       ) : null}
 
       <ModulePage
@@ -267,246 +205,71 @@ export default function GrupoProdutosPage() {
       />
 
       {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="grupo-produto-title"
-          onClick={closeModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 80,
-            background: "rgba(6, 13, 26, 0.72)",
-            display: "grid",
-            placeItems: "center",
-            padding: 20,
-          }}
-        >
-          <form
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={handleSubmit}
-            style={{
-              width: "min(440px, 100%)",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 16,
-              padding: 24,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h2
-                id="grupo-produto-title"
-                style={{
-                  margin: 0,
-                  fontFamily: "var(--font-display)",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "var(--text-primary)",
-                }}
-              >
-                {editing ? "Editar Grupo de Produtos" : "Novo Grupo de Produtos"}
-              </h2>
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="Fechar"
-                disabled={busy}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  display: "flex",
-                  padding: 4,
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {editing ? (
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+        <CadastroModal
+          title={editing ? "Editar Grupo de Produtos" : "Novo Grupo de Produtos"}
+          titleId="grupo-produto-title"
+          subtitle={
+            editing ? (
+              <>
                 Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
-              </div>
-            ) : null}
-
-            <div>
-              <label
-                htmlFor="grupo-descricao"
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--text-secondary)",
-                  marginBottom: 6,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                Descrição
-              </label>
-              <input
-                id="grupo-descricao"
-                name="descricao"
-                className="input-base"
-                placeholder="Ex.: Combustíveis, Conveniência..."
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                autoFocus
-                maxLength={100}
-                required
-                disabled={busy}
-              />
-            </div>
-
-            {formError ? (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  color: "#EF4444",
-                  fontSize: 13,
-                }}
-              >
-                {formError}
-              </div>
-            ) : null}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
-              <button
-                type="button"
-                onClick={closeModal}
-                disabled={busy}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
-                }}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary" disabled={busy}>
-                {busy ? "Aguarde..." : "Salvar"}
-              </button>
-            </div>
-          </form>
-        </div>
+              </>
+            ) : undefined
+          }
+          onClose={closeModal}
+          disabled={busy}
+          width={420}
+          asForm
+          onSubmit={handleSubmit}
+          footer={
+            <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
+          }
+        >
+          <CadastroField label="Descrição" htmlFor="grupo-descricao">
+            <input
+              id="grupo-descricao"
+              name="descricao"
+              className="input-base input-compact"
+              placeholder="Ex.: Combustíveis, Conveniência..."
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              autoFocus
+              maxLength={100}
+              required
+              disabled={busy}
+            />
+          </CadastroField>
+          <CadastroFormError message={formError} />
+        </CadastroModal>
       ) : null}
 
       {deleting ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="grupo-produto-delete-title"
-          onClick={closeDelete}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 80,
-            background: "rgba(6, 13, 26, 0.72)",
-            display: "grid",
-            placeItems: "center",
-            padding: 20,
-          }}
+        <CadastroModal
+          title="Excluir grupo"
+          titleId="grupo-produto-delete-title"
+          onClose={closeDelete}
+          disabled={busy}
+          width={400}
+          footer={
+            <CadastroFormActions
+              onCancel={closeDelete}
+              disabled={busy}
+              busy={busy}
+              danger
+              submitLabel="Excluir"
+              busyLabel="Excluindo..."
+              onConfirm={() => void handleDelete()}
+            />
+          }
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(420px, 100%)",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 16,
-              padding: 24,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <h2
-              id="grupo-produto-delete-title"
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-display)",
-                fontSize: 18,
-                fontWeight: 700,
-                color: "var(--text-primary)",
-              }}
-            >
-              Excluir grupo
-            </h2>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              Confirma a exclusão de{" "}
-              <strong style={{ color: "var(--text-primary)" }}>
-                {deleting.codigo} — {deleting.descricao}
-              </strong>
-              ?
-            </p>
-
-            {actionError ? (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  color: "#EF4444",
-                  fontSize: 13,
-                }}
-              >
-                {actionError}
-              </div>
-            ) : null}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button
-                type="button"
-                onClick={closeDelete}
-                disabled={busy}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={busy}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#EF4444",
-                  color: "white",
-                  cursor: busy ? "wait" : "pointer",
-                  fontWeight: 700,
-                  fontSize: 13,
-                }}
-              >
-                {busy ? "Excluindo..." : "Excluir"}
-              </button>
-            </div>
-          </div>
-        </div>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+            Confirma a exclusão de{" "}
+            <strong style={{ color: "var(--text-primary)" }}>
+              {deleting.codigo} — {deleting.descricao}
+            </strong>
+            ?
+          </p>
+          <CadastroFormError message={actionError} />
+        </CadastroModal>
       ) : null}
     </>
   );

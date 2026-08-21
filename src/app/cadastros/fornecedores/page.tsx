@@ -1,9 +1,17 @@
-"use client";
+﻿"use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { Pencil, Trash2, Truck, X } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Truck } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
+import {
+  CadastroField,
+  CadastroFormActions,
+  CadastroFormError,
+  CadastroFormGrid,
+  CadastroModal,
+  CadastroRowActions,
+} from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
 import {
@@ -94,26 +102,6 @@ const columns = [
   { key: "status", label: "Status", align: "center" as const },
   { key: "acoes", label: "Ações", align: "center" as const },
 ];
-
-const fieldStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const labelStyle: CSSProperties = {
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: "0.45px",
-  textTransform: "uppercase",
-  color: "var(--text-secondary)",
-};
-
-const compactInputStyle: CSSProperties = {
-  fontSize: 11,
-  padding: "5px 8px",
-  borderRadius: 6,
-};
 
 async function nextCodigo() {
   const { data } = await supabase
@@ -206,7 +194,7 @@ async function resolverCidadeIbge(nome: string, uf: string): Promise<string> {
 }
 
 export default function FornecedoresPage() {
-  const { busy, pesquisar, gravar } = useDbStatus();
+  const { busy, pesquisar, gravar, consultar } = useDbStatus();
   const [items, setItems] = useState<Fornecedor[]>([]);
   const [cidadeNomes, setCidadeNomes] = useState<Record<string, string>>({});
   const [ufs, setUfs] = useState<UfRow[]>([]);
@@ -218,7 +206,6 @@ export default function FornecedoresPage() {
   const [deleting, setDeleting] = useState<Fornecedor | null>(null);
   const [form, setForm] = useState<FornecedorForm>(emptyForm);
   const [formError, setFormError] = useState("");
-  const [consultingCnpj, setConsultingCnpj] = useState(false);
   const lastConsultedCnpj = useRef("");
   const consultingRef = useRef(false);
 
@@ -321,29 +308,30 @@ export default function FornecedoresPage() {
     if (!force && lastConsultedCnpj.current === digits) return;
 
     consultingRef.current = true;
-    setConsultingCnpj(true);
     setFormError("");
     try {
-      const data = await consultarCnpj(digits);
-      lastConsultedCnpj.current = digits;
-      const uf = (data.uf || "").toUpperCase();
-      const cidadeCodigo = await resolverCidadeIbge(data.city, uf);
-      setForm((prev) => ({
-        ...prev,
-        cnpj: formatCpfCnpj(data.cnpj),
-        razao_social: data.razaoSocial || data.name || prev.razao_social,
-        fantasia: data.fantasia || prev.fantasia,
-        cep: data.cep || prev.cep,
-        endereco: data.address || prev.endereco,
-        numero: data.number || prev.numero,
-        complemento: data.complemento || prev.complemento,
-        bairro: data.neighborhood || prev.bairro,
-        uf: uf || prev.uf,
-        cidade: cidadeCodigo || prev.cidade,
-        telefone1: data.phone || prev.telefone1,
-        inscricao_estadual: data.stateRegistration || prev.inscricao_estadual,
-        email: data.email || prev.email,
-      }));
+      await consultar(async () => {
+        const data = await consultarCnpj(digits);
+        lastConsultedCnpj.current = digits;
+        const uf = (data.uf || "").toUpperCase();
+        const cidadeCodigo = await resolverCidadeIbge(data.city, uf);
+        setForm((prev) => ({
+          ...prev,
+          cnpj: formatCpfCnpj(data.cnpj),
+          razao_social: data.razaoSocial || data.name || prev.razao_social,
+          fantasia: data.fantasia || prev.fantasia,
+          cep: data.cep || prev.cep,
+          endereco: data.address || prev.endereco,
+          numero: data.number || prev.numero,
+          complemento: data.complemento || prev.complemento,
+          bairro: data.neighborhood || prev.bairro,
+          uf: uf || prev.uf,
+          cidade: cidadeCodigo || prev.cidade,
+          telefone1: data.phone || prev.telefone1,
+          inscricao_estadual: data.stateRegistration || prev.inscricao_estadual,
+          email: data.email || prev.email,
+        }));
+      });
     } catch (err) {
       lastConsultedCnpj.current = "";
       setFormError(
@@ -351,9 +339,8 @@ export default function FornecedoresPage() {
       );
     } finally {
       consultingRef.current = false;
-      setConsultingCnpj(false);
     }
-  }, []);
+  }, [consultar]);
 
   const onCnpjChange = (value: string) => {
     const formatted = formatCpfCnpj(value);
@@ -472,89 +459,22 @@ export default function FornecedoresPage() {
       </span>
     ),
     acoes: (
-      <div style={{ display: "inline-flex", gap: 8, justifyContent: "center" }}>
-        <button
-          type="button"
-          onClick={() => openEdit(item)}
-          disabled={busy}
-          title="Editar"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "3px 7px",
-            borderRadius: 6,
-            border: "1px solid var(--border-default)",
-            background: "var(--bg-elevated)",
-            color: "var(--blue-light)",
-            fontSize: 10,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <Pencil size={11} />
-          Editar
-        </button>
-        <button
-          type="button"
-          onClick={() => openDelete(item)}
-          disabled={busy}
-          title="Excluir"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "3px 7px",
-            borderRadius: 6,
-            border: "1px solid rgba(239,68,68,0.35)",
-            background: "rgba(239,68,68,0.08)",
-            color: "#EF4444",
-            fontSize: 10,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <Trash2 size={11} />
-          Excluir
-        </button>
-      </div>
+      <CadastroRowActions
+        disabled={busy}
+        onEdit={() => openEdit(item)}
+        onDelete={() => openDelete(item)}
+      />
     ),
   }));
 
   return (
     <>
       {loadError ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            color: "#EF4444",
-            fontSize: 13,
-          }}
-        >
-          Erro ao carregar fornecedores: {loadError}
-        </div>
+        <div className="cadastro-alert">Erro ao carregar fornecedores: {loadError}</div>
       ) : null}
 
       {actionError && !deleting ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            color: "#EF4444",
-            fontSize: 13,
-          }}
-        >
-          {actionError}
-        </div>
+        <div className="cadastro-alert">{actionError}</div>
       ) : null}
 
       <ModulePage
@@ -569,380 +489,177 @@ export default function FornecedoresPage() {
       />
 
       {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="fornecedor-title"
-          onClick={closeModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 80,
-            background: "rgba(6, 13, 26, 0.72)",
-            display: "grid",
-            placeItems: "center",
-            padding: 12,
-            overflowY: "auto",
-          }}
+        <CadastroModal
+          title={editing ? "Editar Fornecedor" : "Novo Fornecedor"}
+          titleId="fornecedor-title"
+          subtitle={
+            editing ? (
+              <>
+                Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
+              </>
+            ) : undefined
+          }
+          onClose={closeModal}
+          disabled={busy}
+          width={680}
+          asForm
+          onSubmit={handleSubmit}
+          footer={
+            <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
+          }
         >
-          <form
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={handleSubmit}
-            style={{
-              width: "min(680px, 100%)",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 12,
-              padding: 16,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              margin: "12px 0",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <h2
-                  id="fornecedor-title"
-                  style={{
-                    margin: 0,
-                    fontFamily: "var(--font-display)",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {editing ? "Editar Fornecedor" : "Novo Fornecedor"}
-                </h2>
-                {editing ? (
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                    Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="Fechar"
-                disabled={busy}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  display: "flex",
-                  padding: 2,
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                gap: 10,
-              }}
-            >
-              <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
-                <label htmlFor="cnpj" style={labelStyle}>CNPJ</label>
-                <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
-                  <input
-                    id="cnpj"
-                    className="input-base"
-                    value={form.cnpj}
-                    onChange={(e) => onCnpjChange(e.target.value)}
-                    onBlur={() => {
-                      const digits = onlyDigits(form.cnpj);
-                      if (digits.length === 14) void preencherPorCnpj(digits);
-                    }}
-                    placeholder="00.000.000/0000-00"
-                    disabled={busy || consultingCnpj}
-                    autoFocus
-                    inputMode="numeric"
-                    style={{ ...compactInputStyle, flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void preencherPorCnpj(form.cnpj, true)}
-                    disabled={busy || consultingCnpj}
-                    title="Consultar CNPJ na Receita (publica.cnpj.ws)"
-                    style={{
-                      padding: "0 12px",
-                      borderRadius: 7,
-                      border: "1px solid var(--border-default)",
-                      background: "var(--bg-elevated)",
-                      color: "var(--blue-light)",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: busy || consultingCnpj ? "wait" : "pointer",
-                      opacity: busy || consultingCnpj ? 0.6 : 1,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {consultingCnpj ? "…" : "Consultar"}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
-                <label htmlFor="razao_social" style={labelStyle}>Razão Social *</label>
+          <CadastroFormGrid>
+            <CadastroField label="CNPJ" htmlFor="cnpj" span="full">
+              <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
                 <input
-                  id="razao_social"
-                  className="input-base"
-                  value={form.razao_social}
-                  onChange={(e) => updateField("razao_social", e.target.value)}
-                  required
-                  disabled={busy || consultingCnpj}
-                  style={compactInputStyle}
+                  id="cnpj"
+                  className="input-base input-compact"
+                  value={form.cnpj}
+                  onChange={(e) => onCnpjChange(e.target.value)}
+                  onBlur={() => {
+                    const digits = onlyDigits(form.cnpj);
+                    if (digits.length === 14) void preencherPorCnpj(digits);
+                  }}
+                  placeholder="00.000.000/0000-00"
+                  disabled={busy}
+                  autoFocus
+                  inputMode="numeric"
+                  style={{ flex: 1 }}
                 />
-              </div>
-
-              <div style={fieldStyle}>
-                <label htmlFor="fantasia" style={labelStyle}>Fantasia</label>
-                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy || consultingCnpj} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="cpf" style={labelStyle}>CPF</label>
-                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy || consultingCnpj} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="inscricao_estadual" style={labelStyle}>Inscrição Estadual</label>
-                <input id="inscricao_estadual" className="input-base" value={form.inscricao_estadual} onChange={(e) => updateField("inscricao_estadual", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="inscricao_municipal" style={labelStyle}>Inscrição Municipal</label>
-                <input id="inscricao_municipal" className="input-base" value={form.inscricao_municipal} onChange={(e) => updateField("inscricao_municipal", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-
-              <div style={fieldStyle}>
-                <label htmlFor="cep" style={labelStyle}>CEP</label>
-                <input id="cep" className="input-base" value={form.cep} onChange={(e) => updateField("cep", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
-                <label htmlFor="endereco" style={labelStyle}>Endereço</label>
-                <input id="endereco" className="input-base" value={form.endereco} onChange={(e) => updateField("endereco", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="numero" style={labelStyle}>Número</label>
-                <input id="numero" className="input-base" value={form.numero} onChange={(e) => updateField("numero", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="complemento" style={labelStyle}>Complemento</label>
-                <input id="complemento" className="input-base" value={form.complemento} onChange={(e) => updateField("complemento", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="bairro" style={labelStyle}>Bairro</label>
-                <input id="bairro" className="input-base" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="uf" style={labelStyle}>UF</label>
-                <select
-                  id="uf"
-                  className="input-base"
-                  value={form.uf}
-                  onChange={(e) => onUfChange(e.target.value)}
-                  disabled={busy || consultingCnpj}
-                  style={compactInputStyle}
+                <button
+                  type="button"
+                  className="cadastro-btn-edit"
+                  style={{ padding: "0 12px", fontSize: 10 }}
+                  onClick={() => void preencherPorCnpj(form.cnpj, true)}
+                  disabled={busy}
+                  title="Consultar CNPJ na Receita (publica.cnpj.ws)"
                 >
-                  <option value="">Selecione</option>
-                  {ufs.map((row) => (
-                    <option key={row.codigo} value={row.codigo}>
-                      {row.codigo} — {row.descricao}
-                    </option>
-                  ))}
-                </select>
+                  Consultar
+                </button>
               </div>
-              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
-                <label htmlFor="cidade" style={labelStyle}>Cidade</label>
-                <select
-                  id="cidade"
-                  className="input-base"
-                  value={form.cidade}
-                  onChange={(e) => updateField("cidade", e.target.value)}
-                  disabled={busy || consultingCnpj || !form.uf}
-                  style={compactInputStyle}
-                >
-                  <option value="">{form.uf ? "Selecione a cidade" : "Selecione a UF primeiro"}</option>
-                  {cidadesUf.map((row) => (
-                    <option key={row.codigo} value={String(row.codigo)}>
-                      {row.descricao}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            </CadastroField>
 
-              <div style={fieldStyle}>
-                <label htmlFor="telefone1" style={labelStyle}>Telefone 1</label>
-                <input id="telefone1" className="input-base" value={form.telefone1} onChange={(e) => updateField("telefone1", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="telefone2" style={labelStyle}>Telefone 2</label>
-                <input id="telefone2" className="input-base" value={form.telefone2} onChange={(e) => updateField("telefone2", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="telefone3" style={labelStyle}>Telefone 3</label>
-                <input id="telefone3" className="input-base" value={form.telefone3} onChange={(e) => updateField("telefone3", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="contato" style={labelStyle}>Contato</label>
-                <input id="contato" className="input-base" value={form.contato} onChange={(e) => updateField("contato", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
-                <label htmlFor="email" style={labelStyle}>E-mail</label>
-                <input id="email" type="email" className="input-base" value={form.email} onChange={(e) => updateField("email", e.target.value)} disabled={busy} style={compactInputStyle} />
-              </div>
-            </div>
-
-            {formError ? (
-              <div
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 7,
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  color: "#EF4444",
-                  fontSize: 11,
-                }}
-              >
-                {formError}
-              </div>
-            ) : null}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                type="button"
-                onClick={closeModal}
+            <CadastroField label="Razão Social *" htmlFor="razao_social" span="full">
+              <input
+                id="razao_social"
+                className="input-base input-compact"
+                value={form.razao_social}
+                onChange={(e) => updateField("razao_social", e.target.value)}
+                required
                 disabled={busy}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 11,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
+              />
+            </CadastroField>
+
+            <CadastroField label="Fantasia" htmlFor="fantasia">
+              <input id="fantasia" className="input-base input-compact" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="CPF" htmlFor="cpf">
+              <input id="cpf" className="input-base input-compact" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Inscrição Estadual" htmlFor="inscricao_estadual">
+              <input id="inscricao_estadual" className="input-base input-compact" value={form.inscricao_estadual} onChange={(e) => updateField("inscricao_estadual", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Inscrição Municipal" htmlFor="inscricao_municipal">
+              <input id="inscricao_municipal" className="input-base input-compact" value={form.inscricao_municipal} onChange={(e) => updateField("inscricao_municipal", e.target.value)} disabled={busy} />
+            </CadastroField>
+
+            <CadastroField label="CEP" htmlFor="cep">
+              <input id="cep" className="input-base input-compact" value={form.cep} onChange={(e) => updateField("cep", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Endereço" htmlFor="endereco" span={2}>
+              <input id="endereco" className="input-base input-compact" value={form.endereco} onChange={(e) => updateField("endereco", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Número" htmlFor="numero">
+              <input id="numero" className="input-base input-compact" value={form.numero} onChange={(e) => updateField("numero", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Complemento" htmlFor="complemento">
+              <input id="complemento" className="input-base input-compact" value={form.complemento} onChange={(e) => updateField("complemento", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Bairro" htmlFor="bairro">
+              <input id="bairro" className="input-base input-compact" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="UF" htmlFor="uf">
+              <select
+                id="uf"
+                className="input-base input-compact"
+                value={form.uf}
+                onChange={(e) => onUfChange(e.target.value)}
                 disabled={busy}
-                style={{ padding: "6px 12px", fontSize: 11, borderRadius: 6 }}
               >
-                {busy ? "Aguarde..." : "Salvar"}
-              </button>
-            </div>
-          </form>
-        </div>
+                <option value="">Selecione</option>
+                {ufs.map((row) => (
+                  <option key={row.codigo} value={row.codigo}>
+                    {row.codigo} — {row.descricao}
+                  </option>
+                ))}
+              </select>
+            </CadastroField>
+            <CadastroField label="Cidade" htmlFor="cidade" span={2}>
+              <select
+                id="cidade"
+                className="input-base input-compact"
+                value={form.cidade}
+                onChange={(e) => updateField("cidade", e.target.value)}
+                disabled={busy || !form.uf}
+              >
+                <option value="">{form.uf ? "Selecione a cidade" : "Selecione a UF primeiro"}</option>
+                {cidadesUf.map((row) => (
+                  <option key={row.codigo} value={String(row.codigo)}>
+                    {row.descricao}
+                  </option>
+                ))}
+              </select>
+            </CadastroField>
+
+            <CadastroField label="Telefone 1" htmlFor="telefone1">
+              <input id="telefone1" className="input-base input-compact" value={form.telefone1} onChange={(e) => updateField("telefone1", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Telefone 2" htmlFor="telefone2">
+              <input id="telefone2" className="input-base input-compact" value={form.telefone2} onChange={(e) => updateField("telefone2", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Telefone 3" htmlFor="telefone3">
+              <input id="telefone3" className="input-base input-compact" value={form.telefone3} onChange={(e) => updateField("telefone3", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="Contato" htmlFor="contato">
+              <input id="contato" className="input-base input-compact" value={form.contato} onChange={(e) => updateField("contato", e.target.value)} disabled={busy} />
+            </CadastroField>
+            <CadastroField label="E-mail" htmlFor="email" span={2}>
+              <input id="email" type="email" className="input-base input-compact" value={form.email} onChange={(e) => updateField("email", e.target.value)} disabled={busy} />
+            </CadastroField>
+          </CadastroFormGrid>
+
+          <CadastroFormError message={formError} />
+        </CadastroModal>
       ) : null}
 
       {deleting ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="fornecedor-delete-title"
-          onClick={closeDelete}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 80,
-            background: "rgba(6, 13, 26, 0.72)",
-            display: "grid",
-            placeItems: "center",
-            padding: 20,
-          }}
+        <CadastroModal
+          title="Excluir fornecedor"
+          titleId="fornecedor-delete-title"
+          onClose={closeDelete}
+          disabled={busy}
+          width={400}
+          footer={
+            <CadastroFormActions
+              onCancel={closeDelete}
+              disabled={busy}
+              busy={busy}
+              danger
+              submitLabel="Excluir"
+              busyLabel="Excluindo..."
+              onConfirm={() => void handleDelete()}
+            />
+          }
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(420px, 100%)",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 16,
-              padding: 24,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <h2
-              id="fornecedor-delete-title"
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-display)",
-                fontSize: 18,
-                fontWeight: 700,
-                color: "var(--text-primary)",
-              }}
-            >
-              Excluir fornecedor
-            </h2>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              Confirma a exclusão de{" "}
-              <strong style={{ color: "var(--text-primary)" }}>
-                {deleting.codigo} — {deleting.razao_social}
-              </strong>
-              ?
-            </p>
-            {actionError ? (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  color: "#EF4444",
-                  fontSize: 13,
-                }}
-              >
-                {actionError}
-              </div>
-            ) : null}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button
-                type="button"
-                onClick={closeDelete}
-                disabled={busy}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={busy}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#EF4444",
-                  color: "white",
-                  cursor: busy ? "wait" : "pointer",
-                  fontWeight: 700,
-                  fontSize: 13,
-                }}
-              >
-                {busy ? "Excluindo..." : "Excluir"}
-              </button>
-            </div>
-          </div>
-        </div>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+            Confirma a exclusão de{" "}
+            <strong style={{ color: "var(--text-primary)" }}>
+              {deleting.codigo} — {deleting.razao_social}
+            </strong>
+            ?
+          </p>
+          <CadastroFormError message={actionError} />
+        </CadastroModal>
       ) : null}
     </>
   );
