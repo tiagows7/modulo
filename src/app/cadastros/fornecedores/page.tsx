@@ -102,17 +102,17 @@ const fieldStyle: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9,
   fontWeight: 700,
-  letterSpacing: "0.5px",
+  letterSpacing: "0.45px",
   textTransform: "uppercase",
   color: "var(--text-secondary)",
 };
 
 const compactInputStyle: CSSProperties = {
-  fontSize: 13,
-  padding: "7px 10px",
-  borderRadius: 7,
+  fontSize: 11,
+  padding: "5px 8px",
+  borderRadius: 6,
 };
 
 async function nextCodigo() {
@@ -482,18 +482,18 @@ export default function FornecedoresPage() {
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            padding: "4px 8px",
+            padding: "3px 7px",
             borderRadius: 6,
             border: "1px solid var(--border-default)",
             background: "var(--bg-elevated)",
             color: "var(--blue-light)",
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: 600,
             cursor: busy ? "wait" : "pointer",
             opacity: busy ? 0.6 : 1,
           }}
         >
-          <Pencil size={12} />
+          <Pencil size={11} />
           Editar
         </button>
         <button
@@ -505,18 +505,18 @@ export default function FornecedoresPage() {
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            padding: "4px 8px",
+            padding: "3px 7px",
             borderRadius: 6,
             border: "1px solid rgba(239,68,68,0.35)",
             background: "rgba(239,68,68,0.08)",
             color: "#EF4444",
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: 600,
             cursor: busy ? "wait" : "pointer",
             opacity: busy ? 0.6 : 1,
           }}
         >
-          <Trash2 size={12} />
+          <Trash2 size={11} />
           Excluir
         </button>
       </div>
@@ -608,7 +608,7 @@ export default function FornecedoresPage() {
                   style={{
                     margin: 0,
                     fontFamily: "var(--font-display)",
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: 700,
                     color: "var(--text-primary)",
                   }}
@@ -616,7 +616,7 @@ export default function FornecedoresPage() {
                   {editing ? "Editar Fornecedor" : "Novo Fornecedor"}
                 </h2>
                 {editing ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
                     Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
                   </div>
                 ) : null}
@@ -675,7 +675,7 @@ export default function FornecedoresPage() {
                       border: "1px solid var(--border-default)",
                       background: "var(--bg-elevated)",
                       color: "var(--blue-light)",
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 700,
                       cursor: busy || consultingCnpj ? "wait" : "pointer",
                       opacity: busy || consultingCnpj ? 0.6 : 1,
@@ -804,7 +804,7 @@ export default function FornecedoresPage() {
                   background: "rgba(239,68,68,0.1)",
                   border: "1px solid rgba(239,68,68,0.3)",
                   color: "#EF4444",
-                  fontSize: 12,
+                  fontSize: 11,
                 }}
               >
                 {formError}
@@ -817,14 +817,14 @@ export default function FornecedoresPage() {
                 onClick={closeModal}
                 disabled={busy}
                 style={{
-                  padding: "7px 12px",
-                  borderRadius: 7,
+                  padding: "6px 10px",
+                  borderRadius: 6,
                   border: "1px solid var(--border-subtle)",
                   background: "var(--bg-elevated)",
                   color: "var(--text-secondary)",
                   cursor: "pointer",
                   fontWeight: 600,
-                  fontSize: 12,
+                  fontSize: 11,
                 }}
               >
                 Cancelar
@@ -833,7 +833,7 @@ export default function FornecedoresPage() {
                 type="submit"
                 className="btn-primary"
                 disabled={busy}
-                style={{ padding: "7px 14px", fontSize: 12, borderRadius: 7 }}
+                style={{ padding: "6px 12px", fontSize: 11, borderRadius: 6 }}
               >
                 {busy ? "Aguarde..." : "Salvar"}
               </button>
