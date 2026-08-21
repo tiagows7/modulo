@@ -98,15 +98,21 @@ const columns = [
 const fieldStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 6,
+  gap: 4,
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: 700,
-  letterSpacing: "0.6px",
+  letterSpacing: "0.5px",
   textTransform: "uppercase",
   color: "var(--text-secondary)",
+};
+
+const compactInputStyle: CSSProperties = {
+  fontSize: 13,
+  padding: "7px 10px",
+  borderRadius: 7,
 };
 
 async function nextCodigo() {
@@ -475,19 +481,19 @@ export default function FornecedoresPage() {
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
-            padding: "6px 10px",
-            borderRadius: 8,
+            gap: 4,
+            padding: "4px 8px",
+            borderRadius: 6,
             border: "1px solid var(--border-default)",
             background: "var(--bg-elevated)",
             color: "var(--blue-light)",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
             cursor: busy ? "wait" : "pointer",
             opacity: busy ? 0.6 : 1,
           }}
         >
-          <Pencil size={13} />
+          <Pencil size={12} />
           Editar
         </button>
         <button
@@ -498,19 +504,19 @@ export default function FornecedoresPage() {
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
-            padding: "6px 10px",
-            borderRadius: 8,
+            gap: 4,
+            padding: "4px 8px",
+            borderRadius: 6,
             border: "1px solid rgba(239,68,68,0.35)",
             background: "rgba(239,68,68,0.08)",
             color: "#EF4444",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
             cursor: busy ? "wait" : "pointer",
             opacity: busy ? 0.6 : 1,
           }}
         >
-          <Trash2 size={13} />
+          <Trash2 size={12} />
           Excluir
         </button>
       </div>
@@ -575,7 +581,7 @@ export default function FornecedoresPage() {
             background: "rgba(6, 13, 26, 0.72)",
             display: "grid",
             placeItems: "center",
-            padding: 20,
+            padding: 12,
             overflowY: "auto",
           }}
         >
@@ -583,16 +589,16 @@ export default function FornecedoresPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={handleSubmit}
             style={{
-              width: "min(820px, 100%)",
+              width: "min(680px, 100%)",
               background: "var(--bg-card)",
               border: "1px solid var(--border-default)",
-              borderRadius: 16,
-              padding: 24,
+              borderRadius: 12,
+              padding: 16,
               boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
               display: "flex",
               flexDirection: "column",
-              gap: 18,
-              margin: "24px 0",
+              gap: 12,
+              margin: "12px 0",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -602,7 +608,7 @@ export default function FornecedoresPage() {
                   style={{
                     margin: 0,
                     fontFamily: "var(--font-display)",
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: 700,
                     color: "var(--text-primary)",
                   }}
@@ -610,7 +616,7 @@ export default function FornecedoresPage() {
                   {editing ? "Editar Fornecedor" : "Novo Fornecedor"}
                 </h2>
                 {editing ? (
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                     Código: <strong style={{ color: "var(--text-secondary)" }}>{editing.codigo}</strong>
                   </div>
                 ) : null}
@@ -626,23 +632,23 @@ export default function FornecedoresPage() {
                   color: "var(--text-muted)",
                   cursor: "pointer",
                   display: "flex",
-                  padding: 4,
+                  padding: 2,
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 14,
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 10,
               }}
             >
               <div style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
                 <label htmlFor="cnpj" style={labelStyle}>CNPJ</label>
-                <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
                   <input
                     id="cnpj"
                     className="input-base"
@@ -656,7 +662,7 @@ export default function FornecedoresPage() {
                     disabled={busy || consultingCnpj}
                     autoFocus
                     inputMode="numeric"
-                    style={{ flex: 1 }}
+                    style={{ ...compactInputStyle, flex: 1 }}
                   />
                   <button
                     type="button"
@@ -664,23 +670,20 @@ export default function FornecedoresPage() {
                     disabled={busy || consultingCnpj}
                     title="Consultar CNPJ na Receita (publica.cnpj.ws)"
                     style={{
-                      padding: "0 16px",
-                      borderRadius: 10,
+                      padding: "0 12px",
+                      borderRadius: 7,
                       border: "1px solid var(--border-default)",
                       background: "var(--bg-elevated)",
                       color: "var(--blue-light)",
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 700,
                       cursor: busy || consultingCnpj ? "wait" : "pointer",
                       opacity: busy || consultingCnpj ? 0.6 : 1,
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {consultingCnpj ? "Consultando…" : "Consultar"}
+                    {consultingCnpj ? "…" : "Consultar"}
                   </button>
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  Ao informar o CNPJ válido, os dados são buscados automaticamente.
                 </div>
               </div>
 
@@ -693,45 +696,46 @@ export default function FornecedoresPage() {
                   onChange={(e) => updateField("razao_social", e.target.value)}
                   required
                   disabled={busy || consultingCnpj}
+                  style={compactInputStyle}
                 />
               </div>
 
               <div style={fieldStyle}>
                 <label htmlFor="fantasia" style={labelStyle}>Fantasia</label>
-                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy || consultingCnpj} />
+                <input id="fantasia" className="input-base" value={form.fantasia} onChange={(e) => updateField("fantasia", e.target.value)} disabled={busy || consultingCnpj} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cpf" style={labelStyle}>CPF</label>
-                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy || consultingCnpj} />
+                <input id="cpf" className="input-base" value={form.cpf} onChange={(e) => updateField("cpf", e.target.value)} disabled={busy || consultingCnpj} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="inscricao_estadual" style={labelStyle}>Inscrição Estadual</label>
-                <input id="inscricao_estadual" className="input-base" value={form.inscricao_estadual} onChange={(e) => updateField("inscricao_estadual", e.target.value)} disabled={busy} />
+                <input id="inscricao_estadual" className="input-base" value={form.inscricao_estadual} onChange={(e) => updateField("inscricao_estadual", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="inscricao_municipal" style={labelStyle}>Inscrição Municipal</label>
-                <input id="inscricao_municipal" className="input-base" value={form.inscricao_municipal} onChange={(e) => updateField("inscricao_municipal", e.target.value)} disabled={busy} />
+                <input id="inscricao_municipal" className="input-base" value={form.inscricao_municipal} onChange={(e) => updateField("inscricao_municipal", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
 
               <div style={fieldStyle}>
                 <label htmlFor="cep" style={labelStyle}>CEP</label>
-                <input id="cep" className="input-base" value={form.cep} onChange={(e) => updateField("cep", e.target.value)} disabled={busy} />
+                <input id="cep" className="input-base" value={form.cep} onChange={(e) => updateField("cep", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
                 <label htmlFor="endereco" style={labelStyle}>Endereço</label>
-                <input id="endereco" className="input-base" value={form.endereco} onChange={(e) => updateField("endereco", e.target.value)} disabled={busy} />
+                <input id="endereco" className="input-base" value={form.endereco} onChange={(e) => updateField("endereco", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="numero" style={labelStyle}>Número</label>
-                <input id="numero" className="input-base" value={form.numero} onChange={(e) => updateField("numero", e.target.value)} disabled={busy} />
+                <input id="numero" className="input-base" value={form.numero} onChange={(e) => updateField("numero", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="complemento" style={labelStyle}>Complemento</label>
-                <input id="complemento" className="input-base" value={form.complemento} onChange={(e) => updateField("complemento", e.target.value)} disabled={busy} />
+                <input id="complemento" className="input-base" value={form.complemento} onChange={(e) => updateField("complemento", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="bairro" style={labelStyle}>Bairro</label>
-                <input id="bairro" className="input-base" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} />
+                <input id="bairro" className="input-base" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="uf" style={labelStyle}>UF</label>
@@ -741,6 +745,7 @@ export default function FornecedoresPage() {
                   value={form.uf}
                   onChange={(e) => onUfChange(e.target.value)}
                   disabled={busy || consultingCnpj}
+                  style={compactInputStyle}
                 >
                   <option value="">Selecione</option>
                   {ufs.map((row) => (
@@ -758,6 +763,7 @@ export default function FornecedoresPage() {
                   value={form.cidade}
                   onChange={(e) => updateField("cidade", e.target.value)}
                   disabled={busy || consultingCnpj || !form.uf}
+                  style={compactInputStyle}
                 >
                   <option value="">{form.uf ? "Selecione a cidade" : "Selecione a UF primeiro"}</option>
                   {cidadesUf.map((row) => (
@@ -770,60 +776,65 @@ export default function FornecedoresPage() {
 
               <div style={fieldStyle}>
                 <label htmlFor="telefone1" style={labelStyle}>Telefone 1</label>
-                <input id="telefone1" className="input-base" value={form.telefone1} onChange={(e) => updateField("telefone1", e.target.value)} disabled={busy} />
+                <input id="telefone1" className="input-base" value={form.telefone1} onChange={(e) => updateField("telefone1", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="telefone2" style={labelStyle}>Telefone 2</label>
-                <input id="telefone2" className="input-base" value={form.telefone2} onChange={(e) => updateField("telefone2", e.target.value)} disabled={busy} />
+                <input id="telefone2" className="input-base" value={form.telefone2} onChange={(e) => updateField("telefone2", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="telefone3" style={labelStyle}>Telefone 3</label>
-                <input id="telefone3" className="input-base" value={form.telefone3} onChange={(e) => updateField("telefone3", e.target.value)} disabled={busy} />
+                <input id="telefone3" className="input-base" value={form.telefone3} onChange={(e) => updateField("telefone3", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="contato" style={labelStyle}>Contato</label>
-                <input id="contato" className="input-base" value={form.contato} onChange={(e) => updateField("contato", e.target.value)} disabled={busy} />
+                <input id="contato" className="input-base" value={form.contato} onChange={(e) => updateField("contato", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
               <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
                 <label htmlFor="email" style={labelStyle}>E-mail</label>
-                <input id="email" type="email" className="input-base" value={form.email} onChange={(e) => updateField("email", e.target.value)} disabled={busy} />
+                <input id="email" type="email" className="input-base" value={form.email} onChange={(e) => updateField("email", e.target.value)} disabled={busy} style={compactInputStyle} />
               </div>
             </div>
 
             {formError ? (
               <div
                 style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
+                  padding: "8px 10px",
+                  borderRadius: 7,
                   background: "rgba(239,68,68,0.1)",
                   border: "1px solid rgba(239,68,68,0.3)",
                   color: "#EF4444",
-                  fontSize: 13,
+                  fontSize: 12,
                 }}
               >
                 {formError}
               </div>
             ) : null}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={busy}
                 style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
+                  padding: "7px 12px",
+                  borderRadius: 7,
                   border: "1px solid var(--border-subtle)",
                   background: "var(--bg-elevated)",
                   color: "var(--text-secondary)",
                   cursor: "pointer",
                   fontWeight: 600,
-                  fontSize: 13,
+                  fontSize: 12,
                 }}
               >
                 Cancelar
               </button>
-              <button type="submit" className="btn-primary" disabled={busy}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={busy}
+                style={{ padding: "7px 14px", fontSize: 12, borderRadius: 7 }}
+              >
                 {busy ? "Aguarde..." : "Salvar"}
               </button>
             </div>
