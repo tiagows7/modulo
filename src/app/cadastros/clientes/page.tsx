@@ -42,7 +42,6 @@ type Cliente = {
   email: string | null;
   email2: string | null;
   contato: string | null;
-  observacao: string | null;
   restricoes: string | null;
   mensagem: string | null;
   obriga_placa_venda: boolean | null;
@@ -86,7 +85,6 @@ type ClienteForm = {
   email: string;
   email2: string;
   contato: string;
-  observacao: string;
   restricoes: string;
   mensagem: string;
   obriga_placa_venda: boolean;
@@ -122,7 +120,6 @@ const emptyForm: ClienteForm = {
   email: "",
   email2: "",
   contato: "",
-  observacao: "",
   restricoes: "",
   mensagem: "",
   obriga_placa_venda: false,
