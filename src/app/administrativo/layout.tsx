@@ -23,6 +23,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { DbStatusProvider } from "@/components/DbStatusProvider";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/administrativo", group: "geral" },
@@ -283,6 +284,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarWidth = collapsed ? 72 : 248;
 
   return (
+    <DbStatusProvider>
     <div
       style={{
         display: "flex",
@@ -481,5 +483,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
+    </DbStatusProvider>
   );
 }
