@@ -24,7 +24,8 @@ type Fornecedor = {
   numero: string | null;
   complemento: string | null;
   bairro: string | null;
-  cidade: string | null;
+  /** Código IBGE do município */
+  cidade: number | null;
   uf: string | null;
   telefone1: string | null;
   telefone2: string | null;
@@ -46,6 +47,7 @@ type FornecedorForm = {
   numero: string;
   complemento: string;
   bairro: string;
+  /** Código IBGE (string no select) */
   cidade: string;
   uf: string;
   telefone1: string;
@@ -56,6 +58,9 @@ type FornecedorForm = {
   contato: string;
   email: string;
 };
+
+type UfRow = { codigo: string; descricao: string };
+type CidadeRow = { codigo: string; descricao: string; uf: string };
 
 const emptyForm: FornecedorForm = {
   razao_social: "",
@@ -130,7 +135,7 @@ function toForm(item: Fornecedor): FornecedorForm {
     numero: item.numero ?? "",
     complemento: item.complemento ?? "",
     bairro: item.bairro ?? "",
-    cidade: item.cidade ?? "",
+    cidade: item.cidade != null ? String(item.cidade) : "",
     uf: item.uf ?? "",
     telefone1: item.telefone1 ?? "",
     telefone2: item.telefone2 ?? "",
@@ -147,6 +152,7 @@ function toPayload(form: FornecedorForm) {
     const t = v.trim();
     return t ? t : null;
   };
+  const cidadeCodigo = form.cidade.trim() ? Number(form.cidade) : null;
   return {
     razao_social: form.razao_social.trim(),
     fantasia: blank(form.fantasia),
@@ -157,7 +163,7 @@ function toPayload(form: FornecedorForm) {
     numero: blank(form.numero),
     complemento: blank(form.complemento),
     bairro: blank(form.bairro),
-    cidade: blank(form.cidade),
+    cidade: Number.isFinite(cidadeCodigo) ? cidadeCodigo : null,
     uf: blank(form.uf)?.toUpperCase() ?? null,
     telefone1: blank(form.telefone1),
     telefone2: blank(form.telefone2),
@@ -169,9 +175,36 @@ function toPayload(form: FornecedorForm) {
   };
 }
 
+async function resolverCidadeIbge(nome: string, uf: string): Promise<string> {
+  const nomeLimpo = nome.trim();
+  const ufLimpa = uf.trim().toUpperCase();
+  if (!nomeLimpo || !ufLimpa) return "";
+
+  const { data: exact } = await supabase
+    .from("cidades")
+    .select("codigo")
+    .eq("uf", ufLimpa)
+    .ilike("descricao", nomeLimpo)
+    .limit(1)
+    .maybeSingle();
+  if (exact?.codigo != null) return String(exact.codigo);
+
+  const { data: partial } = await supabase
+    .from("cidades")
+    .select("codigo")
+    .eq("uf", ufLimpa)
+    .ilike("descricao", `%${nomeLimpo}%`)
+    .limit(1)
+    .maybeSingle();
+  return partial?.codigo != null ? String(partial.codigo) : "";
+}
+
 export default function FornecedoresPage() {
   const { busy, pesquisar, gravar } = useDbStatus();
   const [items, setItems] = useState<Fornecedor[]>([]);
+  const [cidadeNomes, setCidadeNomes] = useState<Record<string, string>>({});
+  const [ufs, setUfs] = useState<UfRow[]>([]);
+  const [cidadesUf, setCidadesUf] = useState<CidadeRow[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -196,9 +229,36 @@ export default function FornecedoresPage() {
       if (error) {
         setLoadError(error.message);
         setItems([]);
+        setCidadeNomes({});
         return;
       }
-      setItems((data ?? []) as Fornecedor[]);
+
+      const list = (data ?? []) as Fornecedor[];
+      setItems(list);
+
+      const codes = [
+        ...new Set(
+          list
+            .map((row) => row.cidade)
+            .filter((code): code is number => code != null)
+            .map((code) => String(code)),
+        ),
+      ];
+      if (codes.length === 0) {
+        setCidadeNomes({});
+        return;
+      }
+
+      const { data: cidadesData } = await supabase
+        .from("cidades")
+        .select("codigo, descricao")
+        .in("codigo", codes);
+
+      const map: Record<string, string> = {};
+      for (const row of cidadesData ?? []) {
+        map[String(row.codigo)] = String(row.descricao);
+      }
+      setCidadeNomes(map);
     });
   }, [pesquisar]);
 
@@ -206,8 +266,43 @@ export default function FornecedoresPage() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("uf")
+        .select("codigo, descricao")
+        .order("codigo", { ascending: true });
+      setUfs((data ?? []) as UfRow[]);
+    })();
+  }, []);
+
+  useEffect(() => {
+    const uf = form.uf.trim().toUpperCase();
+    if (!uf) {
+      setCidadesUf([]);
+      return;
+    }
+    void (async () => {
+      const { data } = await supabase
+        .from("cidades")
+        .select("codigo, descricao, uf")
+        .eq("uf", uf)
+        .order("descricao", { ascending: true });
+      setCidadesUf((data ?? []) as CidadeRow[]);
+    })();
+  }, [form.uf]);
+
   const updateField = (key: keyof FornecedorForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const onUfChange = (value: string) => {
+    const uf = value.toUpperCase();
+    setForm((prev) => ({
+      ...prev,
+      uf,
+      cidade: prev.uf === uf ? prev.cidade : "",
+    }));
   };
 
   const preencherPorCnpj = useCallback(async (rawCnpj: string, force = false) => {
@@ -225,6 +320,8 @@ export default function FornecedoresPage() {
     try {
       const data = await consultarCnpj(digits);
       lastConsultedCnpj.current = digits;
+      const uf = (data.uf || "").toUpperCase();
+      const cidadeCodigo = await resolverCidadeIbge(data.city, uf);
       setForm((prev) => ({
         ...prev,
         cnpj: formatCpfCnpj(data.cnpj),
@@ -235,8 +332,8 @@ export default function FornecedoresPage() {
         numero: data.number || prev.numero,
         complemento: data.complemento || prev.complemento,
         bairro: data.neighborhood || prev.bairro,
-        cidade: data.city || prev.cidade,
-        uf: data.uf || prev.uf,
+        uf: uf || prev.uf,
+        cidade: cidadeCodigo || prev.cidade,
         telefone1: data.phone || prev.telefone1,
         inscricao_estadual: data.stateRegistration || prev.inscricao_estadual,
         email: data.email || prev.email,
@@ -360,7 +457,7 @@ export default function FornecedoresPage() {
     razao: item.razao_social,
     fantasia: item.fantasia || "—",
     cnpj: item.cnpj || "—",
-    cidade: item.cidade || "—",
+    cidade: item.cidade != null ? cidadeNomes[String(item.cidade)] || String(item.cidade) : "—",
     uf: item.uf || "—",
     telefone: item.telefone1 || "—",
     status: (
@@ -637,12 +734,38 @@ export default function FornecedoresPage() {
                 <input id="bairro" className="input-base" value={form.bairro} onChange={(e) => updateField("bairro", e.target.value)} disabled={busy} />
               </div>
               <div style={fieldStyle}>
-                <label htmlFor="cidade" style={labelStyle}>Cidade</label>
-                <input id="cidade" className="input-base" value={form.cidade} onChange={(e) => updateField("cidade", e.target.value)} disabled={busy} />
-              </div>
-              <div style={fieldStyle}>
                 <label htmlFor="uf" style={labelStyle}>UF</label>
-                <input id="uf" className="input-base" value={form.uf} maxLength={2} onChange={(e) => updateField("uf", e.target.value.toUpperCase())} disabled={busy} />
+                <select
+                  id="uf"
+                  className="input-base"
+                  value={form.uf}
+                  onChange={(e) => onUfChange(e.target.value)}
+                  disabled={busy || consultingCnpj}
+                >
+                  <option value="">Selecione</option>
+                  {ufs.map((row) => (
+                    <option key={row.codigo} value={row.codigo}>
+                      {row.codigo} — {row.descricao}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ ...fieldStyle, gridColumn: "span 2" }}>
+                <label htmlFor="cidade" style={labelStyle}>Cidade</label>
+                <select
+                  id="cidade"
+                  className="input-base"
+                  value={form.cidade}
+                  onChange={(e) => updateField("cidade", e.target.value)}
+                  disabled={busy || consultingCnpj || !form.uf}
+                >
+                  <option value="">{form.uf ? "Selecione a cidade" : "Selecione a UF primeiro"}</option>
+                  {cidadesUf.map((row) => (
+                    <option key={row.codigo} value={String(row.codigo)}>
+                      {row.descricao}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={fieldStyle}>

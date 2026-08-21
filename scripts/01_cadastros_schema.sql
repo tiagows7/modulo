@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.fornecedores (
     numero VARCHAR(30),
     complemento VARCHAR(100),
     bairro VARCHAR(120),
-    cidade VARCHAR(100),
+    cidade INTEGER,
     uf VARCHAR(2),
     telefone VARCHAR(20),
     telefone1 VARCHAR(20),
@@ -88,6 +88,60 @@ CREATE TABLE IF NOT EXISTS public.bicos (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Criação da tabela de UFs (estados brasileiros)
+CREATE TABLE IF NOT EXISTS public.uf (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    codigo VARCHAR(2) UNIQUE NOT NULL,
+    descricao VARCHAR(60) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO public.uf (codigo, descricao) VALUES
+    ('AC', 'Acre'),
+    ('AL', 'Alagoas'),
+    ('AP', 'Amapá'),
+    ('AM', 'Amazonas'),
+    ('BA', 'Bahia'),
+    ('CE', 'Ceará'),
+    ('DF', 'Distrito Federal'),
+    ('ES', 'Espírito Santo'),
+    ('GO', 'Goiás'),
+    ('MA', 'Maranhão'),
+    ('MT', 'Mato Grosso'),
+    ('MS', 'Mato Grosso do Sul'),
+    ('MG', 'Minas Gerais'),
+    ('PA', 'Pará'),
+    ('PB', 'Paraíba'),
+    ('PR', 'Paraná'),
+    ('PE', 'Pernambuco'),
+    ('PI', 'Piauí'),
+    ('RJ', 'Rio de Janeiro'),
+    ('RN', 'Rio Grande do Norte'),
+    ('RS', 'Rio Grande do Sul'),
+    ('RO', 'Rondônia'),
+    ('RR', 'Roraima'),
+    ('SC', 'Santa Catarina'),
+    ('SP', 'São Paulo'),
+    ('SE', 'Sergipe'),
+    ('TO', 'Tocantins')
+ON CONFLICT (codigo) DO UPDATE
+SET descricao = EXCLUDED.descricao,
+    updated_at = CURRENT_TIMESTAMP;
+
+-- Criação da tabela de Cidades (municípios IBGE)
+CREATE TABLE IF NOT EXISTS public.cidades (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    codigo VARCHAR(10) UNIQUE NOT NULL,
+    descricao VARCHAR(120) NOT NULL,
+    uf VARCHAR(2) NOT NULL REFERENCES public.uf(codigo),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cidades_uf ON public.cidades (uf);
+CREATE INDEX IF NOT EXISTS idx_cidades_descricao ON public.cidades (descricao);
+
 -- Funções e Triggers para atualização do 'updated_at'
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -121,6 +175,14 @@ CREATE TRIGGER update_bicos_modtime
     BEFORE UPDATE ON public.bicos
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+CREATE TRIGGER update_uf_modtime
+    BEFORE UPDATE ON public.uf
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_cidades_modtime
+    BEFORE UPDATE ON public.cidades
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 -- Políticas de Segurança (Row Level Security - Opcional, caso você queira proteger os dados)
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fornecedores ENABLE ROW LEVEL SECURITY;
@@ -128,6 +190,8 @@ ALTER TABLE public.grupo_produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tanques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bicos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.uf ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cidades ENABLE ROW LEVEL SECURITY;
 
 -- Exemplo: Permitir leitura e escrita para todos os usuários logados (autenticados)
 CREATE POLICY "Permitir acesso autenticado - clientes" ON public.clientes FOR ALL USING (auth.role() = 'authenticated');
@@ -136,3 +200,7 @@ CREATE POLICY "Permitir acesso autenticado - grupo_produtos" ON public.grupo_pro
 CREATE POLICY "Permitir acesso autenticado - produtos" ON public.produtos FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Permitir acesso autenticado - tanques" ON public.tanques FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Permitir acesso autenticado - bicos" ON public.bicos FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir acesso autenticado - uf" ON public.uf FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir leitura anon - uf" ON public.uf FOR SELECT USING (true);
+CREATE POLICY "Permitir acesso autenticado - cidades" ON public.cidades FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Permitir leitura anon - cidades" ON public.cidades FOR SELECT USING (true);
