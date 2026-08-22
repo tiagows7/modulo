@@ -24,6 +24,7 @@
 # TEF native DLLs (local bridges only)
 /server/clisitef64/*.dll
 /server/clisitef64/files/
+/server/certs/
 
 # Supabase CLI temp
 /supabase/.temp/
