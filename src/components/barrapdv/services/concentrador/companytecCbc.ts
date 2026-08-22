@@ -275,17 +275,32 @@ export class CompanytecCbcClient {
     supplies: CbcSupplyPayload[]
     nozzles: import('./types').CbcNozzleStatus[]
   }> {
-    const url =
+    const urls = [
       `${CBC_CONFIG.bridgeUrl}/cbc/poll` +
-      `?host=${encodeURIComponent(this.config.host)}` +
-      `&port=${this.config.port}`
+        `?host=${encodeURIComponent(this.config.host)}` +
+        `&port=${this.config.port}`,
+      `${CBC_CONFIG.bridgeUrlHttp}/cbc/poll` +
+        `?host=${encodeURIComponent(this.config.host)}` +
+        `&port=${this.config.port}`,
+    ]
 
-    let response: Response
-    try {
-      response = await fetch(url, { method: 'GET' })
-    } catch {
+    let response: Response | null = null
+    let lastNetworkError: Error | null = null
+    for (const url of urls) {
+      try {
+        response = await fetch(url, { method: 'GET' })
+        break
+      } catch (err) {
+        lastNetworkError = err instanceof Error ? err : new Error(String(err))
+      }
+    }
+
+    if (!response) {
       throw new Error(
-        `Ponte CBC offline (${CBC_CONFIG.bridgeUrl}). Rode npm run cbc-bridge`,
+        lastNetworkError?.message?.includes('Failed to fetch') ||
+          lastNetworkError?.message?.includes('NetworkError')
+          ? `Ponte CBC bloqueada pelo navegador. Aceite o certificado em ${CBC_CONFIG.bridgeUrl}/health e rode npm run posto:autostart.`
+          : `Ponte CBC offline (${CBC_CONFIG.bridgeUrl}). Rode npm run posto:autostart`,
       )
     }
 
@@ -330,16 +345,34 @@ export class CompanytecCbcClient {
   }
 
   private async sendBridgeCommand(command: string, payload: Record<string, string>) {
-    const response = await fetch(`${CBC_CONFIG.bridgeUrl}/cbc/command`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        command,
-        host: this.config.host,
-        port: this.config.port,
-        ...payload,
-      }),
+    const body = JSON.stringify({
+      command,
+      host: this.config.host,
+      port: this.config.port,
+      ...payload,
     })
+    const urls = [
+      `${CBC_CONFIG.bridgeUrl}/cbc/command`,
+      `${CBC_CONFIG.bridgeUrlHttp}/cbc/command`,
+    ]
+    let response: Response | null = null
+    for (const url of urls) {
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        })
+        break
+      } catch {
+        /* tenta próxima URL */
+      }
+    }
+    if (!response) {
+      throw new Error(
+        `Ponte CBC offline. Aceite ${CBC_CONFIG.bridgeUrl}/health e rode npm run posto:autostart`,
+      )
+    }
     if (!response.ok) {
       throw new Error(`Falha ao enviar comando CBC (${response.status})`)
     }

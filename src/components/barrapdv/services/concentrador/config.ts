@@ -10,6 +10,11 @@ export const CBC_CONFIG = {
   /** Intervalo de varredura no PDV (ms) */
   pollIntervalMs: 2000,
   defaultOperator: 'Carlos Silva',
-  /** URL da ponte local Windows */
-  bridgeUrl: 'http://127.0.0.1:39100',
+  /** URL HTTP da ponte (ferramentas locais) */
+  bridgeUrlHttp: 'http://127.0.0.1:39100',
+  /**
+   * URL HTTPS da ponte — necessária quando o PDV abre no Vercel (HTTPS).
+   * O navegador bloqueia HTTP localhost a partir de páginas HTTPS.
+   */
+  bridgeUrl: 'https://127.0.0.1:39110',
 }

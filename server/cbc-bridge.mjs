@@ -13,10 +13,13 @@
  * Uso: npm run cbc-bridge
  */
 import http from 'node:http'
+import https from 'node:https'
 import net from 'node:net'
 import { URL, pathToFileURL } from 'node:url'
+import { loadOrCreateLocalCerts } from './local-certs.mjs'
 
 const BRIDGE_PORT = 39100
+const BRIDGE_HTTPS_PORT = Number(process.env.CBC_BRIDGE_HTTPS_PORT || 39110)
 const DEFAULT_HOST = process.env.CBC_HOST || '192.168.1.150'
 const DEFAULT_PORT = Number(process.env.CBC_PORT || 1771)
 const CONNECT_TIMEOUT_MS = 4000
@@ -495,6 +498,7 @@ function sendJson(res, data, status = 200) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Private-Network': 'true',
   })
   res.end(body)
 }
@@ -547,6 +551,8 @@ const server = http.createServer(async (req, res) => {
         lastError: state.lastError,
         lastCheck: state.lastCheck,
         lastRaw: state.lastRaw,
+        http: `http://127.0.0.1:${BRIDGE_PORT}`,
+        https: `https://127.0.0.1:${BRIDGE_HTTPS_PORT}`,
       })
       return
     }
@@ -717,4 +723,20 @@ if (isMain) {
     console.log(`[CBC Bridge] Alvo: ${DEFAULT_HOST}:${DEFAULT_PORT}`)
     console.log(`[CBC Bridge] Protocolo: (&H) · (&A67) · Incrementa (&I6F)`)
   })
+
+  loadOrCreateLocalCerts()
+    .then((certs) => {
+      const httpsServer = https.createServer(certs, (req, res) => {
+        server.emit('request', req, res)
+      })
+      httpsServer.listen(BRIDGE_HTTPS_PORT, '127.0.0.1', () => {
+        console.log(`[CBC Bridge] https://127.0.0.1:${BRIDGE_HTTPS_PORT} (PDV no Vercel)`)
+        console.log(
+          `[CBC Bridge] Aceite o certificado 1x: https://127.0.0.1:${BRIDGE_HTTPS_PORT}/health`,
+        )
+      })
+    })
+    .catch((err) => {
+      console.error('[CBC Bridge] Falha ao iniciar HTTPS:', err)
+    })
 }
