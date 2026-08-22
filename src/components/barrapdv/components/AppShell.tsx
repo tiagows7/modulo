@@ -155,9 +155,14 @@ export function AppShell() {
               lineHeight: 1.45,
             }}
           >
-            Sem comunicação com a ponte local neste PC. No caixa rode uma vez{' '}
-            <code>npm run posto:autostart</code> (sobe pontes no login e confia no
-            HTTPS local sozinho). Depois recarregue o PDV neste computador.
+            Aguardando o concentrador… Se abriu pelo Vercel, o caixa deve usar{' '}
+            <a
+              href="http://127.0.0.1:39199/pdv"
+              style={{ color: '#fff', textDecoration: 'underline' }}
+            >
+              http://127.0.0.1:39199/pdv
+            </a>
+            (sobe sozinho no login).
           </div>
         ) : null}
         <main className="content">

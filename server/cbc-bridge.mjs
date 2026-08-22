@@ -497,7 +497,8 @@ function sendJson(res, data, status = 200) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Access-Control-Request-Private-Network',
     'Access-Control-Allow-Private-Network': 'true',
   })
   res.end(body)

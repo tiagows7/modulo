@@ -12,10 +12,11 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const services = [
-  { name: 'CBC', file: 'server/cbc-bridge.mjs', url: 'https://127.0.0.1:39110' },
+  { name: 'CBC', file: 'server/cbc-bridge.mjs', url: 'http://127.0.0.1:39100' },
   { name: 'TEF', file: 'server/tef-bridge.mjs', url: 'http://127.0.0.1:39101' },
   { name: 'Fiscal', file: 'server/fiscal-bridge.mjs', url: 'http://127.0.0.1:39102' },
   { name: 'SmartPOS', file: 'server/smartpos-bridge.mjs', url: 'http://127.0.0.1:39103' },
+  { name: 'Web', file: 'server/posto-web-proxy.mjs', url: 'http://127.0.0.1:39199/pdv' },
 ]
 
 const children = []

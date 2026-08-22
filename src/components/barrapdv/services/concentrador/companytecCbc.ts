@@ -275,14 +275,19 @@ export class CompanytecCbcClient {
     supplies: CbcSupplyPayload[]
     nozzles: import('./types').CbcNozzleStatus[]
   }> {
+    const { bridgeUrl, bridgeUrlHttp } = CBC_CONFIG.resolveBridgeUrls()
     const urls = [
-      `${CBC_CONFIG.bridgeUrl}/cbc/poll` +
-        `?host=${encodeURIComponent(this.config.host)}` +
-        `&port=${this.config.port}`,
-      `${CBC_CONFIG.bridgeUrlHttp}/cbc/poll` +
+      `${bridgeUrl}/cbc/poll` +
         `?host=${encodeURIComponent(this.config.host)}` +
         `&port=${this.config.port}`,
     ]
+    if (bridgeUrlHttp !== bridgeUrl) {
+      urls.push(
+        `${bridgeUrlHttp}/cbc/poll` +
+          `?host=${encodeURIComponent(this.config.host)}` +
+          `&port=${this.config.port}`,
+      )
+    }
 
     let response: Response | null = null
     let lastNetworkError: Error | null = null
@@ -299,8 +304,8 @@ export class CompanytecCbcClient {
       throw new Error(
         lastNetworkError?.message?.includes('Failed to fetch') ||
           lastNetworkError?.message?.includes('NetworkError')
-          ? `Ponte CBC bloqueada pelo navegador. Rode npm run posto:autostart neste PC (confia HTTPS e sobe as pontes).`
-          : `Ponte CBC offline (${CBC_CONFIG.bridgeUrl}). Rode npm run posto:autostart`,
+          ? `Ponte CBC bloqueada. Abra o PDV em http://127.0.0.1:39199/pdv`
+          : `Ponte CBC offline. Aguarde o watchdog local (http://127.0.0.1:39199/pdv).`,
       )
     }
 
@@ -345,16 +350,16 @@ export class CompanytecCbcClient {
   }
 
   private async sendBridgeCommand(command: string, payload: Record<string, string>) {
+    const { bridgeUrl, bridgeUrlHttp } = CBC_CONFIG.resolveBridgeUrls()
     const body = JSON.stringify({
       command,
       host: this.config.host,
       port: this.config.port,
       ...payload,
     })
-    const urls = [
-      `${CBC_CONFIG.bridgeUrl}/cbc/command`,
-      `${CBC_CONFIG.bridgeUrlHttp}/cbc/command`,
-    ]
+    const urls = [bridgeUrl, bridgeUrlHttp].filter(
+      (u, i, arr) => arr.indexOf(u) === i,
+    ).map((base) => `${base}/cbc/command`)
     let response: Response | null = null
     for (const url of urls) {
       try {
@@ -370,7 +375,7 @@ export class CompanytecCbcClient {
     }
     if (!response) {
       throw new Error(
-        `Ponte CBC offline. Rode npm run posto:autostart neste PC.`,
+        `Ponte CBC offline. Abra o PDV em http://127.0.0.1:39199/pdv`,
       )
     }
     if (!response.ok) {
