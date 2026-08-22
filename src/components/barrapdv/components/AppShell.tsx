@@ -155,18 +155,9 @@ export function AppShell() {
               lineHeight: 1.45,
             }}
           >
-            Sem comunicação com a ponte local. 1) No PC do posto:{' '}
-            <code>npm run posto:autostart</code>. 2) Abra{' '}
-            <a
-              href="https://127.0.0.1:39110/health"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: '#fff', textDecoration: 'underline' }}
-            >
-              https://127.0.0.1:39110/health
-            </a>{' '}
-            e aceite o certificado (avançado → continuar). 3) Recarregue o PDV neste
-            computador.
+            Sem comunicação com a ponte local neste PC. No caixa rode uma vez{' '}
+            <code>npm run posto:autostart</code> (sobe pontes no login e confia no
+            HTTPS local sozinho). Depois recarregue o PDV neste computador.
           </div>
         ) : null}
         <main className="content">

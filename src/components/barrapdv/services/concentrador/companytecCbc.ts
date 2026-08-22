@@ -299,7 +299,7 @@ export class CompanytecCbcClient {
       throw new Error(
         lastNetworkError?.message?.includes('Failed to fetch') ||
           lastNetworkError?.message?.includes('NetworkError')
-          ? `Ponte CBC bloqueada pelo navegador. Aceite o certificado em ${CBC_CONFIG.bridgeUrl}/health e rode npm run posto:autostart.`
+          ? `Ponte CBC bloqueada pelo navegador. Rode npm run posto:autostart neste PC (confia HTTPS e sobe as pontes).`
           : `Ponte CBC offline (${CBC_CONFIG.bridgeUrl}). Rode npm run posto:autostart`,
       )
     }
@@ -370,7 +370,7 @@ export class CompanytecCbcClient {
     }
     if (!response) {
       throw new Error(
-        `Ponte CBC offline. Aceite ${CBC_CONFIG.bridgeUrl}/health e rode npm run posto:autostart`,
+        `Ponte CBC offline. Rode npm run posto:autostart neste PC.`,
       )
     }
     if (!response.ok) {

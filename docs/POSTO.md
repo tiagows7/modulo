@@ -34,10 +34,9 @@ Isso registra uma tarefa do Windows que:
 - sobe CBC / TEF / Fiscal / SmartPOS **ao logar**
 - inicia as pontes **já na hora** da instalação
 
-**Primeira vez (Chrome/Edge):** abra
-[https://127.0.0.1:39110/health](https://127.0.0.1:39110/health),
-clique em **Avançado → Continuar** (certificado local) e depois recarregue o PDV.
-Sem esse passo, o navegador bloqueia a ponte mesmo com as pontes ligadas.
+O `posto:autostart` também **instala a confiança do certificado HTTPS local**
+no Windows (sem o operador clicar em “Avançado” no navegador). A cada
+`npm run posto`, a confiança é reaplicada se precisar.
 
 Depois disso, basta abrir o PDV no Vercel — sem digitar `npm run posto`.
 
@@ -49,13 +48,11 @@ npm run posto:autostart:off
 
 ## Checklist diário
 
-1. PC do caixa ligado e logado (autostart já sobe as pontes).
-2. Aceitar o certificado HTTPS local (só na 1ª vez / se o certificado mudou).
-3. Abrir https://modulo-e9xc.vercel.app/pdv **neste mesmo PC**.
-4. Conferir o chip “Concentrador conectado”.
-5. Se offline:
-   - reiniciar o PC ou rodar `npm run posto`
-   - abrir `https://127.0.0.1:39110/health` e aceitar o aviso
+1. PC do caixa ligado e logado (autostart já sobe as pontes + confia HTTPS).
+2. Abrir https://modulo-e9xc.vercel.app/pdv **neste mesmo PC**.
+3. Conferir o chip “Concentrador conectado”.
+4. Se offline:
+   - reiniciar o PC ou rodar `npm run posto` / `npm run posto:autostart`
    - ping no IP do CBC (`192.168.1.150`)
    - firewall liberando TCP `1771`
    - IP/porta iguais ao CBCManager
@@ -84,7 +81,6 @@ ponte CBC também escuta em **HTTPS :39110**.
 
 Fluxo automático correto:
 
-1. Windows liga → pontes sobem sozinhas (autostart)
-2. Operador aceita o certificado local 1x (`https://127.0.0.1:39110/health`)
-3. Operador abre o PDV no Vercel
-4. O PDV no navegador fala com `127.0.0.1:39110` (ponte CBC HTTPS)
+1. Windows liga → pontes sobem + HTTPS local já confiado (autostart)
+2. Operador abre o PDV no Vercel
+3. O PDV no navegador fala com `127.0.0.1:39110` (ponte CBC HTTPS)

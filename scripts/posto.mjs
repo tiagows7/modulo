@@ -12,13 +12,40 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const services = [
-  { name: 'CBC', file: 'server/cbc-bridge.mjs', url: 'http://127.0.0.1:39100' },
+  { name: 'CBC', file: 'server/cbc-bridge.mjs', url: 'https://127.0.0.1:39110' },
   { name: 'TEF', file: 'server/tef-bridge.mjs', url: 'http://127.0.0.1:39101' },
   { name: 'Fiscal', file: 'server/fiscal-bridge.mjs', url: 'http://127.0.0.1:39102' },
   { name: 'SmartPOS', file: 'server/smartpos-bridge.mjs', url: 'http://127.0.0.1:39103' },
 ]
 
 const children = []
+
+/** Confia no certificado HTTPS local no Windows (sem clique no navegador). */
+function ensureLocalHttpsTrust() {
+  if (process.platform !== 'win32') return
+  const script = path.join(root, 'scripts', 'trust-local-https.ps1')
+  // Nao bloqueia a subida das pontes; roda em paralelo.
+  const child = spawn(
+    'powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script],
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+  )
+  child.stdout.on('data', (buf) => {
+    for (const line of String(buf).split(/\r?\n/)) {
+      if (line.trim()) console.log(line)
+    }
+  })
+  child.stderr.on('data', (buf) => {
+    for (const line of String(buf).split(/\r?\n/)) {
+      if (line.trim()) console.warn(line)
+    }
+  })
+  child.on('exit', (code) => {
+    if (code !== 0) {
+      console.warn(`[posto] Aviso: trust HTTPS encerrou com codigo ${code}`)
+    }
+  })
+}
 
 function start(service) {
   const child = spawn(process.execPath, [path.join(root, service.file)], {
@@ -54,6 +81,7 @@ console.log('Ctrl+C para parar todas as pontes.')
 console.log('')
 
 for (const service of services) start(service)
+ensureLocalHttpsTrust()
 
 function shutdown() {
   console.log('\nEncerrando pontes…')
