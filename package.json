@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "gateway": "node server/pdv-gateway.mjs",
+    "posto": "node scripts/posto.mjs",
     "cbc-bridge": "node server/cbc-bridge.mjs",
     "tef-bridge": "node server/tef-bridge.mjs",
     "tef-bridge:live": "set TEF_MODE=live&& node server/tef-bridge.mjs",

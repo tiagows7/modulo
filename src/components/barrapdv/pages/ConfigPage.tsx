@@ -1,4 +1,5 @@
 import { AdmBackButton } from '../components/AdmBackButton'
+import { CBC_CONFIG } from '../services/concentrador/config'
 
 export function ConfigPage() {
   return (
@@ -18,11 +19,13 @@ export function ConfigPage() {
             <div className="settings-item">
               <h3>Concentrador Companytec CBC</h3>
               <p>
-                Modo: <strong>TCP real</strong> · IP: <strong>192.168.1.7</strong> · Porta:{' '}
-                <strong>1771</strong>
+                Modo: <strong>{CBC_CONFIG.mode.toUpperCase()}</strong> · IP:{' '}
+                <strong>{CBC_CONFIG.host}</strong> · Porta: <strong>{CBC_CONFIG.port}</strong>
                 <br />
-                Suba a ponte com <code>npm run cbc-bridge</code>. Se aparecer offline, o concentrador
-                não está aceitando TCP nesse endereço.
+                No PC do posto rode <code>npm run posto</code> (sobe CBC/TEF/Fiscal/SmartPOS).
+                Se aparecer offline, o concentrador não está aceitando TCP nesse endereço.
+                <br />
+                Checklist: <code>docs/POSTO.md</code>
               </p>
             </div>
             <div className="settings-item">
@@ -32,8 +35,9 @@ export function ConfigPage() {
             <div className="settings-item">
               <h3>TEF CliSiTef64</h3>
               <p>
-                Débito, crédito e PIX via ponte local (<code>npm run tef-bridge</code> →{' '}
-                <code>127.0.0.1:39101</code>). DLLs em <code>server/clisitef64/</code> (
+                Débito, crédito e PIX via ponte local (<code>npm run posto</code> ou{' '}
+                <code>npm run tef-bridge</code> → <code>127.0.0.1:39101</code>). DLLs em{' '}
+                <code>server/clisitef64/</code> (
                 <code>CliSiTef64I.dll</code> do pacote Win64/Simulado). Modo atual no front:{' '}
                 <strong>live</strong>. Para mock: <code>TEF_MODE=mock</code> na ponte e{' '}
                 <code>mode: &apos;mock&apos;</code> em <code>src/services/tef/config.ts</code>.
