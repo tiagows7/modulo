@@ -198,7 +198,6 @@ function toForm(item: Cliente): ClienteForm {
     email: item.email ?? "",
     email2: item.email2 ?? "",
     contato: item.contato ?? "",
-    observacao: item.observacao ?? "",
     restricoes: item.restricoes ?? "",
     mensagem: item.mensagem ?? "",
     obriga_placa_venda: Boolean(item.obriga_placa_venda),
@@ -233,7 +232,6 @@ function toClientePayload(form: ClienteForm) {
     email: blank(form.email),
     email2: blank(form.email2),
     contato: blank(form.contato),
-    observacao: blank(form.observacao),
     restricoes: blank(form.restricoes),
     mensagem: blank(form.mensagem)?.slice(0, 200) ?? null,
     obriga_placa_venda: form.obriga_placa_venda,
@@ -309,7 +307,7 @@ export default function ClientesPage() {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, observacao, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, status",
+          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, status",
         )
         .order("created_at", { ascending: false });
 
@@ -908,17 +906,6 @@ export default function ClientesPage() {
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
                     {form.mensagem.length}/200
                   </div>
-                </CadastroField>
-                <CadastroField label="Observação" htmlFor="observacao" span="full">
-                  <textarea
-                    id="observacao"
-                    className="input-base input-compact"
-                    value={form.observacao}
-                    onChange={(e) => updateField("observacao", e.target.value)}
-                    disabled={busy}
-                    rows={3}
-                    style={{ resize: "vertical", minHeight: 64 }}
-                  />
                 </CadastroField>
               </CadastroFormGrid>
 
