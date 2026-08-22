@@ -141,6 +141,25 @@ export function AppShell() {
             <span className="chip">{now}</span>
           </div>
         </header>
+        {!connection.connected ? (
+          <div
+            role="status"
+            style={{
+              margin: '0 16px 8px',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid rgba(239,68,68,0.35)',
+              background: 'rgba(239,68,68,0.1)',
+              color: '#fecaca',
+              fontSize: 13,
+              lineHeight: 1.45,
+            }}
+          >
+            Ponte local offline. O Vercel não acessa o concentrador sozinho — no PC do
+            posto rode <code>npm run posto:autostart</code> uma vez (sobe CBC/TEF ao
+            logar). Depois abra o PDV neste mesmo computador.
+          </div>
+        ) : null}
         <main className="content">
           <Outlet />
         </main>

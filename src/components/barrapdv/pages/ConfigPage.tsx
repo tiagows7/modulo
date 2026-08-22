@@ -22,8 +22,9 @@ export function ConfigPage() {
                 Modo: <strong>{CBC_CONFIG.mode.toUpperCase()}</strong> · IP:{' '}
                 <strong>{CBC_CONFIG.host}</strong> · Porta: <strong>{CBC_CONFIG.port}</strong>
                 <br />
-                No PC do posto rode <code>npm run posto</code> (sobe CBC/TEF/Fiscal/SmartPOS).
-                Se aparecer offline, o concentrador não está aceitando TCP nesse endereço.
+                No PC do posto rode <code>npm run posto:autostart</code> uma vez
+                (sobe CBC/TEF/Fiscal/SmartPOS ao logar no Windows). Depois abra o PDV no
+                Vercel neste mesmo PC — sem precisar digitar comando todo dia.
                 <br />
                 Checklist: <code>docs/POSTO.md</code>
               </p>

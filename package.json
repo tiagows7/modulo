@@ -9,6 +9,8 @@
     "lint": "eslint",
     "gateway": "node server/pdv-gateway.mjs",
     "posto": "node scripts/posto.mjs",
+    "posto:autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-posto-autostart.ps1",
+    "posto:autostart:off": "powershell -ExecutionPolicy Bypass -File scripts/uninstall-posto-autostart.ps1",
     "cbc-bridge": "node server/cbc-bridge.mjs",
     "tef-bridge": "node server/tef-bridge.mjs",
     "tef-bridge:live": "set TEF_MODE=live&& node server/tef-bridge.mjs",
