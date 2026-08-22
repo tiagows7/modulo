@@ -78,8 +78,12 @@ export async function POST(req: Request) {
     });
   }
 
-  const role = String(data.user.user_metadata?.role || "admin").toLowerCase();
-  const dest = role === "pdv" ? "/pdv" : "/administrativo";
+  const role = String(data.user.user_metadata?.role || "").toLowerCase();
+  const userKey = username.toLowerCase();
+  const dest =
+    role === "pdv" || userKey === "pdv" || userKey.startsWith("pdv@")
+      ? "/pdv"
+      : "/administrativo";
   const storageKey = `sb-${projectRefFromUrl(url)}-auth-token`;
   const sessionJson = JSON.stringify(data.session);
 
