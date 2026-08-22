@@ -155,14 +155,7 @@ export function AppShell() {
               lineHeight: 1.45,
             }}
           >
-            Aguardando o concentrador… Se abriu pelo Vercel, o caixa deve usar{' '}
-            <a
-              href="http://127.0.0.1:39199/pdv"
-              style={{ color: '#fff', textDecoration: 'underline' }}
-            >
-              http://127.0.0.1:39199/pdv
-            </a>
-            (sobe sozinho no login).
+            Aguardando o concentrador neste PC…
           </div>
         ) : null}
         <main className="content">
