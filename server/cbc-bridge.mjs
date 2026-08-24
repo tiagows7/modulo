@@ -324,10 +324,12 @@ async function writeRead(command, opts = {}) {
 
 /**
  * Incrementa ponteiro de leitura no CBC (DLL Incrementa → (&I6F), sem resposta).
+ * Delay maior: alguns firmwares ignoram &A seguinte se &I for rápido demais.
  */
 async function incrementa() {
-  await writeRead(addChecksum('&I'), { timeoutMs: 250, allowEmpty: true })
-  await delay(40)
+  // Forma canônica do kit / CBCManager
+  await writeRead('(&I6F)', { timeoutMs: 400, allowEmpty: true })
+  await delay(120)
 }
 
 /**
@@ -474,6 +476,10 @@ function applyBicoCodesFromVisualizacao(nozzles, fueling) {
  * @param {number} [max]
  */
 async function drainSupplies(max = 12) {
+  /** @type {string | null} */
+  let lastId = null
+  let sameCount = 0
+
   for (let i = 0; i < max; i += 1) {
     let raw = ''
     try {
@@ -486,10 +492,28 @@ async function drainSupplies(max = 12) {
     const parsed = parseSupplyFrame(raw)
     if (!parsed) break
 
+    if (parsed.supplyId === lastId) {
+      sameCount += 1
+      console.warn(
+        `[CBC] Mesmo abast #${parsed.supplyId} após Incrementa (tentativa ${sameCount}) — reenviando (&I6F)`,
+      )
+      await incrementa()
+      if (sameCount >= 3) {
+        console.warn(
+          '[CBC] Ponteiro do concentrador não avançou; interrompendo drain para não loopar',
+        )
+        break
+      }
+      continue
+    }
+
+    sameCount = 0
+    lastId = parsed.supplyId
+
     if (!pendingSupplies.has(parsed.supplyId)) {
       pendingSupplies.set(parsed.supplyId, parsed)
       console.log(
-        `[CBC] Abast #${parsed.supplyId} bico ${parsed.nozzle} ${parsed.liters}L R$${parsed.total}`,
+        `[CBC] Abast #${parsed.supplyId} bico ${parsed.bicoCode || parsed.nozzle} ${parsed.liters}L R$${parsed.total}`,
       )
     }
 
@@ -498,6 +522,23 @@ async function drainSupplies(max = 12) {
   }
 
   return [...pendingSupplies.values()]
+}
+
+/**
+ * Remove do cache local (após gravar no banco / baixa / limpeza manual).
+ * @param {string[]} [ids]
+ */
+function clearPendingSupplies(ids) {
+  if (!ids || !ids.length) {
+    const n = pendingSupplies.size
+    pendingSupplies.clear()
+    return n
+  }
+  let removed = 0
+  for (const id of ids) {
+    if (pendingSupplies.delete(String(id))) removed += 1
+  }
+  return removed
 }
 
 /**
@@ -690,6 +731,37 @@ const server = http.createServer(async (req, res) => {
           pendingSupplies.delete(id)
           // CBC já foi incrementado na leitura; ACK só limpa cache local do PDV
           return { ok: true, command: 'ACK_SUPPLY', supplyId: id, response: '' }
+        }
+
+        if (body.command === 'ACK_SUPPLIES' || body.command === 'CLEAR_PENDING') {
+          let ids = []
+          if (Array.isArray(body.supplyIds)) {
+            ids = body.supplyIds.map((x) => String(x))
+          } else if (typeof body.supplyIds === 'string' && body.supplyIds.trim()) {
+            try {
+              const parsed = JSON.parse(body.supplyIds)
+              ids = Array.isArray(parsed)
+                ? parsed.map((x) => String(x))
+                : [String(body.supplyIds)]
+            } catch {
+              ids = body.supplyIds.split(',').map((s) => s.trim()).filter(Boolean)
+            }
+          } else if (body.supplyId) {
+            ids = [String(body.supplyId)]
+          }
+          const removed =
+            body.command === 'CLEAR_PENDING' && ids.length === 0
+              ? clearPendingSupplies([])
+              : clearPendingSupplies(ids)
+          console.log(
+            `[CBC] ${body.command}: removeu ${removed}, pending=${pendingSupplies.size}`,
+          )
+          return {
+            ok: true,
+            command: body.command,
+            removed,
+            pending: pendingSupplies.size,
+          }
         }
 
         await ensureSession(host, port)

@@ -171,6 +171,27 @@ export class CompanytecCbcClient {
       })
       const rows = await listAbastecimentosAbertos()
       tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+
+      // Limpa cache da ponte após gravar — senão o próximo poll reimporta os mesmos
+      // (o Incrementa no CBC já rodou na leitura; ACK só libera o pending local).
+      if (this.config.mode === 'tcp' && supplies.length) {
+        const supplyIds = [
+          ...new Set(
+            supplies
+              .map((s) => String(s.supplyId || '').trim())
+              .filter(Boolean),
+          ),
+        ]
+        if (supplyIds.length) {
+          try {
+            await this.sendBridgeCommand('ACK_SUPPLIES', {
+              supplyIds,
+            })
+          } catch (err) {
+            console.warn('[CBC] ACK_SUPPLIES falhou:', err)
+          }
+        }
+      }
     } catch (err) {
       console.warn('[CBC] Falha ao sincronizar abastecimentos:', err)
       const local = supplies
@@ -375,7 +396,10 @@ export class CompanytecCbcClient {
     })
   }
 
-  private async sendBridgeCommand(command: string, payload: Record<string, string>) {
+  private async sendBridgeCommand(
+    command: string,
+    payload: Record<string, string | string[]> = {},
+  ) {
     const { bridgeUrl, bridgeUrlHttp } = CBC_CONFIG.resolveBridgeUrls()
     const body = JSON.stringify({
       command,
