@@ -251,6 +251,7 @@ export class CompanytecCbcClient {
       source: 'companytec-cbc',
       receivedAt: now.toISOString(),
       medicao: payload.medicao ?? null,
+      cartaoAbastecimento: payload.cartaoAbastecimento ?? null,
     }
   }
 

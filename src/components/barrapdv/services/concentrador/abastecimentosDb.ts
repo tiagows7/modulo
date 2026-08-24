@@ -1,5 +1,9 @@
 /**
  * Persistência de abastecimentos no Supabase (grid PDV).
+ *
+ * - Chegada CBC: grava dados do concentrador + cartao_abastecimento.
+ *   Se cartao_abastecimento informado → preenche operador / operador_nome.
+ * - Baixa: só então preenche caixa_operador, caixa_data, caixa_turno, caixa_codigo.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { CbcSupplyPayload, TempFilling } from './types'
@@ -29,6 +33,7 @@ export type AbastecimentoRow = {
   situacao: number
   data: string | null
   medicao: number | null
+  cartao_abastecimento: string | null
   caixa_operador: string | null
   caixa_data: string | null
   caixa_turno: string | null
@@ -83,18 +88,47 @@ function combineDateTime(dateBr: string, timeHm: string): string {
 }
 
 function bicoFromPayload(p: CbcSupplyPayload): string {
-  const extra = p as CbcSupplyPayload & { bicoCode?: string }
-  if (extra.bicoCode) return String(extra.bicoCode).padStart(2, '0').toUpperCase()
+  if (p.bicoCode) return String(p.bicoCode).padStart(2, '0').toUpperCase()
   return String(p.nozzle).padStart(2, '0')
 }
 
 function numeroFromPayload(p: CbcSupplyPayload): number {
   const n = Number.parseInt(String(p.supplyId).replace(/\D/g, ''), 10)
   if (Number.isFinite(n) && n > 0) return n
-  // fallback estável a partir do id
   let hash = 0
   for (const ch of p.supplyId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return (hash % 900000) + 100000
+}
+
+function normalizeCartao(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const raw = String(value).trim().toUpperCase()
+  if (!raw || /^0+$/.test(raw)) return null
+  return raw
+}
+
+/** Monta patch de caixa_* a partir do caixa aberto (só na baixa). */
+async function caixaFieldsForBaixa(): Promise<{
+  caixa_operador: string | null
+  caixa_data: string | null
+  caixa_turno: string | null
+  caixa_codigo: number | null
+}> {
+  const caixa = await getCaixaAberto()
+  if (!caixa) {
+    return {
+      caixa_operador: null,
+      caixa_data: null,
+      caixa_turno: null,
+      caixa_codigo: null,
+    }
+  }
+  return {
+    caixa_operador: caixa.operador,
+    caixa_data: caixa.data,
+    caixa_turno: caixa.turno,
+    caixa_codigo: caixa.codigo,
+  }
 }
 
 export async function getCaixaAberto(): Promise<CaixaAberto | null> {
@@ -141,6 +175,7 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
     'gc'
   const dateBr = isoDateToBr(row.data)
   const time = timeFromHora(row.hora, '00:00')
+  const cartao = normalizeCartao(row.cartao_abastecimento)
   return {
     id: `cbc-${row.bico}-${row.numero}`,
     dbId: row.id,
@@ -152,13 +187,16 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
     total: Number(row.valor ?? 0),
     date: dateBr,
     time,
-    operator: String(row.operador_nome || row.operador || row.caixa_operador || ''),
+    operator: String(
+      row.operador_nome || row.operador || cartao || '',
+    ),
     status: 'disponivel',
     situacao: row.situacao === 1 ? 1 : 0,
     cbcSupplyId: String(row.numero),
     source: 'companytec-cbc',
     receivedAt: row.hora || new Date().toISOString(),
     medicao: row.medicao != null ? Number(row.medicao) : null,
+    cartaoAbastecimento: cartao,
     caixaCodigo: row.caixa_codigo,
     caixaData: row.caixa_data,
     caixaTurno: row.caixa_turno,
@@ -170,30 +208,23 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
 
 /**
  * Grava abastecimentos vindos do CBC (upsert por bico+numero).
- * Não reabre registros já baixados (situacao=1).
+ * Não preenche caixa_* — isso só ocorre na baixa.
+ * Se cartao_abastecimento vier informado → operador / operador_nome.
  */
 export async function upsertFromCbcSupplies(
   supplies: CbcSupplyPayload[],
-  opts: { defaultOperator: string },
+  _opts: { defaultOperator: string },
 ): Promise<void> {
   if (!supplies.length) return
   const sb = getClient()
-  const caixa = await getCaixaAberto()
 
   for (const p of supplies) {
     if (p.status === 'abastecendo') continue
-    const extra = p as CbcSupplyPayload & {
-      date?: string
-      time?: string
-      medicao?: number | null
-      bicoCode?: string
-    }
     const bico = bicoFromPayload(p)
     const numero = numeroFromPayload(p)
-    const dateBr =
-      extra.date || new Date().toLocaleDateString('pt-BR')
+    const dateBr = p.date || new Date().toLocaleDateString('pt-BR')
     const timeHm =
-      extra.time ||
+      p.time ||
       new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const isoDate = brDateToIso(dateBr)
     const horaIso = combineDateTime(dateBr, timeHm)
@@ -202,6 +233,7 @@ export async function upsertFromCbcSupplies(
     const fuel = fuels.find((f) => f.id === fuelId)
     const unitPrice = p.unitPrice || fuel?.price || 0
     const total = p.total || Number((p.liters * unitPrice).toFixed(2))
+    const cartao = normalizeCartao(p.cartaoAbastecimento)
 
     const { data: existing } = await sb
       .from('abastecimentos')
@@ -212,25 +244,33 @@ export async function upsertFromCbcSupplies(
 
     if (existing?.situacao === 1) continue
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       bico,
       numero,
       litros: p.liters,
       preco: unitPrice,
       valor: total,
       aba: p.nozzle,
-      operador: caixa?.operador || opts.defaultOperator,
-      operador_nome: opts.defaultOperator,
       produto: fuel?.name ?? null,
       produto_codigo: fuel?.productCode ?? null,
       hora: horaIso,
       data: isoDate,
-      medicao: extra.medicao ?? null,
+      medicao: p.medicao ?? null,
+      cartao_abastecimento: cartao,
       situacao: 0,
-      caixa_operador: caixa?.operador ?? opts.defaultOperator,
-      caixa_data: caixa?.data ?? isoDate,
-      caixa_turno: caixa?.turno ?? null,
-      caixa_codigo: caixa?.codigo ?? null,
+      // caixa_* só na baixa
+      caixa_operador: null,
+      caixa_data: null,
+      caixa_turno: null,
+      caixa_codigo: null,
+    }
+
+    if (cartao) {
+      payload.operador = cartao
+      payload.operador_nome = cartao
+    } else {
+      payload.operador = null
+      payload.operador_nome = null
     }
 
     if (existing?.id) {
@@ -250,9 +290,15 @@ export async function markAbastecimentoUsado(tempId: string): Promise<void> {
   const parsed = parseTempId(tempId)
   if (!parsed) return
   const sb = getClient()
+  const caixaPatch = await caixaFieldsForBaixa()
   const { error } = await sb
     .from('abastecimentos')
-    .update({ situacao: 1, baixado: 1, selecionado_app: null })
+    .update({
+      situacao: 1,
+      baixado: 1,
+      selecionado_app: null,
+      ...caixaPatch,
+    })
     .eq('bico', parsed.bico)
     .eq('numero', parsed.numero)
     .eq('situacao', 0)
@@ -272,6 +318,10 @@ export async function reabrirAbastecimentosDb(tempIds: string[]): Promise<void> 
         selecionado_app: null,
         documento: null,
         cupom: null,
+        caixa_operador: null,
+        caixa_data: null,
+        caixa_turno: null,
+        caixa_codigo: null,
       })
       .eq('bico', parsed.bico)
       .eq('numero', parsed.numero)
@@ -284,6 +334,7 @@ export async function setDocumentoCupom(
   opts: { documento: string; cupom: string },
 ): Promise<void> {
   const sb = getClient()
+  const caixaPatch = await caixaFieldsForBaixa()
   for (const id of tempIds) {
     const parsed = parseTempId(id)
     if (!parsed) continue
@@ -294,6 +345,7 @@ export async function setDocumentoCupom(
         cupom: opts.cupom,
         situacao: 1,
         baixado: 1,
+        ...caixaPatch,
       })
       .eq('bico', parsed.bico)
       .eq('numero', parsed.numero)
@@ -302,7 +354,6 @@ export async function setDocumentoCupom(
 }
 
 function parseTempId(tempId: string): { bico: string; numero: number } | null {
-  // cbc-{bico}-{numero}
   const m = /^cbc-([0-9A-Fa-f]+)-(\d+)$/.exec(tempId)
   if (!m) return null
   return { bico: m[1].toUpperCase().padStart(2, '0'), numero: Number(m[2]) }

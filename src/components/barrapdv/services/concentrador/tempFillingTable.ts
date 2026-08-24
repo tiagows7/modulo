@@ -91,6 +91,7 @@ class TempFillingTable {
       source: row.source === 'manual' ? 'manual' : 'companytec-cbc',
       receivedAt: String(row.receivedAt ?? new Date().toISOString()),
       medicao: row.medicao ?? null,
+      cartaoAbastecimento: row.cartaoAbastecimento ?? null,
       caixaCodigo: row.caixaCodigo ?? null,
       caixaData: row.caixaData ?? null,
       caixaTurno: row.caixaTurno ?? null,

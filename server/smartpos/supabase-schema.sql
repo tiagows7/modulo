@@ -39,10 +39,11 @@ create table if not exists public.abastecimentos (
   pdv text,
   data date,                                    -- data do concentrador
   medicao numeric(18, 3),                       -- encerrante final do bico
-  caixa_operador text,
+  cartao_abastecimento text,                    -- cartão frentista; alimenta operador_*
+  caixa_operador text,                          -- preenchido só na baixa
   caixa_data date,
   caixa_turno text,
-  caixa_codigo integer,                         -- código sequencial do caixa
+  caixa_codigo integer,                         -- código sequencial do caixa (na baixa)
   documento text,                               -- documento de receita da baixa
   cupom text,                                   -- número NFC-e / NF-e
   created_at timestamptz not null default now(),

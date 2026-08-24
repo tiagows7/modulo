@@ -31,6 +31,8 @@ export type TempFilling = {
   receivedAt: string
   /** Medição/encerrante final do bico (concentrador) */
   medicao?: number | null
+  /** Cartão do frentista (concentrador) — alimenta operador quando informado */
+  cartaoAbastecimento?: string | null
   caixaCodigo?: number | null
   caixaData?: string | null
   caixaTurno?: string | null
@@ -52,6 +54,7 @@ export type CbcSupplyPayload = {
   date?: string
   time?: string
   medicao?: number | null
+  cartaoAbastecimento?: string | null
 }
 
 export type CbcConnectionMode = 'mock' | 'tcp'

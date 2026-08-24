@@ -136,8 +136,8 @@ function applyVirgula(digits, virgula, kind) {
 
 /**
  * Layout observado no CBC real + putAbastGrid:
- * [2:8] total · [8:14] litros · [14:18] PU · [18:20] vírgula · [24:26] bico
- * [28:32] HHMM · [34:38] registro
+ * [2:8] total · [8:14] litros · [14:18] PU · [18:20] vírgula · [20:24] cartão
+ * [24:26] bico · [26:28] dia · [28:32] HHMM · [34:38] registro
  * @param {string} frame
  */
 function parseSupplyFrame(frame) {
@@ -168,6 +168,7 @@ function parseSupplyFrame(frame) {
   const totalRaw = st.length >= 8 ? st.slice(2, 8) : ''
   const litersRaw = st.length >= 14 ? st.slice(8, 14) : ''
   const priceRaw = st.length >= 18 ? st.slice(14, 18) : ''
+  const cartaoRaw = st.length >= 24 ? st.slice(20, 24).replace(/[^0-9A-Fa-f]/g, '') : ''
   const nozzleRaw = st.length >= 26 ? st.slice(24, 26) : ''
   const timeRaw = st.length >= 32 ? st.slice(28, 32) : ''
   const dayRaw = st.length >= 28 ? st.slice(26, 28) : ''
@@ -191,6 +192,10 @@ function parseSupplyFrame(frame) {
   const medicao = medicaoRaw
     ? applyVirgula(medicaoRaw, virgula, 'volume')
     : null
+
+  const cartaoNorm = cartaoRaw.replace(/^0+/, '') || ''
+  const cartaoAbastecimento =
+    cartaoNorm && cartaoRaw !== '0000' ? cartaoRaw.toUpperCase() : null
 
   const now = new Date()
   const dd = dayRaw && dayRaw !== '00' ? dayRaw : String(now.getDate()).padStart(2, '0')
@@ -217,6 +222,7 @@ function parseSupplyFrame(frame) {
     date,
     time,
     medicao,
+    cartaoAbastecimento,
     registro: registro || null,
     raw: st,
   }
