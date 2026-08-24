@@ -106,10 +106,8 @@ type BicoCadastro = {
   id: string
   numero: string
   filial: string | null
-  preco_atual: number | null
   produto_codigo: number | null
   produto_nome: string | null
-  produto_preco: number | null
 }
 
 /**
@@ -121,10 +119,9 @@ async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
       id,
       numero,
       filial,
-      preco_atual,
       codigo_concentrador,
       identificacao_bomba,
-      produtos ( codigo, descricao, preco_venda )
+      produtos ( codigo, descricao )
     `)
   const map = new Map<string, BicoCadastro>()
   if (error) {
@@ -134,8 +131,8 @@ async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
 
   for (const row of data ?? []) {
     const prodRaw = row.produtos as
-      | { codigo: string; descricao: string; preco_venda: number | null }
-      | { codigo: string; descricao: string; preco_venda: number | null }[]
+      | { codigo: string; descricao: string }
+      | { codigo: string; descricao: string }[]
       | null
     const prod = Array.isArray(prodRaw) ? prodRaw[0] ?? null : prodRaw
     const prodCodigoNum = prod?.codigo
@@ -143,14 +140,10 @@ async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
       : NaN
     const entry: BicoCadastro = {
       id: String(row.id),
-      numero: String(row.numero ?? ''),
+      numero: String(row.numero ?? '').trim(),
       filial: row.filial ? String(row.filial) : null,
-      preco_atual:
-        row.preco_atual != null ? Number(row.preco_atual) : null,
       produto_codigo: Number.isFinite(prodCodigoNum) ? prodCodigoNum : null,
       produto_nome: prod?.descricao ? String(prod.descricao) : null,
-      produto_preco:
-        prod?.preco_venda != null ? Number(prod.preco_venda) : null,
     }
 
     const keys = [
@@ -239,8 +232,7 @@ export async function listAbastecimentosAbertos(): Promise<AbastecimentoRow[]> {
 }
 
 export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
-  const nozzle = Number.parseInt(String(row.bico), 16)
-  const nozzleDec = Number.isFinite(nozzle) && nozzle > 0 ? nozzle : Number(row.bico) || 0
+  const nozzleDec = Number.parseInt(String(row.bico).replace(/\D/g, ''), 10) || 0
   const productCode = normalizeBicoCode(row.produto_codigo ?? '')
   const fuelId =
     PRODUCT_MAP[productCode] ??
@@ -250,8 +242,9 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
   const dateBr = isoDateToBr(row.data)
   const time = timeFromHora(row.hora, '00:00')
   const cartao = normalizeCartao(row.cartao_abastecimento)
+  const bicoKey = normalizeBicoCode(row.bico)
   return {
-    id: `cbc-${row.bico}-${row.numero}`,
+    id: `cbc-${bicoKey}-${row.numero}`,
     dbId: row.id,
     nozzle: nozzleDec,
     fuelId,
@@ -295,7 +288,7 @@ export async function upsertFromCbcSupplies(
 
   for (const p of supplies) {
     if (p.status === 'abastecendo') continue
-    const bico = bicoFromPayload(p)
+    const codigoConcentrador = bicoFromPayload(p)
     const numero = numeroFromPayload(p)
     const dateBr = p.date || new Date().toLocaleDateString('pt-BR')
     const timeHm =
@@ -305,8 +298,12 @@ export async function upsertFromCbcSupplies(
     const horaIso = combineDateTime(dateBr, timeHm)
     const cartao = normalizeCartao(p.cartaoAbastecimento)
 
-    // Casa código CBC com public.bicos.codigo_concentrador e usa o produto do cadastro.
-    const bicoCad = bicosMap.get(bico) ?? null
+    // Casa código CBC com bicos.codigo_concentrador; grava o número do bico do cadastro.
+    const bicoCad = bicosMap.get(codigoConcentrador) ?? null
+    const bico = bicoCad?.numero
+      ? normalizeBicoCode(bicoCad.numero)
+      : codigoConcentrador
+
     const fuelIdFallback =
       PRODUCT_MAP[normalizeBicoCode(p.productCode)] ??
       PRODUCT_MAP[String(p.productCode).padStart(2, '0')] ??
@@ -318,21 +315,21 @@ export async function upsertFromCbcSupplies(
       bicoCad?.produto_nome || fuelFallback?.name || null
     const produtoCodigo =
       bicoCad?.produto_codigo ?? fuelFallback?.productCode ?? null
-    const unitPrice =
-      p.unitPrice ||
-      bicoCad?.preco_atual ||
-      bicoCad?.produto_preco ||
-      fuelFallback?.price ||
-      0
-    const total = p.total || Number((p.liters * unitPrice).toFixed(2))
+
+    // Preço e total vêm só do concentrador (não do cadastro de bicos).
+    const unitPrice = Number(p.unitPrice) || 0
+    const total =
+      Number(p.total) > 0
+        ? Number(p.total)
+        : Number((p.liters * unitPrice).toFixed(2))
 
     if (!bicoCad) {
       console.warn(
-        `[abastecimentos] bico concentrador "${bico}" sem cadastro em bicos.codigo_concentrador`,
+        `[abastecimentos] bico concentrador "${codigoConcentrador}" sem cadastro em bicos.codigo_concentrador`,
       )
     } else if (!bicoCad.produto_nome) {
       console.warn(
-        `[abastecimentos] bico concentrador "${bico}" cadastrado sem produto vinculado`,
+        `[abastecimentos] bico concentrador "${codigoConcentrador}" cadastrado sem produto vinculado`,
       )
     }
 
