@@ -214,7 +214,7 @@ export default function UsuariosPage() {
             />
           }
         >
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError ?? ""} />
           <CadastroFormGrid>
             <CadastroField label="Filial" htmlFor="usuario-filial">
               <select
