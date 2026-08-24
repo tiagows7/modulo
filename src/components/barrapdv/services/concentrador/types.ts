@@ -3,6 +3,8 @@ export type TempFillingStatus = 'disponivel' | 'abastecendo' | 'lancado'
 
 export type TempFilling = {
   id: string
+  /** id na tabela public.abastecimentos (quando persistido) */
+  dbId?: number | null
   /** Número do bico no concentrador */
   nozzle: number
   /** Código interno do combustível no PDV */
@@ -27,6 +29,29 @@ export type TempFilling = {
   /** Origem do registro */
   source: 'companytec-cbc' | 'manual'
   receivedAt: string
+  /** Medição/encerrante final do bico (concentrador) */
+  medicao?: number | null
+  caixaCodigo?: number | null
+  caixaData?: string | null
+  caixaTurno?: string | null
+  caixaOperador?: string | null
+  documento?: string | null
+  cupom?: string | null
+}
+
+/** Resposta bruta parseada de um abastecimento CBC */
+export type CbcSupplyPayload = {
+  supplyId: string
+  nozzle: number
+  productCode: string
+  liters: number
+  unitPrice: number
+  total: number
+  status: 'disponivel' | 'abastecendo'
+  bicoCode?: string
+  date?: string
+  time?: string
+  medicao?: number | null
 }
 
 export type CbcConnectionMode = 'mock' | 'tcp'
@@ -67,15 +92,4 @@ export type CbcConnectionState = {
   lastError: string | null
   message: string
   nozzles: CbcNozzleStatus[]
-}
-
-/** Resposta bruta parseada de um abastecimento CBC */
-export type CbcSupplyPayload = {
-  supplyId: string
-  nozzle: number
-  productCode: string
-  liters: number
-  unitPrice: number
-  total: number
-  status: 'disponivel' | 'abastecendo'
 }

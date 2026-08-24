@@ -172,6 +172,8 @@ function parseSupplyFrame(frame) {
   const timeRaw = st.length >= 32 ? st.slice(28, 32) : ''
   const dayRaw = st.length >= 28 ? st.slice(26, 28) : ''
   const registro = st.length >= 38 ? st.slice(34, 38).replace(/\D/g, '') : ''
+  // Encerrante / medição final do bico (quando o frame traz dígitos após o registro)
+  const medicaoRaw = st.length >= 46 ? st.slice(38, 46).replace(/\D/g, '') : ''
 
   // DT435: código de bico é hexadecimal (ex.: 04, 0A)
   const bicoCode = nozzleRaw.toUpperCase()
@@ -185,6 +187,10 @@ function parseSupplyFrame(frame) {
   if (!total || total < 0.05 || (computed > 0 && Math.abs(total - computed) / computed > 0.35)) {
     total = computed
   }
+
+  const medicao = medicaoRaw
+    ? applyVirgula(medicaoRaw, virgula, 'volume')
+    : null
 
   const now = new Date()
   const dd = dayRaw && dayRaw !== '00' ? dayRaw : String(now.getDate()).padStart(2, '0')
@@ -210,6 +216,8 @@ function parseSupplyFrame(frame) {
     virgula,
     date,
     time,
+    medicao,
+    registro: registro || null,
     raw: st,
   }
 }

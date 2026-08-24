@@ -75,6 +75,7 @@ class TempFillingTable {
       row.situacao === 1 || status === 'lancado' ? 1 : 0
     return {
       id: String(row.id ?? ''),
+      dbId: row.dbId ?? null,
       nozzle: Number(row.nozzle ?? 0),
       fuelId: String(row.fuelId ?? ''),
       cbcProductCode: String(row.cbcProductCode ?? ''),
@@ -89,6 +90,13 @@ class TempFillingTable {
       cbcSupplyId: String(row.cbcSupplyId ?? ''),
       source: row.source === 'manual' ? 'manual' : 'companytec-cbc',
       receivedAt: String(row.receivedAt ?? new Date().toISOString()),
+      medicao: row.medicao ?? null,
+      caixaCodigo: row.caixaCodigo ?? null,
+      caixaData: row.caixaData ?? null,
+      caixaTurno: row.caixaTurno ?? null,
+      caixaOperador: row.caixaOperador ?? null,
+      documento: row.documento ?? null,
+      cupom: row.cupom ?? null,
     }
   }
 
@@ -166,6 +174,12 @@ class TempFillingTable {
         this.rows.push(incoming)
       }
     })
+    this.persist()
+  }
+
+  /** Substitui o cache local pelo snapshot do banco (abertos). */
+  replaceAll(rows: TempFilling[]) {
+    this.rows = rows.map((r) => this.normalizeRow(r))
     this.persist()
   }
 

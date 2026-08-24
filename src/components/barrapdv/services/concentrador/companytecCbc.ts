@@ -1,6 +1,14 @@
 import { fuels } from '../../data/mock'
 import { CBC_CONFIG } from './config'
 import { tempFillingTable } from './tempFillingTable'
+import { PRODUCT_MAP, NOZZLE_FUEL_MAP } from './productMaps'
+import {
+  listAbastecimentosAbertos,
+  markAbastecimentoUsado,
+  reabrirAbastecimentosDb,
+  rowToTempFilling,
+  upsertFromCbcSupplies,
+} from './abastecimentosDb'
 import type {
   CbcConfig,
   CbcConnectionState,
@@ -10,25 +18,6 @@ import type {
 
 type StateListener = (state: CbcConnectionState) => void
 
-const PRODUCT_MAP: Record<string, string> = {
-  '01': 'gc',
-  '02': 'ga',
-  '03': 'et',
-  '04': 'd10',
-  '05': 'd500',
-}
-
-/** Fallback por bico quando o frame CBC não traz código de produto (socket). */
-const NOZZLE_FUEL_MAP: Record<number, string> = {
-  1: 'gc',
-  2: 'ga',
-  3: 'et',
-  4: 'd10',
-  5: 'd500',
-  6: 'gc',
-  7: 'ga',
-  8: 'et',
-}
 
 /**
  * Cliente Companytec CBC.
@@ -91,9 +80,12 @@ export class CompanytecCbcClient {
   start() {
     if (this.timer != null) return
 
-    // Em TCP, começa limpo — só entra o que o CBC real enviar
+    // Em TCP, carrega abertos do banco (não depende só do localStorage)
     if (this.config.mode === 'tcp') {
       tempFillingTable.clear()
+      void listAbastecimentosAbertos()
+        .then((rows) => tempFillingTable.replaceAll(rows.map(rowToTempFilling)))
+        .catch(() => undefined)
     }
 
     // No modo simulado, começa zerado — só entra o que o CBC mock enviar
@@ -129,8 +121,7 @@ export class CompanytecCbcClient {
   }
 
   /**
-   * Ciclo de varredura — não bloqueia a UI.
-   * Lê abastecimentos do CBC e grava na tabela temporária.
+   * Ciclo de varredura — CBC → public.abastecimentos → grid.
    */
   async poll() {
     if (this.polling) return
@@ -138,23 +129,19 @@ export class CompanytecCbcClient {
     try {
       if (this.config.mode === 'mock') {
         const supplies = await this.pollMock()
-        const rows = supplies.map((s) => this.toTempFilling(s))
-        if (rows.length) tempFillingTable.upsertMany(rows)
+        await this.persistAndReload(supplies)
         this.setState({
           connected: true,
           lastPollAt: new Date().toISOString(),
           lastError: null,
           nozzles: this.mockNozzleStatuses(),
-          message: `Simulação CBC · ${this.config.host} · ${tempFillingTable.countDisponiveis()} disponíveis`,
+          message: `Simulação CBC · ${tempFillingTable.countDisponiveis()} disponíveis`,
         })
         return
       }
 
       const { supplies, nozzles } = await this.pollTcpBridge()
-      const rows = supplies.map((s) => this.toTempFilling(s))
-      if (rows.length) {
-        tempFillingTable.upsertMany(rows)
-      }
+      await this.persistAndReload(supplies)
 
       this.setState({
         connected: true,
@@ -176,24 +163,59 @@ export class CompanytecCbcClient {
     }
   }
 
+  /** Persistência Supabase + refresh do grid (situacao=0). */
+  private async persistAndReload(supplies: CbcSupplyPayload[]) {
+    try {
+      await upsertFromCbcSupplies(supplies, {
+        defaultOperator: this.config.defaultOperator,
+      })
+      const rows = await listAbastecimentosAbertos()
+      tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+    } catch (err) {
+      console.warn('[CBC] Falha ao sincronizar abastecimentos:', err)
+      const local = supplies
+        .filter((s) => s.status !== 'abastecendo')
+        .map((s) => this.toTempFilling(s))
+      if (local.length) tempFillingTable.upsertMany(local)
+    }
+  }
+
   /**
    * Confirma/baixa abastecimento no CBC após lançar no cupom ou baixar sem nota.
-   * Marca situacao = 1 na tabela temporária.
+   * Marca situacao = 1 em public.abastecimentos.
    */
   async acknowledgeSupply(fillingId: string) {
     const row = tempFillingTable.getById(fillingId)
     if (!row || row.situacao === 1) return
 
     if (this.config.mode === 'tcp') {
-      await this.sendBridgeCommand('ACK_SUPPLY', { supplyId: row.cbcSupplyId })
+      try {
+        await this.sendBridgeCommand('ACK_SUPPLY', { supplyId: row.cbcSupplyId })
+      } catch {
+        /* segue com baixa no banco */
+      }
     }
 
+    try {
+      await markAbastecimentoUsado(fillingId)
+    } catch (err) {
+      console.warn('[CBC] mark usado DB:', err)
+    }
     tempFillingTable.markAsUsado(fillingId)
   }
 
   /** Baixa o abastecimento sem lançar no cupom / emitir nota. */
   async baixaSemNota(fillingId: string) {
     await this.acknowledgeSupply(fillingId)
+  }
+
+  async reabrirSupplies(ids: string[]) {
+    try {
+      await reabrirAbastecimentosDb(ids)
+    } catch (err) {
+      console.warn('[CBC] reabrir DB:', err)
+    }
+    tempFillingTable.reabrirMany(ids)
   }
 
   private toTempFilling(payload: CbcSupplyPayload): TempFilling {
@@ -206,19 +228,21 @@ export class CompanytecCbcClient {
     const unitPrice = payload.unitPrice || fuel?.price || 0
     const total =
       payload.total || Number((payload.liters * unitPrice).toFixed(2))
-    const extra = payload as CbcSupplyPayload & { date?: string; time?: string }
+    const bico = (payload.bicoCode || String(payload.nozzle)).padStart(2, '0')
+    const numero =
+      Number.parseInt(String(payload.supplyId).replace(/\D/g, ''), 10) || 0
 
     return {
-      id: `cbc-${payload.supplyId}`,
+      id: `cbc-${bico}-${numero || payload.supplyId}`,
       nozzle: payload.nozzle,
       fuelId,
       cbcProductCode: payload.productCode,
       quantity: payload.liters,
       unitPrice,
       total,
-      date: extra.date || now.toLocaleDateString('pt-BR'),
+      date: payload.date || now.toLocaleDateString('pt-BR'),
       time:
-        extra.time ||
+        payload.time ||
         now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       operator: this.config.defaultOperator,
       status: payload.status,
@@ -226,6 +250,7 @@ export class CompanytecCbcClient {
       cbcSupplyId: payload.supplyId,
       source: 'companytec-cbc',
       receivedAt: now.toISOString(),
+      medicao: payload.medicao ?? null,
     }
   }
 

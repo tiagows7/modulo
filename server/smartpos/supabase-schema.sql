@@ -37,6 +37,14 @@ create table if not exists public.abastecimentos (
   cartao_hora text,
   baixado integer null,                         -- ABABXA
   pdv text,
+  data date,                                    -- data do concentrador
+  medicao numeric(18, 3),                       -- encerrante final do bico
+  caixa_operador text,
+  caixa_data date,
+  caixa_turno text,
+  caixa_codigo integer,                         -- código sequencial do caixa
+  documento text,                               -- documento de receita da baixa
+  cupom text,                                   -- número NFC-e / NF-e
   created_at timestamptz not null default now(),
   unique (bico, numero)
 );

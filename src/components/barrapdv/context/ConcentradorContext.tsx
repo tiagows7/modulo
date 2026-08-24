@@ -73,7 +73,7 @@ export function ConcentradorProvider({ children }: { children: ReactNode }) {
         await companytecCbc.baixaSemNota(id)
       },
       reabrirAbastecimentos(ids: string[]) {
-        tempFillingTable.reabrirMany(ids)
+        void companytecCbc.reabrirSupplies(ids)
       },
     }),
     [tempRows, connection],

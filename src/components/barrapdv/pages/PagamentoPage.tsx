@@ -599,6 +599,23 @@ export function PagamentoPage() {
       const doc = result.document
       setLastFiscalDoc(doc)
 
+      const combustivelIds = cart
+        .filter((item) => item.kind === 'combustivel')
+        .map((item) => item.id)
+      if (combustivelIds.length > 0) {
+        try {
+          const { setDocumentoCupom } = await import(
+            '../services/concentrador/abastecimentosDb'
+          )
+          await setDocumentoCupom(combustivelIds, {
+            documento: doc.tipo || 'NFC-e',
+            cupom: String(doc.numero ?? doc.id ?? ''),
+          })
+        } catch (err) {
+          console.warn('[pagamento] atualizar documento/cupom:', err)
+        }
+      }
+
       const sendInfo = result.send?.ok ? `\nEnvio NF-e: ${result.send.sentTo}` : ''
       const querImprimir = await showConfirm({
         title: 'Imprimir cupom',
