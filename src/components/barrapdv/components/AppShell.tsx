@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { operators, station } from '../data/mock'
 import { useConcentrador } from '../context/ConcentradorContext'
 import { startFullscreenLock } from '../utils/fullscreen'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { to: '/venda', label: 'Venda', icon: IconPump },
@@ -74,11 +75,70 @@ const titles: Record<string, string> = {
   '/config': 'Configurações',
 }
 
+function useHeaderFilial() {
+  const [fantasia, setFantasia] = useState<string | null>(null)
+  const [operatorName, setOperatorName] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      const { data } = await supabase.auth.getUser()
+      if (cancelled) return
+      const user = data.user
+      if (!user) {
+        setFantasia(null)
+        setOperatorName(null)
+        return
+      }
+
+      const meta = user.user_metadata ?? {}
+      const name = String(meta.name || meta.full_name || '').trim()
+      setOperatorName(name || (user.email?.split('@')[0] ?? null))
+
+      const filialId = meta.filial ? String(meta.filial) : ''
+      if (!filialId) {
+        setFantasia(null)
+        return
+      }
+
+      const { data: filial } = await supabase
+        .from('filial')
+        .select('fantasia, razao_social, codigo')
+        .eq('id', filialId)
+        .maybeSingle()
+
+      if (cancelled) return
+      if (!filial) {
+        setFantasia(null)
+        return
+      }
+
+      const label =
+        String(filial.fantasia || '').trim() ||
+        String(filial.razao_social || '').trim() ||
+        String(filial.codigo || '').trim()
+      setFantasia(label || null)
+    }
+
+    void load()
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      void load()
+    })
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
+  }, [])
+
+  return { fantasia, operatorName }
+}
+
 export function AppShell() {
-  const navigate = useNavigate()
   const { pathname } = useLocation()
   const title = titles[pathname] ?? 'PDV Posto'
   const operator = operators[0]
+  const { fantasia, operatorName } = useHeaderFilial()
   const { connection } = useConcentrador()
   const now = new Date().toLocaleString('pt-BR', {
     day: '2-digit',
@@ -90,6 +150,9 @@ export function AppShell() {
 
   // Tela cheia travada: Esc/F11 não devem tirar o PDV da tela cheia.
   useEffect(() => startFullscreenLock(), [])
+
+  const stationLabel = fantasia || station.name
+  const operatorLabel = operatorName || operator.name
 
   return (
     <div className="app-shell">
@@ -127,7 +190,9 @@ export function AppShell() {
         <header className="top-bar">
           <div className="top-bar-title">
             <h1>{title}</h1>
-            <strong className="station-name">{station.name}</strong>
+            <strong className="station-name" title={stationLabel}>
+              {stationLabel}
+            </strong>
           </div>
           <div className="top-meta">
             <span
@@ -137,7 +202,7 @@ export function AppShell() {
               {connection.connected ? 'Concentrador conectado' : 'Concentrador offline'}
             </span>
             <span className="chip ok">Caixa aberto</span>
-            <span className="chip">{operator.name}</span>
+            <span className="chip">{operatorLabel}</span>
             <span className="chip">{now}</span>
           </div>
         </header>
