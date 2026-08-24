@@ -1,14 +1,16 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Pencil, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
+import { useDbStatus } from "@/components/DbStatusProvider";
 import {
   CadastroField,
   CadastroFormActions,
   CadastroFormError,
   CadastroFormGrid,
   CadastroModal,
+  CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 
@@ -21,6 +23,7 @@ type AuthUserRow = {
   filial_id: string | null;
   last_sign_in_at: string | null;
   banned: boolean;
+  status: string;
 };
 
 type FilialOpt = {
@@ -30,13 +33,36 @@ type FilialOpt = {
   razao_social: string;
 };
 
+type UsuarioForm = {
+  usuario: string;
+  nome: string;
+  role: string;
+  filial_id: string;
+  password: string;
+  status: string;
+};
+
+const emptyForm: UsuarioForm = {
+  usuario: "",
+  nome: "",
+  role: "pdv",
+  filial_id: "",
+  password: "",
+  status: "ativo",
+};
+
+const ROLE_OPTIONS = [
+  { value: "super_admin", label: "Super Admin" },
+  { value: "gerente", label: "Gerente" },
+  { value: "pdv", label: "Operador PDV" },
+];
+
 function roleLabel(role: string) {
+  const found = ROLE_OPTIONS.find((r) => r.value === role);
+  if (found) return found.label;
   const r = role.trim().toLowerCase();
-  if (r === "super_admin" || r === "superadmin" || r === "admin") {
-    return "Super Admin";
-  }
-  if (r === "pdv" || r === "operador" || r === "caixa") return "Operador PDV";
-  if (r === "gerente") return "Gerente";
+  if (r === "admin" || r === "superadmin") return "Super Admin";
+  if (r === "operador" || r === "caixa") return "Operador PDV";
   return role || "—";
 }
 
@@ -72,13 +98,16 @@ const columns = [
 ];
 
 export default function UsuariosPage() {
+  const { busy, pesquisar, gravar } = useDbStatus();
   const [users, setUsers] = useState<AuthUserRow[]>([]);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AuthUserRow | null>(null);
-  const [filialId, setFilialId] = useState("");
+  const [deleting, setDeleting] = useState<AuthUserRow | null>(null);
+  const [form, setForm] = useState<UsuarioForm>(emptyForm);
+  const [formError, setFormError] = useState("");
 
   const filialById = useCallback(
     (id: string | null) =>
@@ -86,65 +115,179 @@ export default function UsuariosPage() {
     [filiais],
   );
 
-  const load = useCallback(async () => {
-    setLoadError(null);
-    const [usersRes, filiaisRes] = await Promise.all([
-      fetch("/api/usuarios"),
-      supabase
-        .from("filial")
-        .select("id, codigo, fantasia, razao_social")
-        .order("codigo", { ascending: true }),
-    ]);
+  const loadData = useCallback(async () => {
+    await pesquisar(async () => {
+      setLoadError("");
+      const [usersRes, filiaisRes] = await Promise.all([
+        fetch("/api/usuarios"),
+        supabase
+          .from("filial")
+          .select("id, codigo, fantasia, razao_social")
+          .order("codigo", { ascending: true }),
+      ]);
 
-    if (filiaisRes.error) {
-      setLoadError(filiaisRes.error.message);
-      return;
-    }
-    setFiliais((filiaisRes.data as FilialOpt[]) ?? []);
+      if (filiaisRes.error) {
+        setLoadError(filiaisRes.error.message);
+        setUsers([]);
+        return;
+      }
+      setFiliais((filiaisRes.data as FilialOpt[]) ?? []);
 
-    if (!usersRes.ok) {
-      const body = await usersRes.json().catch(() => ({}));
-      setLoadError(body.error || `Erro ao listar usuários (${usersRes.status})`);
-      return;
-    }
-    const body = await usersRes.json();
-    setUsers(body.users ?? []);
-  }, []);
+      if (!usersRes.ok) {
+        const body = await usersRes.json().catch(() => ({}));
+        setLoadError(
+          body.error || `Erro ao listar usuários (${usersRes.status})`,
+        );
+        setUsers([]);
+        return;
+      }
+      const body = await usersRes.json();
+      setUsers((body.users ?? []) as AuthUserRow[]);
+    });
+  }, [pesquisar]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadData();
+  }, [loadData]);
 
-  function openEdit(user: AuthUserRow) {
-    setActionError(null);
-    setEditing(user);
-    setFilialId(user.filial_id ?? "");
-  }
+  const setField = <K extends keyof UsuarioForm>(key: K, value: UsuarioForm[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
-  async function saveFilial(e: FormEvent) {
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      filial_id: filiais.length === 1 ? filiais[0].id : "",
+    });
+    setFormError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (item: AuthUserRow) => {
+    setEditing(item);
+    setForm({
+      usuario: item.usuario,
+      nome: item.nome,
+      role:
+        item.role === "admin" || item.role === "superadmin"
+          ? "super_admin"
+          : item.role === "operador" || item.role === "caixa"
+            ? "pdv"
+            : item.role || "pdv",
+      filial_id: item.filial_id ?? "",
+      password: "",
+      status: item.banned || item.status === "inativo" ? "inativo" : "ativo",
+    });
+    setFormError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const openDelete = (item: AuthUserRow) => {
+    setDeleting(item);
+    setActionError("");
+  };
+
+  const closeModal = () => {
+    if (busy) return;
+    setModalOpen(false);
+    setEditing(null);
+    setFormError("");
+  };
+
+  const closeDelete = () => {
+    if (busy) return;
+    setDeleting(null);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!editing) return;
-    setBusy(true);
-    setActionError(null);
-    try {
-      const res = await fetch("/api/usuarios", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editing.id,
-          filial_id: filialId || null,
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "Falha ao salvar.");
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Falha ao salvar.");
-    } finally {
-      setBusy(false);
+    const usuario = form.usuario.trim();
+    const nome = form.nome.trim();
+    if (!usuario) {
+      setFormError("Informe o usuário (login).");
+      return;
     }
-  }
+    if (!nome) {
+      setFormError("Informe o nome completo.");
+      return;
+    }
+    if (!editing && form.password.trim().length < 6) {
+      setFormError("Senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (editing && form.password.trim() && form.password.trim().length < 6) {
+      setFormError("Senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    setFormError("");
+    try {
+      await gravar(async () => {
+        if (editing) {
+          const payload: Record<string, unknown> = {
+            id: editing.id,
+            usuario,
+            nome,
+            role: form.role,
+            filial_id: form.filial_id || null,
+            status: form.status,
+          };
+          if (form.password.trim()) payload.password = form.password.trim();
+          const res = await fetch("/api/usuarios", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Falha ao salvar.");
+        } else {
+          const res = await fetch("/api/usuarios", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              usuario,
+              nome,
+              role: form.role,
+              filial_id: form.filial_id || null,
+              password: form.password.trim(),
+              status: form.status,
+            }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Falha ao criar.");
+        }
+      });
+      setModalOpen(false);
+      setEditing(null);
+      await loadData();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setActionError("");
+    try {
+      await gravar(async () => {
+        const res = await fetch(
+          `/api/usuarios?id=${encodeURIComponent(deleting.id)}`,
+          { method: "DELETE" },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "Falha ao excluir.");
+      });
+      setDeleting(null);
+      await loadData();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Falha ao excluir o usuário.",
+      );
+    }
+  };
 
   const rows = users.map((u) => ({
     usuario: u.usuario,
@@ -152,35 +295,30 @@ export default function UsuariosPage() {
     perfil: roleLabel(u.role),
     filial: filialLabel(filialById(u.filial_id)),
     ultimoAcesso: formatLastAccess(u.last_sign_in_at),
-    status: u.banned ? (
-      <span className="badge badge-warning">Inativo</span>
-    ) : (
-      <span className="badge badge-success">Ativo</span>
+    status: (
+      <span
+        className={`badge ${
+          u.banned || u.status === "inativo" ? "badge-warning" : "badge-success"
+        }`}
+      >
+        {u.banned || u.status === "inativo" ? "Inativo" : "Ativo"}
+      </span>
     ),
     acoes: (
-      <div className="cadastro-row-actions">
-        <button
-          type="button"
-          className="cadastro-btn-edit"
-          onClick={() => openEdit(u)}
-          disabled={busy}
-          title="Editar filial"
-        >
-          <Pencil size={12} />
-          Filial
-        </button>
-      </div>
+      <CadastroRowActions
+        disabled={busy}
+        onEdit={() => openEdit(u)}
+        onDelete={() => openDelete(u)}
+      />
     ),
   }));
 
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">
-          Erro ao carregar usuários: {loadError}
-        </div>
+        <div className="cadastro-alert">Erro ao carregar usuários: {loadError}</div>
       ) : null}
-      {actionError && !editing ? (
+      {actionError && !deleting ? (
         <div className="cadastro-alert">{actionError}</div>
       ) : null}
 
@@ -191,37 +329,97 @@ export default function UsuariosPage() {
         columns={columns}
         rows={rows}
         addLabel="Novo Usuário"
+        onAdd={busy ? undefined : openCreate}
       />
 
-      {editing ? (
+      {modalOpen ? (
         <CadastroModal
-          title="Vincular filial"
-          titleId="usuario-filial-title"
+          title={editing ? "Editar Usuário" : "Novo Usuário"}
+          titleId="usuario-title"
           subtitle={
-            <>
-              {editing.nome} <span style={{ opacity: 0.7 }}>({editing.usuario})</span>
-            </>
+            editing ? (
+              <>
+                Login:{" "}
+                <strong style={{ color: "var(--text-secondary)" }}>
+                  {editing.usuario}
+                </strong>
+              </>
+            ) : (
+              "O login no sistema usa o usuário informado (ex.: pdv)."
+            )
           }
-          onClose={() => !busy && setEditing(null)}
+          onClose={closeModal}
           disabled={busy}
+          width={520}
           asForm
-          onSubmit={saveFilial}
+          onSubmit={handleSubmit}
           footer={
-            <CadastroFormActions
-              busy={busy}
-              onCancel={() => setEditing(null)}
-              submitLabel="Salvar"
-            />
+            <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
           }
         >
-          <CadastroFormError message={actionError ?? ""} />
+          <CadastroFormError message={formError} />
           <CadastroFormGrid>
-            <CadastroField label="Filial" htmlFor="usuario-filial">
+            <CadastroField label="Usuário (login)" htmlFor="usu-login">
+              <input
+                id="usu-login"
+                className="input-base input-compact"
+                value={form.usuario}
+                onChange={(e) => setField("usuario", e.target.value)}
+                placeholder="Ex.: operador1"
+                disabled={busy}
+                required
+                autoFocus={!editing}
+                autoComplete="off"
+              />
+            </CadastroField>
+
+            <CadastroField label="Status" htmlFor="usu-status">
               <select
-                id="usuario-filial"
-                className="input-base"
-                value={filialId}
-                onChange={(e) => setFilialId(e.target.value)}
+                id="usu-status"
+                className="input-base input-compact"
+                value={form.status}
+                onChange={(e) => setField("status", e.target.value)}
+                disabled={busy}
+              >
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </CadastroField>
+
+            <CadastroField label="Nome completo" htmlFor="usu-nome" span="full">
+              <input
+                id="usu-nome"
+                className="input-base input-compact"
+                value={form.nome}
+                onChange={(e) => setField("nome", e.target.value)}
+                placeholder="Nome do usuário"
+                disabled={busy}
+                required
+              />
+            </CadastroField>
+
+            <CadastroField label="Perfil" htmlFor="usu-role">
+              <select
+                id="usu-role"
+                className="input-base input-compact"
+                value={form.role}
+                onChange={(e) => setField("role", e.target.value)}
+                disabled={busy}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </CadastroField>
+
+            <CadastroField label="Filial" htmlFor="usu-filial">
+              <select
+                id="usu-filial"
+                className="input-base input-compact"
+                value={form.filial_id}
+                onChange={(e) => setField("filial_id", e.target.value)}
                 disabled={busy}
               >
                 <option value="">— Sem filial —</option>
@@ -232,7 +430,62 @@ export default function UsuariosPage() {
                 ))}
               </select>
             </CadastroField>
+
+            <CadastroField
+              label={editing ? "Nova senha (opcional)" : "Senha"}
+              htmlFor="usu-senha"
+              span="full"
+            >
+              <input
+                id="usu-senha"
+                type="password"
+                className="input-base input-compact"
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
+                placeholder={editing ? "Deixe em branco para manter" : "Mín. 6 caracteres"}
+                disabled={busy}
+                required={!editing}
+                autoComplete="new-password"
+              />
+            </CadastroField>
           </CadastroFormGrid>
+        </CadastroModal>
+      ) : null}
+
+      {deleting ? (
+        <CadastroModal
+          title="Excluir usuário"
+          titleId="usuario-delete-title"
+          onClose={closeDelete}
+          disabled={busy}
+          width={400}
+          footer={
+            <CadastroFormActions
+              onCancel={closeDelete}
+              disabled={busy}
+              busy={busy}
+              danger
+              submitLabel="Excluir"
+              busyLabel="Excluindo..."
+              onConfirm={() => void handleDelete()}
+            />
+          }
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              lineHeight: 1.45,
+            }}
+          >
+            Confirma a exclusão de{" "}
+            <strong style={{ color: "var(--text-primary)" }}>
+              {deleting.usuario} — {deleting.nome}
+            </strong>
+            ?
+          </p>
+          {actionError ? <CadastroFormError message={actionError} /> : null}
         </CadastroModal>
       ) : null}
     </>
