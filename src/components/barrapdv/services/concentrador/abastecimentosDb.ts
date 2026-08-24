@@ -88,8 +88,81 @@ function combineDateTime(dateBr: string, timeHm: string): string {
 }
 
 function bicoFromPayload(p: CbcSupplyPayload): string {
-  if (p.bicoCode) return String(p.bicoCode).padStart(2, '0').toUpperCase()
-  return String(p.nozzle).padStart(2, '0')
+  if (p.bicoCode) return normalizeBicoCode(p.bicoCode)
+  return normalizeBicoCode(p.nozzle)
+}
+
+/** Normaliza código do bico CBC / cadastro (ex.: 4 → 04). */
+function normalizeBicoCode(value: string | number | null | undefined): string {
+  const raw = String(value ?? '')
+    .trim()
+    .toUpperCase()
+  if (!raw) return ''
+  if (/^\d+$/.test(raw)) return raw.padStart(2, '0')
+  return raw
+}
+
+type BicoCadastro = {
+  id: string
+  numero: string
+  filial: string | null
+  preco_atual: number | null
+  produto_codigo: number | null
+  produto_nome: string | null
+  produto_preco: number | null
+}
+
+/**
+ * Índice codigo_concentrador / identificacao_bomba → bico + produto do cadastro.
+ */
+async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
+  const sb = getClient()
+  const { data, error } = await sb.from('bicos').select(`
+      id,
+      numero,
+      filial,
+      preco_atual,
+      codigo_concentrador,
+      identificacao_bomba,
+      produtos ( codigo, descricao, preco_venda )
+    `)
+  const map = new Map<string, BicoCadastro>()
+  if (error) {
+    console.warn('[abastecimentos] bicos cadastro:', error.message)
+    return map
+  }
+
+  for (const row of data ?? []) {
+    const prodRaw = row.produtos as
+      | { codigo: string; descricao: string; preco_venda: number | null }
+      | { codigo: string; descricao: string; preco_venda: number | null }[]
+      | null
+    const prod = Array.isArray(prodRaw) ? prodRaw[0] ?? null : prodRaw
+    const prodCodigoNum = prod?.codigo
+      ? Number.parseInt(String(prod.codigo).replace(/\D/g, ''), 10)
+      : NaN
+    const entry: BicoCadastro = {
+      id: String(row.id),
+      numero: String(row.numero ?? ''),
+      filial: row.filial ? String(row.filial) : null,
+      preco_atual:
+        row.preco_atual != null ? Number(row.preco_atual) : null,
+      produto_codigo: Number.isFinite(prodCodigoNum) ? prodCodigoNum : null,
+      produto_nome: prod?.descricao ? String(prod.descricao) : null,
+      produto_preco:
+        prod?.preco_venda != null ? Number(prod.preco_venda) : null,
+    }
+
+    const keys = [
+      normalizeBicoCode(row.codigo_concentrador as string | null),
+      normalizeBicoCode(row.identificacao_bomba as string | null),
+    ].filter(Boolean)
+
+    for (const key of new Set(keys)) {
+      map.set(key, entry)
+    }
+  }
+  return map
 }
 
 function numeroFromPayload(p: CbcSupplyPayload): number {
@@ -168,9 +241,10 @@ export async function listAbastecimentosAbertos(): Promise<AbastecimentoRow[]> {
 export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
   const nozzle = Number.parseInt(String(row.bico), 16)
   const nozzleDec = Number.isFinite(nozzle) && nozzle > 0 ? nozzle : Number(row.bico) || 0
-  const productCode = String(row.produto_codigo ?? row.bico ?? '').padStart(2, '0')
+  const productCode = normalizeBicoCode(row.produto_codigo ?? '')
   const fuelId =
     PRODUCT_MAP[productCode] ??
+    PRODUCT_MAP[String(row.produto_codigo ?? '').padStart(2, '0')] ??
     NOZZLE_FUEL_MAP[nozzleDec] ??
     'gc'
   const dateBr = isoDateToBr(row.data)
@@ -181,7 +255,7 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
     dbId: row.id,
     nozzle: nozzleDec,
     fuelId,
-    cbcProductCode: productCode,
+    cbcProductCode: productCode || String(row.produto_codigo ?? ''),
     quantity: Number(row.litros ?? 0),
     unitPrice: Number(row.preco ?? 0),
     total: Number(row.valor ?? 0),
@@ -217,6 +291,7 @@ export async function upsertFromCbcSupplies(
 ): Promise<void> {
   if (!supplies.length) return
   const sb = getClient()
+  const bicosMap = await loadBicosCadastroMap()
 
   for (const p of supplies) {
     if (p.status === 'abastecendo') continue
@@ -228,12 +303,38 @@ export async function upsertFromCbcSupplies(
       new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const isoDate = brDateToIso(dateBr)
     const horaIso = combineDateTime(dateBr, timeHm)
-    const fuelId =
-      PRODUCT_MAP[p.productCode] ?? NOZZLE_FUEL_MAP[p.nozzle] ?? 'gc'
-    const fuel = fuels.find((f) => f.id === fuelId)
-    const unitPrice = p.unitPrice || fuel?.price || 0
-    const total = p.total || Number((p.liters * unitPrice).toFixed(2))
     const cartao = normalizeCartao(p.cartaoAbastecimento)
+
+    // Casa código CBC com public.bicos.codigo_concentrador e usa o produto do cadastro.
+    const bicoCad = bicosMap.get(bico) ?? null
+    const fuelIdFallback =
+      PRODUCT_MAP[normalizeBicoCode(p.productCode)] ??
+      PRODUCT_MAP[String(p.productCode).padStart(2, '0')] ??
+      NOZZLE_FUEL_MAP[p.nozzle] ??
+      'gc'
+    const fuelFallback = fuels.find((f) => f.id === fuelIdFallback)
+
+    const produtoNome =
+      bicoCad?.produto_nome || fuelFallback?.name || null
+    const produtoCodigo =
+      bicoCad?.produto_codigo ?? fuelFallback?.productCode ?? null
+    const unitPrice =
+      p.unitPrice ||
+      bicoCad?.preco_atual ||
+      bicoCad?.produto_preco ||
+      fuelFallback?.price ||
+      0
+    const total = p.total || Number((p.liters * unitPrice).toFixed(2))
+
+    if (!bicoCad) {
+      console.warn(
+        `[abastecimentos] bico concentrador "${bico}" sem cadastro em bicos.codigo_concentrador`,
+      )
+    } else if (!bicoCad.produto_nome) {
+      console.warn(
+        `[abastecimentos] bico concentrador "${bico}" cadastrado sem produto vinculado`,
+      )
+    }
 
     const { data: existing } = await sb
       .from('abastecimentos')
@@ -251,13 +352,14 @@ export async function upsertFromCbcSupplies(
       preco: unitPrice,
       valor: total,
       aba: p.nozzle,
-      produto: fuel?.name ?? null,
-      produto_codigo: fuel?.productCode ?? null,
+      produto: produtoNome,
+      produto_codigo: produtoCodigo,
       hora: horaIso,
       data: isoDate,
       medicao: p.medicao ?? null,
       cartao_abastecimento: cartao,
       situacao: 0,
+      filial: bicoCad?.filial ?? null,
       // caixa_* só na baixa
       caixa_operador: null,
       caixa_data: null,
