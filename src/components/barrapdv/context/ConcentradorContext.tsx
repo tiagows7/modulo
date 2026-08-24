@@ -64,6 +64,13 @@ export function ConcentradorProvider({ children }: { children: ReactNode }) {
       tempRows,
       fillings: tempRows
         .filter((r) => r.situacao === 0)
+        .slice()
+        .sort((a, b) => {
+          const na = Number(a.cbcSupplyId) || 0
+          const nb = Number(b.cbcSupplyId) || 0
+          if (na !== nb) return na - nb
+          return a.id.localeCompare(b.id)
+        })
         .map(toGridFilling),
       connection,
       async acknowledgeFilling(id: string) {

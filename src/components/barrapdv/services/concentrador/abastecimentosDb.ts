@@ -229,14 +229,14 @@ export async function getCaixaAberto(): Promise<CaixaAberto | null> {
   }
 }
 
-/** Lista abertos (situacao=0) para o grid. */
+/** Lista abertos (situacao=0) para o grid, ordenados pelo campo numero. */
 export async function listAbastecimentosAbertos(): Promise<AbastecimentoRow[]> {
   const sb = getClient()
   const { data, error } = await sb
     .from('abastecimentos')
     .select('*')
     .eq('situacao', 0)
-    .order('hora', { ascending: true, nullsFirst: false })
+    .order('numero', { ascending: true })
     .limit(200)
   if (error) throw new Error(error.message)
   return (data ?? []) as AbastecimentoRow[]
