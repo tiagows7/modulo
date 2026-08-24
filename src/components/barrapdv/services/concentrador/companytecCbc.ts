@@ -8,6 +8,9 @@ import {
   reabrirAbastecimentosDb,
   rowToTempFilling,
   upsertFromCbcSupplies,
+  loadBicosCadastroMap,
+  resolveBicoNumero,
+  normalizeBicoCode,
 } from './abastecimentosDb'
 import type {
   CbcConfig,
@@ -141,13 +144,14 @@ export class CompanytecCbcClient {
       }
 
       const { supplies, nozzles } = await this.pollTcpBridge()
+      const mapped = await this.mapNozzlesToCadastro(nozzles)
       await this.persistAndReload(supplies)
 
       this.setState({
         connected: true,
         lastPollAt: new Date().toISOString(),
         lastError: null,
-        nozzles,
+        nozzles: mapped,
         message: `CBC ${this.config.host}:${this.config.port} online · ${tempFillingTable.countDisponiveis()} disponíveis`,
       })
     } catch (err) {
@@ -315,6 +319,32 @@ export class CompanytecCbcClient {
 
     await delay(40)
     return supplies
+  }
+
+  /**
+   * Converte código do bico do concentrador → número do cadastro de bicos
+   * (ex.: CBC 04 → cadastro 01).
+   */
+  private async mapNozzlesToCadastro(
+    nozzles: import('./types').CbcNozzleStatus[],
+  ): Promise<import('./types').CbcNozzleStatus[]> {
+    if (!nozzles.length) return nozzles
+    try {
+      const map = await loadBicosCadastroMap()
+      return nozzles.map((n) => {
+        const conc = normalizeBicoCode(n.bicoCode || n.nozzle)
+        const numero = resolveBicoNumero(map, conc)
+        const nozzleNum = Number.parseInt(numero.replace(/\D/g, ''), 10)
+        return {
+          ...n,
+          bicoCode: numero || conc,
+          nozzle: Number.isFinite(nozzleNum) && nozzleNum > 0 ? nozzleNum : n.nozzle,
+        }
+      })
+    } catch (err) {
+      console.warn('[CBC] map bicos cadastro:', err)
+      return nozzles
+    }
   }
 
   /** Consulta a ponte local → 192.168.1.150:1771 */

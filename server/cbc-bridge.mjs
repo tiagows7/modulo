@@ -459,9 +459,28 @@ async function readVisualizacao() {
  * @param {ReturnType<typeof parseVisualizacao>} fueling
  */
 function applyBicoCodesFromVisualizacao(nozzles, fueling) {
-  if (fueling.length === 0) return nozzles
+  // Ignora (&V) com valor zerado (TTTTTT = 000000)
+  const activeFueling = fueling.filter((f) => {
+    const raw = String(f.valueRaw || '').replace(/[^0-9A-Fa-f]/g, '')
+    if (!raw || /^0+$/.test(raw)) return false
+    const asNum = Number.parseInt(raw, 16)
+    return Number.isFinite(asNum) && asNum > 0
+  })
+
+  if (activeFueling.length === 0) {
+    // (&V) vazio ou só zeros: não promove bico "fantasma" como abastecendo
+    if (fueling.length > 0) {
+      return nozzles.map((n) =>
+        n.status === 'abastecendo'
+          ? { ...n, status: /** @type {'livre'} */ ('livre'), code: 'L' }
+          : n,
+      )
+    }
+    return nozzles
+  }
+
   const idle = nozzles.filter((n) => n.status !== 'abastecendo')
-  const active = fueling.map((f) => ({
+  const active = activeFueling.map((f) => ({
     nozzle: f.nozzle,
     bicoCode: f.bicoCode,
     code: 'A',
@@ -491,6 +510,19 @@ async function drainSupplies(max = 12) {
 
     const parsed = parseSupplyFrame(raw)
     if (!parsed) break
+
+    // Litros ou valor zerados: ainda Incrementa para não travar a fila, mas não entrega ao PDV
+    const litersOk = Number(parsed.liters) > 0
+    const totalOk = Number(parsed.total) > 0
+    if (!litersOk || !totalOk) {
+      console.warn(
+        `[CBC] Ignorando abast #${parsed.supplyId} (litros=${parsed.liters} valor=${parsed.total})`,
+      )
+      await incrementa()
+      lastId = parsed.supplyId
+      sameCount = 0
+      continue
+    }
 
     if (parsed.supplyId === lastId) {
       sameCount += 1

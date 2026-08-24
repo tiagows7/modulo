@@ -80,9 +80,9 @@ export type CbcNozzleStatusCode =
   | 'desconhecido'
 
 export type CbcNozzleStatus = {
-  /** Índice/ordem no (&S) ou valor numérico do código hex */
+  /** Número do bico (preferencialmente o do cadastro após mapear o CBC) */
   nozzle: number
-  /** Código de bico do CBC (hex, ex.: "04") — vem do (&V) quando abastecendo */
+  /** Código exibido: número do cadastro (ex.: "01"), resolvido a partir do CBC */
   bicoCode: string
   code: string
   status: CbcNozzleStatusCode

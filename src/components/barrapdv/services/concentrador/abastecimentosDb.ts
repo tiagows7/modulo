@@ -92,8 +92,7 @@ function bicoFromPayload(p: CbcSupplyPayload): string {
   return normalizeBicoCode(p.nozzle)
 }
 
-/** Normaliza código do bico CBC / cadastro (ex.: 4 → 04). */
-function normalizeBicoCode(value: string | number | null | undefined): string {
+export function normalizeBicoCode(value: string | number | null | undefined): string {
   const raw = String(value ?? '')
     .trim()
     .toUpperCase()
@@ -102,7 +101,7 @@ function normalizeBicoCode(value: string | number | null | undefined): string {
   return raw
 }
 
-type BicoCadastro = {
+export type BicoCadastro = {
   id: string
   numero: string
   filial: string | null
@@ -113,7 +112,7 @@ type BicoCadastro = {
 /**
  * Índice codigo_concentrador / identificacao_bomba → bico + produto do cadastro.
  */
-async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
+export async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
   const sb = getClient()
   const { data, error } = await sb.from('bicos').select(`
       id,
@@ -156,6 +155,18 @@ async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
     }
   }
   return map
+}
+
+/** Resolve número do bico do cadastro a partir do código do concentrador. */
+export function resolveBicoNumero(
+  map: Map<string, BicoCadastro>,
+  codigoConcentrador: string | number | null | undefined,
+): string {
+  const code = normalizeBicoCode(codigoConcentrador)
+  if (!code) return ''
+  const cad = map.get(code)
+  if (cad?.numero) return normalizeBicoCode(cad.numero)
+  return code
 }
 
 function numeroFromPayload(p: CbcSupplyPayload): number {
@@ -288,6 +299,16 @@ export async function upsertFromCbcSupplies(
 
   for (const p of supplies) {
     if (p.status === 'abastecendo') continue
+
+    const liters = Number(p.liters) || 0
+    const unitPriceCbc = Number(p.unitPrice) || 0
+    const totalCbc =
+      Number(p.total) > 0
+        ? Number(p.total)
+        : Number((liters * unitPriceCbc).toFixed(2))
+    // Quantidade ou valor zerados → ignora movimento
+    if (!(liters > 0) || !(totalCbc > 0)) continue
+
     const codigoConcentrador = bicoFromPayload(p)
     const numero = numeroFromPayload(p)
     const dateBr = p.date || new Date().toLocaleDateString('pt-BR')
@@ -317,11 +338,8 @@ export async function upsertFromCbcSupplies(
       bicoCad?.produto_codigo ?? fuelFallback?.productCode ?? null
 
     // Preço e total vêm só do concentrador (não do cadastro de bicos).
-    const unitPrice = Number(p.unitPrice) || 0
-    const total =
-      Number(p.total) > 0
-        ? Number(p.total)
-        : Number((p.liters * unitPrice).toFixed(2))
+    const unitPrice = unitPriceCbc
+    const total = totalCbc
 
     if (!bicoCad) {
       console.warn(
@@ -345,7 +363,7 @@ export async function upsertFromCbcSupplies(
     const payload: Record<string, unknown> = {
       bico,
       numero,
-      litros: p.liters,
+      litros: liters,
       preco: unitPrice,
       valor: total,
       aba: p.nozzle,
