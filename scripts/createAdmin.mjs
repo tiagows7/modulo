@@ -24,7 +24,7 @@ async function createAdmin() {
     password: password,
     email_confirm: true,
     user_metadata: {
-      role: 'admin',
+      role: 'super_admin',
       name: 'Administrador'
     }
   });
