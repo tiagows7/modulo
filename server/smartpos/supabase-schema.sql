@@ -9,7 +9,7 @@ create table if not exists public.caixa (
   turno text,
   operador text,
   parametro integer,
-  filial text,
+  filial text, -- codigo da filial (public.filial.codigo)
   situacao integer not null default 0, -- 0 = aberto
   created_at timestamptz not null default now()
 );
@@ -46,6 +46,7 @@ create table if not exists public.abastecimentos (
   caixa_codigo integer,                         -- código sequencial do caixa (na baixa)
   documento text,                               -- documento de receita da baixa
   cupom text,                                   -- número NFC-e / NF-e
+  filial uuid,                                  -- public.filial.id
   created_at timestamptz not null default now(),
   unique (bico, numero)
 );

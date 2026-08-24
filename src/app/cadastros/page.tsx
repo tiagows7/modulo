@@ -10,9 +10,11 @@ import {
   Database, 
   Fuel,
   WalletCards,
+  Building2,
 } from "lucide-react";
 
 const submenus = [
+  { href: "/cadastros/filiais", label: "Filiais", icon: Building2, description: "Dados cadastrais das filiais" },
   { href: "/cadastros/clientes", label: "Clientes", icon: Users, description: "Gestão de clientes e histórico" },
   { href: "/cadastros/fornecedores", label: "Fornecedores", icon: Truck, description: "Gestão de fornecedores" },
   { href: "/cadastros/produtos", label: "Produtos", icon: Package, description: "Cadastro de produtos e itens" },
