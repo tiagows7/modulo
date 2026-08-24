@@ -144,12 +144,6 @@ const recentMovements = [
   { id: "MOV-006", hora: "20:12", tipo: "Compra", produto: "Gasolina Comum", qtd: "8.000 L", valor: "R$ 51.200,00", status: "info" },
 ];
 
-const alerts = [
-  { id: 1, type: "danger", msg: "Diesel S10 com estoque crítico — 18% da capacidade" },
-  { id: 2, type: "warning", msg: "Etanol abaixo de 30% — solicitar reabastecimento" },
-  { id: 3, type: "info", msg: "3 notas fiscais pendentes de emissão" },
-];
-
 const fadeUp = {
   hidden: { opacity: 1, y: 0 },
   visible: (i: number) => ({
@@ -471,47 +465,6 @@ export default function DashboardPage() {
           Sistema Operacional
         </motion.div>
       </motion.div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {alerts.map((alert, i) => (
-          <motion.div
-            key={alert.id}
-            initial={false}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08, duration: 0.35 }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "10px 16px",
-              borderRadius: 8,
-              background:
-                alert.type === "danger"
-                  ? "rgba(239,68,68,0.08)"
-                  : alert.type === "warning"
-                    ? "rgba(245,158,11,0.08)"
-                    : "rgba(59,130,246,0.08)",
-              border: `1px solid ${
-                alert.type === "danger"
-                  ? "rgba(239,68,68,0.2)"
-                  : alert.type === "warning"
-                    ? "rgba(245,158,11,0.2)"
-                    : "rgba(59,130,246,0.2)"
-              }`,
-              fontSize: 13,
-              color:
-                alert.type === "danger"
-                  ? "#EF4444"
-                  : alert.type === "warning"
-                    ? "#F59E0B"
-                    : "#3B82F6",
-            }}
-          >
-            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-            {alert.msg}
-          </motion.div>
-        ))}
-      </div>
 
       <div
         style={{
