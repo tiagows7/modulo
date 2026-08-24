@@ -55,13 +55,19 @@ export async function POST(req: Request) {
 
   const form = await req.formData();
   const username = String(form.get("username") || "").trim();
-  const password = String(form.get("password") || "");
+  let password = String(form.get("password") || "");
 
   if (!username || !password) {
     return new NextResponse(loginErrorPage("Preencha usuário e senha."), {
       status: 400,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
+  }
+
+  // Operador digita pdv/pdv; Supabase exige senha >= 6 caracteres.
+  const userKey = username.toLowerCase();
+  if (userKey === "pdv" && password === "pdv") {
+    password = "pdvpdv";
   }
 
   const email = username.includes("@") ? username : `${username}@modulo.com`;
@@ -79,10 +85,9 @@ export async function POST(req: Request) {
   }
 
   const role = String(data.user.user_metadata?.role || "").toLowerCase();
-  const userKey = username.toLowerCase();
   const dest =
     role === "pdv" || userKey === "pdv" || userKey.startsWith("pdv@")
-      ? "/pdv"
+      ? "/pdv#/venda"
       : "/administrativo";
   const storageKey = `sb-${projectRefFromUrl(url)}-auth-token`;
   const sessionJson = JSON.stringify(data.session);
