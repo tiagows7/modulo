@@ -149,7 +149,40 @@ export default function BicosPage() {
         return;
       }
 
-      const rows = (data ?? []) as Omit<Bico, "filial_row">[];
+      type RawBico = {
+        id: string;
+        numero: string;
+        identificacao_bomba: string;
+        codigo_concentrador: string | null;
+        tanque_id: string | null;
+        produto_id: string | null;
+        preco_atual: number | null;
+        status: string | null;
+        filial: string | null;
+        tanques:
+          | { numero: string; descricao: string }
+          | { numero: string; descricao: string }[]
+          | null;
+        produtos:
+          | { codigo: string; descricao: string }
+          | { codigo: string; descricao: string }[]
+          | null;
+      };
+
+      const raw = (data ?? []) as RawBico[];
+      const rows: Omit<Bico, "filial_row">[] = raw.map((r) => ({
+        id: r.id,
+        numero: r.numero,
+        identificacao_bomba: r.identificacao_bomba,
+        codigo_concentrador: r.codigo_concentrador,
+        tanque_id: r.tanque_id,
+        produto_id: r.produto_id,
+        preco_atual: r.preco_atual,
+        status: r.status,
+        filial: r.filial,
+        tanques: Array.isArray(r.tanques) ? r.tanques[0] ?? null : r.tanques,
+        produtos: Array.isArray(r.produtos) ? r.produtos[0] ?? null : r.produtos,
+      }));
       const filialIds = [
         ...new Set(rows.map((r) => r.filial).filter(Boolean) as string[]),
       ];
