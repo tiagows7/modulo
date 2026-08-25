@@ -63,7 +63,7 @@ const admActions = [
   {
     to: '/config',
     label: 'Configurações',
-    description: 'Posto, concentrador, TEF, impressora e operadores',
+    description: 'Modelo do PDV (posto/loja), concentrador, TEF e impressora',
     icon: IconGear,
   },
 ]

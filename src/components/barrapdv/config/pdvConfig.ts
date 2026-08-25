@@ -47,7 +47,9 @@ export function setPdvModo(modo: PdvModo) {
 export function subscribePdvModo(listener: (modo: PdvModo) => void) {
   listeners.add(listener)
   listener(currentModo)
-  return () => listeners.delete(listener)
+  return () => {
+    listeners.delete(listener)
+  }
 }
 
 export const PDV_MODO_LABEL: Record<PdvModo, string> = {
