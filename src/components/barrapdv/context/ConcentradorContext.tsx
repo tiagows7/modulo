@@ -10,6 +10,7 @@ import { companytecCbc } from '../services/concentrador/companytecCbc'
 import { tempFillingTable } from '../services/concentrador/tempFillingTable'
 import type { CbcConnectionState, TempFilling } from '../services/concentrador/types'
 import type { Filling } from '../data/mock'
+import { isModoLoja, subscribePdvModo } from '../config/pdvConfig'
 
 type ConcentradorContextValue = {
   /** Abastecimentos em aberto (situacao = 0) para o grid */
@@ -24,6 +25,15 @@ type ConcentradorContextValue = {
 }
 
 const ConcentradorContext = createContext<ConcentradorContextValue | null>(null)
+
+const LOJA_CONNECTION: CbcConnectionState = {
+  connected: true,
+  mode: 'mock',
+  lastPollAt: null,
+  lastError: null,
+  message: 'Modo loja — concentrador CBC desligado',
+  nozzles: [],
+}
 
 function toGridFilling(row: TempFilling): Filling {
   return {
@@ -42,12 +52,25 @@ function toGridFilling(row: TempFilling): Filling {
 }
 
 export function ConcentradorProvider({ children }: { children: ReactNode }) {
-  const [tempRows, setTempRows] = useState<TempFilling[]>(() => tempFillingTable.list())
+  const [modoLoja, setModoLoja] = useState(() => isModoLoja())
+  const [tempRows, setTempRows] = useState<TempFilling[]>(() =>
+    modoLoja ? [] : tempFillingTable.list(),
+  )
   const [connection, setConnection] = useState<CbcConnectionState>(() =>
-    companytecCbc.getState(),
+    modoLoja ? LOJA_CONNECTION : companytecCbc.getState(),
   )
 
+  useEffect(() => subscribePdvModo((modo) => setModoLoja(modo === 'loja')), [])
+
   useEffect(() => {
+    if (modoLoja) {
+      companytecCbc.stop()
+      tempFillingTable.clear()
+      setTempRows([])
+      setConnection(LOJA_CONNECTION)
+      return
+    }
+
     const unsubTable = tempFillingTable.subscribe(setTempRows)
     const unsubState = companytecCbc.subscribeState(setConnection)
     companytecCbc.start()
@@ -57,33 +80,38 @@ export function ConcentradorProvider({ children }: { children: ReactNode }) {
       unsubState()
       companytecCbc.stop()
     }
-  }, [])
+  }, [modoLoja])
 
   const value = useMemo<ConcentradorContextValue>(
     () => ({
       tempRows,
-      fillings: tempRows
-        .filter((r) => r.situacao === 0)
-        .slice()
-        .sort((a, b) => {
-          const na = Number(a.cbcSupplyId) || 0
-          const nb = Number(b.cbcSupplyId) || 0
-          if (na !== nb) return na - nb
-          return a.id.localeCompare(b.id)
-        })
-        .map(toGridFilling),
-      connection,
+      fillings: modoLoja
+        ? []
+        : tempRows
+            .filter((r) => r.situacao === 0)
+            .slice()
+            .sort((a, b) => {
+              const na = Number(a.cbcSupplyId) || 0
+              const nb = Number(b.cbcSupplyId) || 0
+              if (na !== nb) return na - nb
+              return a.id.localeCompare(b.id)
+            })
+            .map(toGridFilling),
+      connection: modoLoja ? LOJA_CONNECTION : connection,
       async acknowledgeFilling(id: string) {
+        if (modoLoja) return
         await companytecCbc.acknowledgeSupply(id)
       },
       async baixaSemNota(id: string) {
+        if (modoLoja) return
         await companytecCbc.baixaSemNota(id)
       },
       reabrirAbastecimentos(ids: string[]) {
+        if (modoLoja) return
         void companytecCbc.reabrirSupplies(ids)
       },
     }),
-    [tempRows, connection],
+    [tempRows, connection, modoLoja],
   )
 
   return (

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../context/AlertContext'
 import { useCart } from '../context/CartContext'
 import { useConcentrador } from '../context/ConcentradorContext'
+import { ProductSaleGrid } from '../components/ProductSaleGrid'
+import { usePdvModo } from '../hooks/usePdvModo'
 import {
   formatCurrency,
   formatLiters,
@@ -33,6 +35,7 @@ function PumpIcon({ active }: { active: boolean }) {
 export function VendaPage() {
   const navigate = useNavigate()
   const { showAlert } = useAlert()
+  const { isLoja } = usePdvModo()
   const { cart, total, addItem, removeItem, clearCart } = useCart()
   const { fillings, connection, acknowledgeFilling, baixaSemNota, reabrirAbastecimentos } =
     useConcentrador()
@@ -91,8 +94,9 @@ export function VendaPage() {
     if (cart.length === 0) {
       showAlert({
         title: 'Não há produtos informados',
-        message:
-          'O cupom está vazio. Selecione um abastecimento disponível ou um produto antes de ir para o pagamento.',
+        message: isLoja
+          ? 'O cupom está vazio. Selecione um produto antes de ir para o pagamento.'
+          : 'O cupom está vazio. Selecione um abastecimento disponível ou um produto antes de ir para o pagamento.',
       })
       return
     }
@@ -162,6 +166,8 @@ export function VendaPage() {
   }
 
   useEffect(() => {
+    if (isLoja) return
+
     function isTypingTarget(target: EventTarget | null) {
       const el = target as HTMLElement | null
       const tag = el?.tagName?.toLowerCase()
@@ -190,12 +196,23 @@ export function VendaPage() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedFilling, focusedFillingId, fillings, selectedFilling, clickSelect, baixaSemNota])
+  }, [isLoja, focusedFilling, focusedFillingId, fillings, selectedFilling, clickSelect, baixaSemNota])
 
   return (
     <div className="venda-layout">
 
       <div className="venda-left">
+        {isLoja ? (
+          <section className="panel fillings-panel">
+            <div className="panel-header">
+              <h2>Produtos</h2>
+              <span className="chip">Conveniência</span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12 }}>
+              <ProductSaleGrid embedded />
+            </div>
+          </section>
+        ) : (
         <section className="panel fillings-panel">
           <div className="panel-header">
             <h2>Abastecimentos</h2>
@@ -319,6 +336,7 @@ export function VendaPage() {
             </div>
           </div>
         </section>
+        )}
       </div>
 
       <div className="venda-right">
@@ -339,7 +357,9 @@ export function VendaPage() {
           <div className="cart-list">
             {cart.length === 0 ? (
               <div className="empty">
-                Nenhum item no cupom. Selecione um abastecimento disponível ou um produto.
+                {isLoja
+                  ? 'Nenhum item no cupom. Selecione um produto à esquerda.'
+                  : 'Nenhum item no cupom. Selecione um abastecimento disponível ou um produto.'}
               </div>
             ) : (
               cart.map((item) => (

@@ -4,12 +4,21 @@ import { operators, station } from '../data/mock'
 import { useConcentrador } from '../context/ConcentradorContext'
 import { startFullscreenLock } from '../utils/fullscreen'
 import { supabase } from '@/lib/supabase'
+import { usePdvModo } from '../hooks/usePdvModo'
 
-const navItems = [
+const navItemsPosto = [
   { to: '/venda', label: 'Venda', icon: IconPump },
   { to: '/produtos', label: 'Produtos', icon: IconStore },
   { to: '/pagamento', label: 'Pagar', icon: IconPay },
   { to: '/abastecidas', label: 'Abast.', icon: IconPump },
+  { to: '/cancelamento', label: 'Cancel.', icon: IconCancel },
+  { to: '/adm', label: 'ADM', icon: IconAdm },
+]
+
+const navItemsLoja = [
+  { to: '/venda', label: 'Venda', icon: IconStore },
+  { to: '/produtos', label: 'Produtos', icon: IconStore },
+  { to: '/pagamento', label: 'Pagar', icon: IconPay },
   { to: '/cancelamento', label: 'Cancel.', icon: IconCancel },
   { to: '/adm', label: 'ADM', icon: IconAdm },
 ]
@@ -136,7 +145,8 @@ function useHeaderFilial() {
 
 export function AppShell() {
   const { pathname } = useLocation()
-  const title = titles[pathname] ?? 'PDV Posto'
+  const { isLoja } = usePdvModo()
+  const title = titles[pathname] ?? (isLoja ? 'PDV Loja' : 'PDV Posto')
   const operator = operators[0]
   const { fantasia, operatorName } = useHeaderFilial()
   const { connection } = useConcentrador()
@@ -153,6 +163,7 @@ export function AppShell() {
 
   const stationLabel = fantasia || station.name
   const operatorLabel = operatorName || operator.name
+  const navItems = isLoja ? navItemsLoja : navItemsPosto
 
   return (
     <div className="app-shell">
@@ -195,18 +206,24 @@ export function AppShell() {
             </strong>
           </div>
           <div className="top-meta">
-            <span
-              className={`chip ${connection.connected ? 'ok' : 'danger'}`}
-              title={connection.message}
-            >
-              {connection.connected ? 'Concentrador conectado' : 'Concentrador offline'}
-            </span>
+            {isLoja ? (
+              <span className="chip ok" title="PDV sem combustível / CBC">
+                Modo loja
+              </span>
+            ) : (
+              <span
+                className={`chip ${connection.connected ? 'ok' : 'danger'}`}
+                title={connection.message}
+              >
+                {connection.connected ? 'Concentrador conectado' : 'Concentrador offline'}
+              </span>
+            )}
             <span className="chip ok">Caixa aberto</span>
             <span className="chip">{operatorLabel}</span>
             <span className="chip">{now}</span>
           </div>
         </header>
-        {!connection.connected ? (
+        {!isLoja && !connection.connected ? (
           <div
             role="status"
             style={{
