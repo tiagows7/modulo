@@ -93,7 +93,32 @@ export default function SubgrupoProdutosPage() {
         return;
       }
 
-      setItems((subRes.data ?? []) as Subgrupo[]);
+      const rows = (subRes.data ?? []).map((row) => {
+        const raw = row as {
+          id: string;
+          codigo: string;
+          descricao: string;
+          grupo_id: string;
+          status: string | null;
+          grupo_produtos:
+            | { codigo: string; descricao: string }
+            | { codigo: string; descricao: string }[]
+            | null;
+        };
+        const g = Array.isArray(raw.grupo_produtos)
+          ? raw.grupo_produtos[0] ?? null
+          : raw.grupo_produtos;
+        return {
+          id: raw.id,
+          codigo: raw.codigo,
+          descricao: raw.descricao,
+          grupo_id: raw.grupo_id,
+          status: raw.status,
+          grupo_produtos: g,
+        } satisfies Subgrupo;
+      });
+
+      setItems(rows);
       setGrupos((grupoRes.data ?? []) as GrupoOpt[]);
     });
   }, [pesquisar]);
