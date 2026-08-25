@@ -10,7 +10,6 @@ import {
   CadastroFormError,
   CadastroFormGrid,
   CadastroModal,
-  CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
@@ -51,6 +50,7 @@ type FilialForm = {
   endereco_uf: string;
   endereco_cidade: string;
   telefone: string;
+  status: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -69,6 +69,7 @@ const emptyForm: FilialForm = {
   endereco_uf: "",
   endereco_cidade: "",
   telefone: "",
+  status: "ativo",
 };
 
 const columns = [
@@ -113,6 +114,7 @@ function toForm(item: Filial): FilialForm {
     endereco_cidade:
       item.endereco_cidade != null ? String(item.endereco_cidade) : "",
     telefone: item.telefone ?? "",
+    status: item.status === "inativo" ? "inativo" : "ativo",
   };
 }
 
@@ -137,7 +139,45 @@ function toPayload(form: FilialForm) {
     endereco_uf: blank(form.endereco_uf)?.toUpperCase() ?? null,
     endereco_cidade: Number.isFinite(cidadeCodigo) ? cidadeCodigo : null,
     telefone: blank(form.telefone),
+    status: form.status === "inativo" ? "inativo" : "ativo",
   };
+}
+
+/** Retorna mensagem se a filial tiver vínculo/movimento; null se puder excluir. */
+async function filialTemVinculo(filial: Filial): Promise<string | null> {
+  const checks: { table: string; label: string }[] = [
+    { table: "bicos", label: "bicos" },
+    { table: "tanques", label: "tanques" },
+    { table: "abastecimentos", label: "abastecimentos" },
+  ];
+
+  for (const check of checks) {
+    const { count, error } = await supabase
+      .from(check.table)
+      .select("id", { count: "exact", head: true })
+      .eq("filial", filial.id);
+    if (error) {
+      return `Não foi possível verificar vínculos em ${check.label}: ${error.message}`;
+    }
+    if ((count ?? 0) > 0) {
+      return `Não é possível excluir: há movimento/vínculo em ${check.label} (${count}). Desative a filial em vez de excluir.`;
+    }
+  }
+
+  const { count: caixaCount, error: caixaErr } = await supabase
+    .from("caixa")
+    .select("codigo", { count: "exact", head: true })
+    .eq("filial", filial.codigo);
+  if (caixaErr) {
+    // coluna pode não existir em todos os ambientes — não bloqueia por erro de schema
+    if (!/column|does not exist|42703/i.test(caixaErr.message)) {
+      return `Não foi possível verificar vínculos em caixa: ${caixaErr.message}`;
+    }
+  } else if ((caixaCount ?? 0) > 0) {
+    return `Não é possível excluir: há movimento em caixa (${caixaCount}). Desative a filial em vez de excluir.`;
+  }
+
+  return null;
 }
 
 async function resolverCidadeIbge(nome: string, uf: string): Promise<string> {
@@ -386,7 +426,6 @@ export default function FilialPage() {
         const { error } = await supabase.from("filial").insert({
           ...payload,
           codigo,
-          status: "ativo",
         });
         if (error) throw new Error(error.message);
       }
@@ -402,15 +441,42 @@ export default function FilialPage() {
     if (!deleting) return;
     setActionError("");
     await gravar(async () => {
+      const bloqueio = await filialTemVinculo(deleting);
+      if (bloqueio) throw new Error(bloqueio);
+
       const { error } = await supabase
         .from("filial")
         .delete()
         .eq("id", deleting.id);
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (/foreign key|violates|restric/i.test(error.message)) {
+          throw new Error(
+            "Não é possível excluir: a filial está vinculada a outros cadastros ou movimentos. Desative a filial em vez de excluir.",
+          );
+        }
+        throw new Error(error.message);
+      }
       setDeleting(null);
       await loadData();
     }).catch((err: unknown) => {
       setActionError(err instanceof Error ? err.message : "Falha ao excluir.");
+    });
+  };
+
+  const toggleStatus = async (item: Filial) => {
+    const next = item.status === "ativo" ? "inativo" : "ativo";
+    setActionError("");
+    await gravar(async () => {
+      const { error } = await supabase
+        .from("filial")
+        .update({ status: next })
+        .eq("id", item.id);
+      if (error) throw new Error(error.message);
+      await loadData();
+    }).catch((err: unknown) => {
+      setActionError(
+        err instanceof Error ? err.message : "Falha ao alterar status.",
+      );
     });
   };
 
@@ -434,11 +500,35 @@ export default function FilialPage() {
       </span>
     ),
     acoes: (
-      <CadastroRowActions
-        disabled={busy}
-        onEdit={() => openEdit(item)}
-        onDelete={() => openDelete(item)}
-      />
+      <div className="cadastro-row-actions">
+        <button
+          type="button"
+          className="cadastro-btn-edit"
+          onClick={() => void toggleStatus(item)}
+          disabled={busy}
+          title={item.status === "ativo" ? "Desativar" : "Ativar"}
+        >
+          {item.status === "ativo" ? "Desativar" : "Ativar"}
+        </button>
+        <button
+          type="button"
+          className="cadastro-btn-edit"
+          onClick={() => openEdit(item)}
+          disabled={busy}
+          title="Editar"
+        >
+          Editar
+        </button>
+        <button
+          type="button"
+          className="cadastro-btn-delete"
+          onClick={() => openDelete(item)}
+          disabled={busy}
+          title="Excluir"
+        >
+          Excluir
+        </button>
+      </div>
     ),
   }));
 
@@ -545,6 +635,18 @@ export default function FilialPage() {
                 onChange={(e) => updateField("telefone", e.target.value)}
                 disabled={busy}
               />
+            </CadastroField>
+            <CadastroField label="Status" htmlFor="filial-status">
+              <select
+                id="filial-status"
+                className="input-base input-compact"
+                value={form.status}
+                onChange={(e) => updateField("status", e.target.value)}
+                disabled={busy}
+              >
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+              </select>
             </CadastroField>
             <CadastroField label="Inscrição Estadual" htmlFor="inscricao_estadual">
               <input
@@ -669,6 +771,17 @@ export default function FilialPage() {
               {deleting.codigo} — {deleting.razao_social}
             </strong>
             ?
+          </p>
+          <p
+            style={{
+              margin: "10px 0 0",
+              fontSize: 12,
+              color: "var(--text-muted)",
+              lineHeight: 1.45,
+            }}
+          >
+            Se houver vínculo em bicos, tanques, abastecimentos ou caixa, a
+            exclusão será bloqueada. Nesse caso, use <strong>Desativar</strong>.
           </p>
           {actionError ? <CadastroFormError message={actionError} /> : null}
         </CadastroModal>
