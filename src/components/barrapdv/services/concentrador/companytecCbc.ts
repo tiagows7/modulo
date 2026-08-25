@@ -43,6 +43,8 @@ export class CompanytecCbcClient {
   private recoverHandlersBound = false
   private recoverTimer: number | null = null
   private emptyPolls = 0
+  /** Bicos em abastecimento que ficam visíveis até o abast. finalizado chegar. */
+  private fuelingSticky = new Map<string, import('./types').CbcNozzleStatus>()
   private state: CbcConnectionState
   private stateListeners = new Set<StateListener>()
 
@@ -83,6 +85,67 @@ export class CompanytecCbcClient {
     this.state = { ...this.state, ...patch }
     const snapshot = this.getState()
     this.stateListeners.forEach((fn) => fn(snapshot))
+  }
+
+  private nozzleKey(n: {
+    bicoCode?: string
+    nozzle?: number
+  }): string {
+    return normalizeBicoCode(n.bicoCode || n.nozzle || '')
+  }
+
+  /** Marca bicos em abastecimento para não sumirem entre polls. */
+  private rememberFueling(nozzles: import('./types').CbcNozzleStatus[]) {
+    for (const n of nozzles) {
+      if (n.status !== 'abastecendo') continue
+      const key = this.nozzleKey(n)
+      if (!key) continue
+      this.fuelingSticky.set(key, { ...n, status: 'abastecendo', code: 'A' })
+    }
+  }
+
+  /** Remove sticky quando o abastecimento finalizado daquele bico chega. */
+  private finishedNozzleKeys(
+    supplies: CbcSupplyPayload[],
+    bicosMap?: Map<string, import('./abastecimentosDb').BicoCadastro>,
+  ): Set<string> {
+    const keys = new Set<string>()
+    for (const s of supplies) {
+      if (s.status === 'abastecendo') continue
+      const conc = normalizeBicoCode(s.bicoCode || s.nozzle)
+      if (conc) keys.add(conc)
+      if (bicosMap) {
+        const numero = resolveBicoNumero(bicosMap, conc)
+        if (numero) keys.add(normalizeBicoCode(numero))
+      }
+    }
+    return keys
+  }
+
+  private clearFuelingKeys(keys: Set<string>) {
+    for (const key of keys) this.fuelingSticky.delete(key)
+  }
+
+  /** Junta status atual com sticky de abastecimento. */
+  private mergeNozzlesWithSticky(
+    nozzles: import('./types').CbcNozzleStatus[],
+  ): import('./types').CbcNozzleStatus[] {
+    const byKey = new Map<string, import('./types').CbcNozzleStatus>()
+    for (const n of nozzles) {
+      const key = this.nozzleKey(n)
+      if (key) byKey.set(key, n)
+    }
+    for (const [key, sticky] of this.fuelingSticky) {
+      const current = byKey.get(key)
+      if (!current || current.status !== 'abastecendo') {
+        byKey.set(key, sticky)
+      }
+    }
+    return [...byKey.values()].sort((a, b) => a.nozzle - b.nozzle)
+  }
+
+  private stickyFuelingList(): import('./types').CbcNozzleStatus[] {
+    return [...this.fuelingSticky.values()].sort((a, b) => a.nozzle - b.nozzle)
   }
 
   /** Sync leve: atualiza grid pelo banco e agenda um poll (sem bloquear). */
@@ -199,17 +262,44 @@ export class CompanytecCbcClient {
       if (!online) {
         this.wasOffline = true
         this.emptyPolls = 0
+        // Mesmo offline: se veio abast. finalizado no cache, tira o sticky
+        try {
+          const map = await loadBicosCadastroMap()
+          this.clearFuelingKeys(this.finishedNozzleKeys(supplies, map))
+        } catch {
+          this.clearFuelingKeys(this.finishedNozzleKeys(supplies))
+        }
         this.setState({
           connected: false,
           lastPollAt: new Date().toISOString(),
           lastError: error || 'Sem conexão com o concentrador',
-          nozzles: [],
+          // Mantém ícones de bico abastecendo mesmo offline
+          nozzles: this.stickyFuelingList(),
           message: `CBC offline — ${error || 'sem conexão'} · ${tempFillingTable.countDisponiveis()} em aberto`,
         })
         return
       }
 
       const mapped = await this.mapNozzlesToCadastro(nozzles)
+      let finishedKeys = new Set<string>()
+      try {
+        const map = await loadBicosCadastroMap()
+        finishedKeys = this.finishedNozzleKeys(supplies, map)
+      } catch {
+        finishedKeys = this.finishedNozzleKeys(supplies)
+      }
+      this.clearFuelingKeys(finishedKeys)
+
+      // Não mantém sticky/ícone se o abast. deste bico já foi importado neste ciclo
+      const mappedOpen = mapped.map((n) => {
+        const key = this.nozzleKey(n)
+        if (key && finishedKeys.has(key) && n.status === 'abastecendo') {
+          return { ...n, status: 'livre' as const, code: 'L' }
+        }
+        return n
+      })
+      this.rememberFueling(mappedOpen)
+      const displayNozzles = this.mergeNozzlesWithSticky(mappedOpen)
       this.wasOffline = false
       if (supplies.some((s) => s.status !== 'abastecendo')) {
         this.emptyPolls = 0
@@ -221,7 +311,7 @@ export class CompanytecCbcClient {
         connected: true,
         lastPollAt: new Date().toISOString(),
         lastError: null,
-        nozzles: mapped,
+        nozzles: displayNozzles,
         message: `CBC ${this.config.host}:${this.config.port} online · ${tempFillingTable.countDisponiveis()} disponíveis`,
       })
     } catch (err) {
@@ -237,7 +327,7 @@ export class CompanytecCbcClient {
       this.setState({
         connected: false,
         lastError: message,
-        nozzles: [],
+        nozzles: this.stickyFuelingList(),
         message: `CBC offline — ${message}`,
       })
     } finally {

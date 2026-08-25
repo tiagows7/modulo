@@ -468,14 +468,7 @@ function applyBicoCodesFromVisualizacao(nozzles, fueling) {
   })
 
   if (activeFueling.length === 0) {
-    // (&V) vazio ou só zeros: não promove bico "fantasma" como abastecendo
-    if (fueling.length > 0) {
-      return nozzles.map((n) =>
-        n.status === 'abastecendo'
-          ? { ...n, status: /** @type {'livre'} */ ('livre'), code: 'L' }
-          : n,
-      )
-    }
+    // (&V) vazio/zerado: mantém o (&S) — não apaga "abastecendo" (evita piscar o ícone)
     return nozzles
   }
 
