@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Pencil, Trash2, X } from "lucide-react";
+import { AlertTriangle, CircleAlert, Pencil, Trash2, X } from "lucide-react";
 
 type CadastroRowActionsProps = {
   disabled?: boolean;
@@ -159,9 +159,90 @@ export function CadastroFormGrid({ children }: { children: ReactNode }) {
   return <div className="cadastro-form-grid">{children}</div>;
 }
 
-export function CadastroFormError({ message }: { message: string }) {
+export type CadastroMessageType = "error" | "warning";
+
+type CadastroMessageDialogProps = {
+  type?: CadastroMessageType;
+  title?: string;
+  message: string;
+  onClose: () => void;
+  confirmLabel?: string;
+};
+
+/** Mensagem padronizada na frente da tela (alerta / erro). */
+export function CadastroMessageDialog({
+  type = "error",
+  title,
+  message,
+  onClose,
+  confirmLabel = "OK",
+}: CadastroMessageDialogProps) {
   if (!message) return null;
-  return <div className="cadastro-form-error">{message}</div>;
+
+  const isWarning = type === "warning";
+  const resolvedTitle = title ?? (isWarning ? "Atenção" : "Erro");
+  const Icon = isWarning ? AlertTriangle : CircleAlert;
+
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="cadastro-message-title"
+      aria-describedby="cadastro-message-body"
+      className={`cadastro-message-backdrop cadastro-message-${type}`}
+      onClick={onClose}
+    >
+      <div
+        className="cadastro-message-panel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`cadastro-message-icon cadastro-message-icon-${type}`}>
+          <Icon size={22} strokeWidth={2.2} />
+        </div>
+        <div className="cadastro-message-content">
+          <h2 id="cadastro-message-title" className="cadastro-message-title">
+            {resolvedTitle}
+          </h2>
+          <p id="cadastro-message-body" className="cadastro-message-text">
+            {message}
+          </p>
+        </div>
+        <div className="cadastro-message-actions">
+          <button
+            type="button"
+            className={`cadastro-message-btn cadastro-message-btn-${type}`}
+            onClick={onClose}
+            autoFocus
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Atalho para erro/aviso com o layout padrão na frente da tela. */
+export function CadastroFormError({
+  message,
+  onClose,
+  type = "error",
+  title,
+}: {
+  message: string;
+  onClose: () => void;
+  type?: CadastroMessageType;
+  title?: string;
+}) {
+  if (!message) return null;
+  return (
+    <CadastroMessageDialog
+      type={type}
+      title={title}
+      message={message}
+      onClose={onClose}
+    />
+  );
 }
 
 export function CadastroFormActions({

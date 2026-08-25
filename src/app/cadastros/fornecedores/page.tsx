@@ -470,21 +470,28 @@ export default function FornecedoresPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar fornecedores: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar fornecedores: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
-      <ModulePage
-        title="Fornecedores"
-        description="Gerenciamento de fornecedores"
-        icon={<Truck size={22} />}
-        columns={columns}
-        rows={rows}
-        addLabel="Novo Fornecedor"
-        backUrl="/cadastros"
+    <ModulePage
+      title="Fornecedores"
+      description="Gerenciamento de fornecedores"
+      icon={<Truck size={22} />}
+      columns={columns}
+      rows={rows}
+      addLabel="Novo Fornecedor"
+      backUrl="/cadastros"
         onAdd={busy ? undefined : openCreate}
       />
 
@@ -628,7 +635,7 @@ export default function FornecedoresPage() {
             </CadastroField>
           </CadastroFormGrid>
 
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -658,7 +665,7 @@ export default function FornecedoresPage() {
             </strong>
             ?
           </p>
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError} onClose={() => setActionError("")} />
         </CadastroModal>
       ) : null}
     </>

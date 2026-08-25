@@ -186,11 +186,18 @@ export default function GrupoProdutosPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar grupo_produtos: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar grupo_produtos: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -238,7 +245,7 @@ export default function GrupoProdutosPage() {
               disabled={busy}
             />
           </CadastroField>
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -268,7 +275,7 @@ export default function GrupoProdutosPage() {
             </strong>
             ?
           </p>
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError} onClose={() => setActionError("")} />
         </CadastroModal>
       ) : null}
     </>

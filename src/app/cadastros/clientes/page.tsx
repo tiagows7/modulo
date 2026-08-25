@@ -52,6 +52,7 @@ type Cliente = {
   envia_nfce_venda: boolean | null;
   obriga_motorista: boolean | null;
   grupo_preco_id: string | null;
+  documento_caixa_id: string | null;
   status: string | null;
 };
 
@@ -96,11 +97,13 @@ type ClienteForm = {
   envia_nfce_venda: boolean;
   obriga_motorista: boolean;
   grupo_preco_id: string;
+  documento_caixa_id: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
 type CidadeRow = { codigo: string; descricao: string; uf: string };
 type GrupoPrecoOpt = { id: string; codigo: string; descricao: string };
+type DocumentoCaixaOpt = { id: string; codigo: string; descricao: string };
 type TabId = "geral" | "outras" | "veiculos";
 
 const emptyForm: ClienteForm = {
@@ -133,6 +136,7 @@ const emptyForm: ClienteForm = {
   envia_nfce_venda: false,
   obriga_motorista: false,
   grupo_preco_id: "",
+  documento_caixa_id: "",
 };
 
 const emptyVeiculo = (): VeiculoForm => ({
@@ -212,6 +216,7 @@ function toForm(item: Cliente): ClienteForm {
     envia_nfce_venda: Boolean(item.envia_nfce_venda),
     obriga_motorista: Boolean(item.obriga_motorista),
     grupo_preco_id: item.grupo_preco_id ?? "",
+    documento_caixa_id: item.documento_caixa_id ?? "",
   };
 }
 
@@ -247,6 +252,7 @@ function toClientePayload(form: ClienteForm) {
     envia_nfce_venda: form.envia_nfce_venda,
     obriga_motorista: form.obriga_motorista,
     grupo_preco_id: blank(form.grupo_preco_id),
+    documento_caixa_id: blank(form.documento_caixa_id),
   };
 }
 
@@ -294,6 +300,7 @@ export default function ClientesPage() {
   const [ufs, setUfs] = useState<UfRow[]>([]);
   const [cidadesUf, setCidadesUf] = useState<CidadeRow[]>([]);
   const [gruposPrecos, setGruposPrecos] = useState<GrupoPrecoOpt[]>([]);
+  const [documentosCaixa, setDocumentosCaixa] = useState<DocumentoCaixaOpt[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -314,7 +321,7 @@ export default function ClientesPage() {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, grupo_preco_id, status",
+          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, grupo_preco_id, documento_caixa_id, status",
         )
         .order("created_at", { ascending: false });
 
@@ -383,6 +390,27 @@ export default function ClientesPage() {
               g.status === "inativo"
                 ? `${g.descricao} (inativo)`
                 : g.descricao,
+          }),
+        ),
+      );
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("documentos_caixa")
+        .select("id, codigo, descricao, status")
+        .order("descricao", { ascending: true });
+      setDocumentosCaixa(
+        ((data ?? []) as (DocumentoCaixaOpt & { status?: string | null })[]).map(
+          (d) => ({
+            id: d.id,
+            codigo: d.codigo,
+            descricao:
+              d.status === "inativo"
+                ? `${d.descricao} (inativo)`
+                : d.descricao,
           }),
         ),
       );
@@ -712,11 +740,18 @@ export default function ClientesPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar clientes: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar clientes: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
     <ModulePage
@@ -912,6 +947,22 @@ export default function ClientesPage() {
                     {gruposPrecos.map((g) => (
                       <option key={g.id} value={g.id}>
                         {g.codigo} — {g.descricao}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
+                <CadastroField label="Tipo de documento" htmlFor="documento_caixa_id" span="full">
+                  <select
+                    id="documento_caixa_id"
+                    className="input-base input-compact"
+                    value={form.documento_caixa_id}
+                    onChange={(e) => updateField("documento_caixa_id", e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="">— Selecione —</option>
+                    {documentosCaixa.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.codigo} — {d.descricao}
                       </option>
                     ))}
                   </select>
@@ -1133,7 +1184,7 @@ export default function ClientesPage() {
             </div>
           ) : null}
 
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -1163,7 +1214,7 @@ export default function ClientesPage() {
             </strong>
             ? Os veículos vinculados também serão removidos.
           </p>
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError} onClose={() => setActionError("")} />
         </CadastroModal>
       ) : null}
     </>

@@ -454,13 +454,18 @@ export default function GrupoPrecosPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">
-          Erro ao carregar grupo de preços: {loadError}
-        </div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar grupo de preços: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -648,7 +653,7 @@ export default function GrupoPrecosPage() {
             </div>
           </div>
 
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -685,7 +690,7 @@ export default function GrupoPrecosPage() {
             </strong>
             ?
           </p>
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError} onClose={() => setActionError("")} />
         </CadastroModal>
       ) : null}
     </>

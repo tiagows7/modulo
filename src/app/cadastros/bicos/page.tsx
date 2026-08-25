@@ -396,20 +396,27 @@ export default function BicosPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar bicos: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar bicos: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
-      <ModulePage
-        title="Bicos"
-        description="Configuração de bicos de bombas"
-        icon={<Fuel size={22} />}
-        columns={columns}
-        rows={rows}
-        addLabel="Novo Bico"
-        backUrl="/cadastros"
+    <ModulePage
+      title="Bicos"
+      description="Configuração de bicos de bombas"
+      icon={<Fuel size={22} />}
+      columns={columns}
+      rows={rows}
+      addLabel="Novo Bico"
+      backUrl="/cadastros"
         onAdd={busy ? undefined : openCreate}
       />
 
@@ -436,7 +443,7 @@ export default function BicosPage() {
             <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
           }
         >
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
           <CadastroFormGrid>
             <CadastroField label="Filial" htmlFor="bico-filial" span="full">
               <select
@@ -557,7 +564,7 @@ export default function BicosPage() {
             ?
           </p>
           {actionError ? (
-            <CadastroFormError message={actionError} />
+            <CadastroFormError message={actionError} onClose={() => setActionError("")} />
           ) : null}
         </CadastroModal>
       ) : null}

@@ -316,10 +316,17 @@ export default function UsuariosPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar usuários: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar usuários: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -357,7 +364,7 @@ export default function UsuariosPage() {
             <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
           }
         >
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
           <CadastroFormGrid>
             <CadastroField label="Usuário (login)" htmlFor="usu-login">
               <input
@@ -485,7 +492,9 @@ export default function UsuariosPage() {
             </strong>
             ?
           </p>
-          {actionError ? <CadastroFormError message={actionError} /> : null}
+          {actionError ? (
+            <CadastroFormError message={actionError} onClose={() => setActionError("")} />
+          ) : null}
         </CadastroModal>
       ) : null}
     </>

@@ -535,11 +535,18 @@ export default function FilialPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar filiais: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar filiais: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -742,7 +749,7 @@ export default function FilialPage() {
               </select>
             </CadastroField>
           </CadastroFormGrid>
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -783,7 +790,9 @@ export default function FilialPage() {
             Se houver vínculo em bicos, tanques, abastecimentos ou caixa, a
             exclusão será bloqueada. Nesse caso, use <strong>Desativar</strong>.
           </p>
-          {actionError ? <CadastroFormError message={actionError} /> : null}
+          {actionError ? (
+            <CadastroFormError message={actionError} onClose={() => setActionError("")} />
+          ) : null}
         </CadastroModal>
       ) : null}
     </>

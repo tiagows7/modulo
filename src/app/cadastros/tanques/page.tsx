@@ -356,10 +356,17 @@ export default function TanquesPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar tanques: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar tanques: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -396,7 +403,7 @@ export default function TanquesPage() {
             <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
           }
         >
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
           <CadastroFormGrid>
             <CadastroField label="Filial" htmlFor="tanque-filial" span="full">
               <select
@@ -496,7 +503,9 @@ export default function TanquesPage() {
             </strong>
             ?
           </p>
-          {actionError ? <CadastroFormError message={actionError} /> : null}
+          {actionError ? (
+            <CadastroFormError message={actionError} onClose={() => setActionError("")} />
+          ) : null}
         </CadastroModal>
       ) : null}
     </>

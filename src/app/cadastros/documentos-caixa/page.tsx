@@ -105,6 +105,17 @@ export default function DocumentosCaixaPage() {
 
     try {
       await gravar(async () => {
+        const { count, error: linkErr } = await supabase
+          .from("clientes")
+          .select("id", { count: "exact", head: true })
+          .eq("documento_caixa_id", deleting.id);
+        if (linkErr) throw new Error(linkErr.message);
+        if ((count ?? 0) > 0) {
+          throw new Error(
+            `Não é possível excluir: há ${count} cliente(s) com este tipo de documento.`,
+          );
+        }
+
         const { error } = await supabase
           .from("documentos_caixa")
           .delete()
@@ -186,11 +197,18 @@ export default function DocumentosCaixaPage() {
   return (
     <>
       {loadError ? (
-        <div className="cadastro-alert">Erro ao carregar documentos de caixa: {loadError}</div>
+        <CadastroFormError
+          title="Erro ao carregar"
+          message={`Erro ao carregar documentos de caixa: ${loadError}`}
+          onClose={() => setLoadError("")}
+        />
       ) : null}
 
       {actionError && !deleting ? (
-        <div className="cadastro-alert">{actionError}</div>
+        <CadastroFormError
+          message={actionError}
+          onClose={() => setActionError("")}
+        />
       ) : null}
 
       <ModulePage
@@ -238,7 +256,7 @@ export default function DocumentosCaixaPage() {
               disabled={busy}
             />
           </CadastroField>
-          <CadastroFormError message={formError} />
+          <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}
 
@@ -268,7 +286,7 @@ export default function DocumentosCaixaPage() {
             </strong>
             ?
           </p>
-          <CadastroFormError message={actionError} />
+          <CadastroFormError message={actionError} onClose={() => setActionError("")} />
         </CadastroModal>
       ) : null}
     </>
