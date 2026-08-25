@@ -543,7 +543,7 @@ button.chip.fullscreen-toggle:hover {
 
 .fillings-head-cols {
   display: grid;
-  grid-template-columns: 0.7fr 1.5fr 1fr 1.1fr 1.1fr 0.8fr;
+  grid-template-columns: 0.65fr 1.35fr 0.95fr 1.05fr 1.45fr 0.75fr;
   gap: 10px;
   padding: 0 14px;
 }
@@ -717,7 +717,7 @@ button.chip.fullscreen-toggle:hover {
 
 .filling-grid {
   display: grid;
-  grid-template-columns: 0.7fr 1.5fr 1fr 1.1fr 1.1fr 0.8fr;
+  grid-template-columns: 0.65fr 1.35fr 0.95fr 1.05fr 1.45fr 0.75fr;
   gap: 10px;
   padding: 5px 14px;
   align-items: center;
@@ -749,6 +749,9 @@ button.chip.fullscreen-toggle:hover {
   color: var(--accent);
   letter-spacing: 0.02em;
   line-height: 1.1;
+  min-width: 6.25rem;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .status-pill.disponivel {
@@ -3112,7 +3115,7 @@ table.data tbody tr {
 
   .filling-grid,
   .fillings-head-cols {
-    grid-template-columns: 0.7fr 1.4fr 1fr 1fr 1fr 0.8fr;
+    grid-template-columns: 0.65fr 1.25fr 0.95fr 1fr 1.35fr 0.75fr;
   }
 
   .venda-layout,
