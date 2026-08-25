@@ -14,10 +14,13 @@ import {
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 
+type TipoPreco = "percentual" | "unitario" | "centavos";
+
 type GrupoPreco = {
   id: string;
   codigo: string;
   descricao: string;
+  tipo: TipoPreco | string | null;
   status: string | null;
 };
 
@@ -35,21 +38,64 @@ type ItemForm = {
   preco: string;
 };
 
+const TIPO_OPTIONS: { value: TipoPreco; label: string; hint: string }[] = [
+  {
+    value: "unitario",
+    label: "Valor unitário",
+    hint: "Define o preço final em R$ para cada produto.",
+  },
+  {
+    value: "percentual",
+    label: "Percentual",
+    hint: "Aplica % sobre o preço de tabela (ex.: -5 = 5% de desconto).",
+  },
+  {
+    value: "centavos",
+    label: "Centavos",
+    hint: "Soma ou subtrai centavos do preço de tabela (ex.: -5 = R$ 0,05 a menos).",
+  },
+];
+
 const columns = [
   { key: "codigo", label: "Código" },
   { key: "descricao", label: "Descrição" },
+  { key: "tipo", label: "Tipo" },
   { key: "itens", label: "Produtos", align: "center" as const },
   { key: "status", label: "Status", align: "center" as const },
   { key: "acoes", label: "Ações", align: "center" as const },
 ];
 
+function normalizeTipo(value: string | null | undefined): TipoPreco {
+  if (value === "percentual" || value === "centavos") return value;
+  return "unitario";
+}
+
+function tipoLabel(tipo: TipoPreco) {
+  return TIPO_OPTIONS.find((o) => o.value === tipo)?.label ?? "Valor unitário";
+}
+
+function valorLabel(tipo: TipoPreco) {
+  if (tipo === "percentual") return "Percentual (%)";
+  if (tipo === "centavos") return "Centavos";
+  return "Preço (R$)";
+}
+
+function valorPlaceholder(tipo: TipoPreco) {
+  if (tipo === "percentual") return "-5";
+  if (tipo === "centavos") return "-5";
+  return "0,00";
+}
+
 function emptyItem(produtoId = "", preco = ""): ItemForm {
   return { key: crypto.randomUUID(), produto_id: produtoId, preco };
 }
 
-function parsePreco(value: string): number | null {
+/** Unitário: >= 0. Percentual/centavos: qualquer número finito (permite desconto). */
+function parseValor(value: string, tipo: TipoPreco): number | null {
   const n = Number(value.replace(",", ".").trim());
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  if (!Number.isFinite(n)) return null;
+  if (tipo === "unitario" && n < 0) return null;
+  return n;
 }
 
 async function nextCodigo() {
@@ -82,6 +128,7 @@ export default function GrupoPrecosPage() {
   const [editing, setEditing] = useState<GrupoPreco | null>(null);
   const [deleting, setDeleting] = useState<GrupoPreco | null>(null);
   const [descricao, setDescricao] = useState("");
+  const [tipo, setTipo] = useState<TipoPreco>("unitario");
   const [status, setStatus] = useState("ativo");
   const [itens, setItens] = useState<ItemForm[]>([emptyItem()]);
   const [formError, setFormError] = useState("");
@@ -92,7 +139,7 @@ export default function GrupoPrecosPage() {
       const [gruposRes, produtosRes, itensRes] = await Promise.all([
         supabase
           .from("grupo_precos")
-          .select("id, codigo, descricao, status")
+          .select("id, codigo, descricao, tipo, status")
           .order("created_at", { ascending: false }),
         supabase
           .from("produtos")
@@ -127,6 +174,7 @@ export default function GrupoPrecosPage() {
   const openCreate = () => {
     setEditing(null);
     setDescricao("");
+    setTipo("unitario");
     setStatus("ativo");
     setItens([emptyItem()]);
     setFormError("");
@@ -136,6 +184,7 @@ export default function GrupoPrecosPage() {
   const openEdit = async (item: GrupoPreco) => {
     setEditing(item);
     setDescricao(item.descricao);
+    setTipo(normalizeTipo(item.tipo));
     setStatus(item.status === "inativo" ? "inativo" : "ativo");
     setFormError("");
     setActionError("");
@@ -192,7 +241,11 @@ export default function GrupoPrecosPage() {
       prev.map((row) => {
         if (row.key !== key) return row;
         const next = { ...row, ...patch };
-        if (patch.produto_id && patch.produto_id !== row.produto_id) {
+        if (
+          tipo === "unitario" &&
+          patch.produto_id &&
+          patch.produto_id !== row.produto_id
+        ) {
           const prod = produtos.find((p) => p.id === patch.produto_id);
           if (prod && !row.preco.trim()) {
             next.preco =
@@ -216,7 +269,7 @@ export default function GrupoPrecosPage() {
   const syncItens = async (grupoId: string) => {
     const valid = itens
       .map((row) => {
-        const preco = parsePreco(row.preco);
+        const preco = parseValor(row.preco, tipo);
         return {
           ...row,
           produto_id: row.produto_id.trim(),
@@ -285,8 +338,12 @@ export default function GrupoPrecosPage() {
         setFormError("Selecione o produto em todas as linhas preenchidas.");
         return;
       }
-      if (parsePreco(row.preco) == null) {
-        setFormError("Informe um preço válido para cada produto.");
+      if (parseValor(row.preco, tipo) == null) {
+        setFormError(
+          tipo === "unitario"
+            ? "Informe um preço unitário válido (>= 0) para cada produto."
+            : `Informe um valor válido de ${valorLabel(tipo).toLowerCase()} para cada produto.`,
+        );
         return;
       }
     }
@@ -296,24 +353,22 @@ export default function GrupoPrecosPage() {
     try {
       await gravar(async () => {
         let grupoId = editing?.id ?? "";
+        const payload = {
+          descricao: desc,
+          tipo,
+          status: status === "inativo" ? "inativo" : "ativo",
+        };
         if (editing) {
           const { error } = await supabase
             .from("grupo_precos")
-            .update({
-              descricao: desc,
-              status: status === "inativo" ? "inativo" : "ativo",
-            })
+            .update(payload)
             .eq("id", editing.id);
           if (error) throw new Error(error.message);
         } else {
           const codigo = await nextCodigo();
           const { data, error } = await supabase
             .from("grupo_precos")
-            .insert({
-              codigo,
-              descricao: desc,
-              status: status === "inativo" ? "inativo" : "ativo",
-            })
+            .insert({ ...payload, codigo })
             .select("id")
             .single();
           if (error) throw new Error(error.message);
@@ -364,25 +419,33 @@ export default function GrupoPrecosPage() {
     }
   };
 
-  const rows = items.map((item) => ({
-    codigo: item.codigo,
-    descricao: item.descricao,
-    itens: itemCounts[item.id] ?? 0,
-    status: (
-      <span
-        className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
-      >
-        {item.status || "—"}
-      </span>
-    ),
-    acoes: (
-      <CadastroRowActions
-        disabled={busy}
-        onEdit={() => void openEdit(item)}
-        onDelete={() => openDelete(item)}
-      />
-    ),
-  }));
+  const tipoHint =
+    TIPO_OPTIONS.find((o) => o.value === tipo)?.hint ??
+    TIPO_OPTIONS[0].hint;
+
+  const rows = items.map((item) => {
+    const t = normalizeTipo(item.tipo);
+    return {
+      codigo: item.codigo,
+      descricao: item.descricao,
+      tipo: tipoLabel(t),
+      itens: itemCounts[item.id] ?? 0,
+      status: (
+        <span
+          className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
+        >
+          {item.status || "—"}
+        </span>
+      ),
+      acoes: (
+        <CadastroRowActions
+          disabled={busy}
+          onEdit={() => void openEdit(item)}
+          onDelete={() => openDelete(item)}
+        />
+      ),
+    };
+  });
 
   const produtosUsados = new Set(
     itens.map((r) => r.produto_id).filter(Boolean),
@@ -424,12 +487,12 @@ export default function GrupoPrecosPage() {
                 </strong>
               </>
             ) : (
-              "Defina a descrição e os preços por produto deste grupo."
+              "Escolha o tipo de preço e informe os valores por produto."
             )
           }
           onClose={closeModal}
           disabled={busy}
-          width={640}
+          width={680}
           asForm
           onSubmit={handleSubmit}
           footer={
@@ -453,6 +516,31 @@ export default function GrupoPrecosPage() {
                 required
                 disabled={busy}
               />
+            </CadastroField>
+            <CadastroField label="Tipo de preço" htmlFor="gpr-tipo" span={2}>
+              <select
+                id="gpr-tipo"
+                className="input-base input-compact"
+                value={tipo}
+                onChange={(e) => setTipo(normalizeTipo(e.target.value))}
+                disabled={busy}
+              >
+                {TIPO_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
+                {tipoHint}
+              </div>
             </CadastroField>
             <CadastroField label="Status" htmlFor="gpr-status">
               <select
@@ -478,7 +566,7 @@ export default function GrupoPrecosPage() {
                 gap: 8,
               }}
             >
-              <span>Preços por produto</span>
+              <span>Valores por produto</span>
               <button
                 type="button"
                 className="cadastro-btn-edit"
@@ -496,7 +584,7 @@ export default function GrupoPrecosPage() {
                   key={row.key}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 120px 36px",
+                    gridTemplateColumns: "1fr 140px 36px",
                     gap: 8,
                     alignItems: "end",
                   }}
@@ -530,14 +618,14 @@ export default function GrupoPrecosPage() {
                     </select>
                   </CadastroField>
                   <CadastroField
-                    label={idx === 0 ? "Preço (R$)" : ""}
+                    label={idx === 0 ? valorLabel(tipo) : ""}
                     htmlFor={`gpr-preco-${row.key}`}
                   >
                     <input
                       id={`gpr-preco-${row.key}`}
                       className="input-base input-compact"
                       inputMode="decimal"
-                      placeholder="0,00"
+                      placeholder={valorPlaceholder(tipo)}
                       value={row.preco}
                       onChange={(e) =>
                         updateItem(row.key, { preco: e.target.value })

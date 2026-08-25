@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS public.grupo_precos (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
     descricao VARCHAR(100) NOT NULL,
+    tipo VARCHAR(20) NOT NULL DEFAULT 'unitario'
+      CHECK (tipo IN ('percentual', 'unitario', 'centavos')),
     status VARCHAR(20) DEFAULT 'ativo',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
