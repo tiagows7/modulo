@@ -976,27 +976,27 @@ export default function ClientesPage() {
                     disabled={busy}
                   />
                 </CadastroField>
-                <CadastroField label="Restrições" htmlFor="restricoes" span="full">
+                <CadastroField label="Restrições" htmlFor="restricoes">
                   <textarea
                     id="restricoes"
                     className="input-base input-compact"
                     value={form.restricoes}
                     onChange={(e) => updateField("restricoes", e.target.value)}
                     disabled={busy}
-                    rows={3}
-                    style={{ resize: "vertical", minHeight: 64 }}
+                    rows={1}
+                    style={{ resize: "vertical", minHeight: 34, maxHeight: 72 }}
                   />
                 </CadastroField>
-                <CadastroField label="Mensagem" htmlFor="mensagem" span="full">
+                <CadastroField label="Mensagem" htmlFor="mensagem">
                   <textarea
                     id="mensagem"
                     className="input-base input-compact"
                     value={form.mensagem}
                     onChange={(e) => updateField("mensagem", e.target.value.slice(0, 200))}
                     disabled={busy}
-                    rows={3}
+                    rows={1}
                     maxLength={200}
-                    style={{ resize: "vertical", minHeight: 64 }}
+                    style={{ resize: "vertical", minHeight: 34, maxHeight: 72 }}
                   />
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
                     {form.mensagem.length}/200
