@@ -38,6 +38,8 @@ export class CompanytecCbcClient {
   private timer: number | null = null
   private mockTick = 0
   private polling = false
+  private wasOffline = false
+  private recoverHandlersBound = false
   private state: CbcConnectionState
   private stateListeners = new Set<StateListener>()
 
@@ -80,8 +82,33 @@ export class CompanytecCbcClient {
     this.stateListeners.forEach((fn) => fn(snapshot))
   }
 
+  /** Força sync: banco → grid + poll CBC (usado após queda/volta). */
+  async forceSync() {
+    try {
+      const rows = await listAbastecimentosAbertos()
+      tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+    } catch (err) {
+      console.warn('[CBC] forceSync DB:', err)
+    }
+    await this.poll({ force: true })
+  }
+
+  private bindRecoverHandlers() {
+    if (this.recoverHandlersBound || typeof window === 'undefined') return
+    this.recoverHandlersBound = true
+    const kick = () => {
+      void this.forceSync()
+    }
+    window.addEventListener('online', kick)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') kick()
+    })
+  }
+
   start() {
     if (this.timer != null) return
+
+    this.bindRecoverHandlers()
 
     // Em TCP, carrega abertos do banco (não depende só do localStorage)
     if (this.config.mode === 'tcp') {
@@ -106,7 +133,7 @@ export class CompanytecCbcClient {
           ? `CBC simulação · aguardando abastecimentos`
           : `Conectando CBC ${this.config.host}:${this.config.port}…`,
     })
-    void this.poll()
+    void this.poll({ force: true })
     this.timer = window.setInterval(() => {
       void this.poll()
     }, this.config.pollIntervalMs)
@@ -126,13 +153,22 @@ export class CompanytecCbcClient {
   /**
    * Ciclo de varredura — CBC → public.abastecimentos → grid.
    */
-  async poll() {
-    if (this.polling) return
+  async poll(opts?: { force?: boolean }) {
+    if (this.polling) {
+      if (!opts?.force) return
+      // force: espera o ciclo atual terminar (até ~12s) e tenta de novo
+      const started = Date.now()
+      while (this.polling && Date.now() - started < 12000) {
+        await delay(200)
+      }
+      if (this.polling) return
+    }
     this.polling = true
     try {
       if (this.config.mode === 'mock') {
         const supplies = await this.pollMock()
         await this.persistAndReload(supplies)
+        this.wasOffline = false
         this.setState({
           connected: true,
           lastPollAt: new Date().toISOString(),
@@ -143,9 +179,44 @@ export class CompanytecCbcClient {
         return
       }
 
-      const { supplies, nozzles } = await this.pollTcpBridge()
-      const mapped = await this.mapNozzlesToCadastro(nozzles)
+      const { supplies, nozzles, online, error } = await this.pollTcpBridge()
+      // Sempre tenta gravar o que veio (inclusive cache da ponte em queda)
       await this.persistAndReload(supplies)
+
+      if (!online) {
+        this.wasOffline = true
+        // Mesmo offline, mantém grid alinhado com o banco
+        try {
+          const rows = await listAbastecimentosAbertos()
+          tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+        } catch {
+          /* ignore */
+        }
+        this.setState({
+          connected: false,
+          lastPollAt: new Date().toISOString(),
+          lastError: error || 'Sem conexão com o concentrador',
+          nozzles: [],
+          message: `CBC offline — ${error || 'sem conexão'} · ${tempFillingTable.countDisponiveis()} em aberto`,
+        })
+        return
+      }
+
+      const mapped = await this.mapNozzlesToCadastro(nozzles)
+      const recovered = this.wasOffline
+      this.wasOffline = false
+
+      // Após voltar online, um segundo drain pega o que ficou na fila do CBC
+      if (recovered) {
+        try {
+          const again = await this.pollTcpBridge()
+          if (again.supplies.length) {
+            await this.persistAndReload(again.supplies)
+          }
+        } catch (err) {
+          console.warn('[CBC] poll pós-reconexão:', err)
+        }
+      }
 
       this.setState({
         connected: true,
@@ -155,7 +226,15 @@ export class CompanytecCbcClient {
         message: `CBC ${this.config.host}:${this.config.port} online · ${tempFillingTable.countDisponiveis()} disponíveis`,
       })
     } catch (err) {
+      this.wasOffline = true
       const message = err instanceof Error ? err.message : 'Erro na comunicação CBC'
+      // Em falha dura, ainda tenta mostrar abertos do banco
+      try {
+        const rows = await listAbastecimentosAbertos()
+        tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+      } catch {
+        /* ignore */
+      }
       this.setState({
         connected: false,
         lastError: message,
@@ -170,30 +249,20 @@ export class CompanytecCbcClient {
   /** Persistência Supabase + refresh do grid (situacao=0). */
   private async persistAndReload(supplies: CbcSupplyPayload[]) {
     try {
-      await upsertFromCbcSupplies(supplies, {
+      const persistedIds = await upsertFromCbcSupplies(supplies, {
         defaultOperator: this.config.defaultOperator,
       })
       const rows = await listAbastecimentosAbertos()
       tempFillingTable.replaceAll(rows.map(rowToTempFilling))
 
-      // Limpa cache da ponte após gravar — senão o próximo poll reimporta os mesmos
-      // (o Incrementa no CBC já rodou na leitura; ACK só libera o pending local).
-      if (this.config.mode === 'tcp' && supplies.length) {
-        const supplyIds = [
-          ...new Set(
-            supplies
-              .map((s) => String(s.supplyId || '').trim())
-              .filter(Boolean),
-          ),
-        ]
-        if (supplyIds.length) {
-          try {
-            await this.sendBridgeCommand('ACK_SUPPLIES', {
-              supplyIds,
-            })
-          } catch (err) {
-            console.warn('[CBC] ACK_SUPPLIES falhou:', err)
-          }
+      // ACK só do que realmente gravou / já estava baixado — senão perde na ponte
+      if (this.config.mode === 'tcp' && persistedIds.length) {
+        try {
+          await this.sendBridgeCommand('ACK_SUPPLIES', {
+            supplyIds: persistedIds,
+          })
+        } catch (err) {
+          console.warn('[CBC] ACK_SUPPLIES falhou:', err)
         }
       }
     } catch (err) {
@@ -351,6 +420,8 @@ export class CompanytecCbcClient {
   private async pollTcpBridge(): Promise<{
     supplies: CbcSupplyPayload[]
     nozzles: import('./types').CbcNozzleStatus[]
+    online: boolean
+    error?: string
   }> {
     const { bridgeUrl, bridgeUrlHttp } = CBC_CONFIG.resolveBridgeUrls()
     const urls = [
@@ -370,19 +441,31 @@ export class CompanytecCbcClient {
     let lastNetworkError: Error | null = null
     for (const url of urls) {
       try {
-        response = await fetch(url, { method: 'GET' })
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 15000)
+        try {
+          response = await fetch(url, {
+            method: 'GET',
+            signal: controller.signal,
+          })
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
         break
       } catch (err) {
-        lastNetworkError = err instanceof Error ? err : new Error(String(err))
+        lastNetworkError =
+          err instanceof Error ? err : new Error(String(err))
       }
     }
 
     if (!response) {
       throw new Error(
-        lastNetworkError?.message?.includes('Failed to fetch') ||
-          lastNetworkError?.message?.includes('NetworkError')
-          ? `Ponte CBC bloqueada. Abra o PDV em http://127.0.0.1:39199/pdv`
-          : `Ponte CBC offline. Aguarde o watchdog local (http://127.0.0.1:39199/pdv).`,
+        lastNetworkError?.name === 'AbortError'
+          ? `Timeout na ponte CBC (${this.config.host}:${this.config.port})`
+          : lastNetworkError?.message?.includes('Failed to fetch') ||
+              lastNetworkError?.message?.includes('NetworkError')
+            ? `Ponte CBC bloqueada. Abra o PDV em http://127.0.0.1:39199/pdv`
+            : `Ponte CBC offline. Aguarde o watchdog local (http://127.0.0.1:39199/pdv).`,
       )
     }
 
@@ -399,7 +482,13 @@ export class CompanytecCbcClient {
       // corpo inválido
     }
 
-    if (!response.ok || data.ok === false || data.connected === false) {
+    const supplies = data.supplies ?? []
+    const nozzles = data.nozzles ?? []
+    const online =
+      response.ok && data.ok !== false && data.connected !== false
+
+    // Em queda, a ponte ainda devolve o cache pending — não descartar
+    if (!online && !supplies.length) {
       throw new Error(
         data.error ||
           `Sem conexão com ${this.config.host}:${this.config.port}`,
@@ -407,8 +496,10 @@ export class CompanytecCbcClient {
     }
 
     return {
-      supplies: data.supplies ?? [],
-      nozzles: data.nozzles ?? [],
+      supplies,
+      nozzles,
+      online,
+      error: data.error,
     }
   }
 

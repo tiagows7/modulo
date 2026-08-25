@@ -288,14 +288,16 @@ export function rowToTempFilling(row: AbastecimentoRow): TempFilling {
  * Grava abastecimentos vindos do CBC (upsert por bico+numero).
  * Não preenche caixa_* — isso só ocorre na baixa.
  * Se cartao_abastecimento vier informado → operador / operador_nome.
+ * @returns supplyIds efetivamente gravados (ou já abertos no banco)
  */
 export async function upsertFromCbcSupplies(
   supplies: CbcSupplyPayload[],
   _opts: { defaultOperator: string },
-): Promise<void> {
-  if (!supplies.length) return
+): Promise<string[]> {
+  if (!supplies.length) return []
   const sb = getClient()
   const bicosMap = await loadBicosCadastroMap()
+  const persistedIds: string[] = []
 
   for (const p of supplies) {
     if (p.status === 'abastecendo') continue
@@ -318,6 +320,7 @@ export async function upsertFromCbcSupplies(
     const isoDate = brDateToIso(dateBr)
     const horaIso = combineDateTime(dateBr, timeHm)
     const cartao = normalizeCartao(p.cartaoAbastecimento)
+    const supplyKey = String(p.supplyId || '').trim()
 
     // Casa código CBC com bicos.codigo_concentrador; grava o número do bico do cadastro.
     const bicoCad = bicosMap.get(codigoConcentrador) ?? null
@@ -358,7 +361,11 @@ export async function upsertFromCbcSupplies(
       .eq('numero', numero)
       .maybeSingle()
 
-    if (existing?.situacao === 1) continue
+    // Já baixado — libera cache da ponte (não reabre)
+    if (existing?.situacao === 1) {
+      if (supplyKey) persistedIds.push(supplyKey)
+      continue
+    }
 
     const payload: Record<string, unknown> = {
       bico,
@@ -395,12 +402,22 @@ export async function upsertFromCbcSupplies(
         .from('abastecimentos')
         .update(payload)
         .eq('id', existing.id)
-      if (error) console.warn('[abastecimentos] update', error.message)
+      if (error) {
+        console.warn('[abastecimentos] update', error.message)
+        continue
+      }
     } else {
       const { error } = await sb.from('abastecimentos').insert(payload)
-      if (error) console.warn('[abastecimentos] insert', error.message)
+      if (error) {
+        console.warn('[abastecimentos] insert', error.message)
+        continue
+      }
     }
+
+    if (supplyKey) persistedIds.push(supplyKey)
   }
+
+  return [...new Set(persistedIds)]
 }
 
 export async function markAbastecimentoUsado(tempId: string): Promise<void> {
