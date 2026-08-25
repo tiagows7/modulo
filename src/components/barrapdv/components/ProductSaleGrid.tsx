@@ -188,11 +188,12 @@ export function ProductSaleGrid({ embedded = false }: Props) {
         <div className="loja-preview" aria-live="polite">
           {preview ? (
             <>
-              <div className="loja-preview-main">
-                <span className="loja-preview-code">{preview.codigo}</span>
-                <strong className="loja-preview-desc">{preview.descricao}</strong>
-              </div>
+              <strong className="loja-preview-desc">{preview.descricao}</strong>
               <div className="loja-preview-vals">
+                <div>
+                  <span>Código</span>
+                  <strong>{preview.codigo}</strong>
+                </div>
                 <div>
                   <span>Qtd</span>
                   <strong>{preview.qty}</strong>
