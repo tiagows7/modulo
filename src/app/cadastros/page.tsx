@@ -12,6 +12,8 @@ import {
   WalletCards,
   Building2,
   BadgeDollarSign,
+  IdCard,
+  FolderTree,
 } from "lucide-react";
 import { useAuthProfile } from "@/lib/authRole";
 
@@ -36,6 +38,12 @@ const submenus = [
     description: "Gestão de fornecedores",
   },
   {
+    href: "/cadastros/funcionarios",
+    label: "Funcionários",
+    icon: IdCard,
+    description: "Cadastro de funcionários",
+  },
+  {
     href: "/cadastros/produtos",
     label: "Produtos",
     icon: Package,
@@ -46,6 +54,12 @@ const submenus = [
     label: "Grupo de Produtos",
     icon: Layers,
     description: "Categorias e grupos",
+  },
+  {
+    href: "/cadastros/subgrupo-produtos",
+    label: "Sub-grupo de Produtos",
+    icon: FolderTree,
+    description: "Subcategorias vinculadas ao grupo",
   },
   {
     href: "/cadastros/grupo-precos",

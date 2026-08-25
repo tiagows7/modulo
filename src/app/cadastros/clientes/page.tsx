@@ -976,7 +976,7 @@ export default function ClientesPage() {
                     disabled={busy}
                   />
                 </CadastroField>
-                <CadastroField label="Restrições" htmlFor="restricoes">
+                <CadastroField label="Restrições" htmlFor="restricoes" span="full">
                   <textarea
                     id="restricoes"
                     className="input-base input-compact"
@@ -987,7 +987,7 @@ export default function ClientesPage() {
                     style={{ resize: "vertical", minHeight: 34, maxHeight: 72 }}
                   />
                 </CadastroField>
-                <CadastroField label="Mensagem" htmlFor="mensagem">
+                <CadastroField label="Mensagem" htmlFor="mensagem" span="full">
                   <textarea
                     id="mensagem"
                     className="input-base input-compact"

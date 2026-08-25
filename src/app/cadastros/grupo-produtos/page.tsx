@@ -105,6 +105,28 @@ export default function GrupoProdutosPage() {
 
     try {
       await gravar(async () => {
+        const { count: subCount, error: subErr } = await supabase
+          .from("subgrupo_produtos")
+          .select("id", { count: "exact", head: true })
+          .eq("grupo_id", deleting.id);
+        if (subErr) throw new Error(subErr.message);
+        if ((subCount ?? 0) > 0) {
+          throw new Error(
+            `Não é possível excluir: há ${subCount} sub-grupo(s) vinculados. Remova ou altere os sub-grupos antes.`,
+          );
+        }
+
+        const { count: prodCount, error: prodErr } = await supabase
+          .from("produtos")
+          .select("id", { count: "exact", head: true })
+          .eq("grupo_id", deleting.id);
+        if (prodErr) throw new Error(prodErr.message);
+        if ((prodCount ?? 0) > 0) {
+          throw new Error(
+            `Não é possível excluir: há ${prodCount} produto(s) vinculados a este grupo.`,
+          );
+        }
+
         const { error } = await supabase
           .from("grupo_produtos")
           .delete()
