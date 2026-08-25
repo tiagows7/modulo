@@ -11,6 +11,7 @@ import {
   Fuel,
   WalletCards,
   Building2,
+  BadgeDollarSign,
 } from "lucide-react";
 import { useAuthProfile } from "@/lib/authRole";
 
@@ -45,6 +46,12 @@ const submenus = [
     label: "Grupo de Produtos",
     icon: Layers,
     description: "Categorias e grupos",
+  },
+  {
+    href: "/cadastros/grupo-precos",
+    label: "Grupo de Preços",
+    icon: BadgeDollarSign,
+    description: "Preços diferenciados para clientes",
   },
   {
     href: "/cadastros/documentos-caixa",

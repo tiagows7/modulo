@@ -51,6 +51,7 @@ type Cliente = {
   obriga_autorizacao: boolean | null;
   envia_nfce_venda: boolean | null;
   obriga_motorista: boolean | null;
+  grupo_preco_id: string | null;
   status: string | null;
 };
 
@@ -94,10 +95,12 @@ type ClienteForm = {
   obriga_autorizacao: boolean;
   envia_nfce_venda: boolean;
   obriga_motorista: boolean;
+  grupo_preco_id: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
 type CidadeRow = { codigo: string; descricao: string; uf: string };
+type GrupoPrecoOpt = { id: string; codigo: string; descricao: string };
 type TabId = "geral" | "outras" | "veiculos";
 
 const emptyForm: ClienteForm = {
@@ -129,6 +132,7 @@ const emptyForm: ClienteForm = {
   obriga_autorizacao: false,
   envia_nfce_venda: false,
   obriga_motorista: false,
+  grupo_preco_id: "",
 };
 
 const emptyVeiculo = (): VeiculoForm => ({
@@ -207,6 +211,7 @@ function toForm(item: Cliente): ClienteForm {
     obriga_autorizacao: Boolean(item.obriga_autorizacao),
     envia_nfce_venda: Boolean(item.envia_nfce_venda),
     obriga_motorista: Boolean(item.obriga_motorista),
+    grupo_preco_id: item.grupo_preco_id ?? "",
   };
 }
 
@@ -241,6 +246,7 @@ function toClientePayload(form: ClienteForm) {
     obriga_autorizacao: form.obriga_autorizacao,
     envia_nfce_venda: form.envia_nfce_venda,
     obriga_motorista: form.obriga_motorista,
+    grupo_preco_id: blank(form.grupo_preco_id),
   };
 }
 
@@ -287,6 +293,7 @@ export default function ClientesPage() {
   const [cidadeNomes, setCidadeNomes] = useState<Record<string, string>>({});
   const [ufs, setUfs] = useState<UfRow[]>([]);
   const [cidadesUf, setCidadesUf] = useState<CidadeRow[]>([]);
+  const [gruposPrecos, setGruposPrecos] = useState<GrupoPrecoOpt[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -307,7 +314,7 @@ export default function ClientesPage() {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, status",
+          "id, codigo, nome, nome_fantasia, cpf_cnpj, cep, endereco, numero, complemento, bairro, cidade, uf, fone1, fone2, fone3, inscricao_estadual, identidade, inscricao_municipal, email, email2, contato, restricoes, mensagem, obriga_placa_venda, libera_veiculo_nao_cadastrado, obriga_km, controla_frota, obriga_autorizacao, envia_nfce_venda, obriga_motorista, grupo_preco_id, status",
         )
         .order("created_at", { ascending: false });
 
@@ -358,6 +365,27 @@ export default function ClientesPage() {
         .select("codigo, descricao")
         .order("codigo", { ascending: true });
       setUfs((data ?? []) as UfRow[]);
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("grupo_precos")
+        .select("id, codigo, descricao, status")
+        .order("descricao", { ascending: true });
+      setGruposPrecos(
+        ((data ?? []) as (GrupoPrecoOpt & { status?: string | null })[]).map(
+          (g) => ({
+            id: g.id,
+            codigo: g.codigo,
+            descricao:
+              g.status === "inativo"
+                ? `${g.descricao} (inativo)`
+                : g.descricao,
+          }),
+        ),
+      );
     })();
   }, []);
 
@@ -691,14 +719,14 @@ export default function ClientesPage() {
         <div className="cadastro-alert">{actionError}</div>
       ) : null}
 
-      <ModulePage
-        title="Clientes"
-        description="Gerenciamento de clientes"
-        icon={<Users size={22} />}
-        columns={columns}
-        rows={rows}
-        addLabel="Novo Cliente"
-        backUrl="/cadastros"
+    <ModulePage
+      title="Clientes"
+      description="Gerenciamento de clientes"
+      icon={<Users size={22} />}
+      columns={columns}
+      rows={rows}
+      addLabel="Novo Cliente"
+      backUrl="/cadastros"
         onAdd={busy ? undefined : openCreate}
       />
 
@@ -872,6 +900,22 @@ export default function ClientesPage() {
           {tab === "outras" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
+                <CadastroField label="Grupo de preços" htmlFor="grupo_preco_id" span="full">
+                  <select
+                    id="grupo_preco_id"
+                    className="input-base input-compact"
+                    value={form.grupo_preco_id}
+                    onChange={(e) => updateField("grupo_preco_id", e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="">— Preço padrão (tabela do produto) —</option>
+                    {gruposPrecos.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.codigo} — {g.descricao}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
                 <CadastroField label="Contato" htmlFor="contato" span="full">
                   <input
                     id="contato"
