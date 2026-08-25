@@ -109,10 +109,23 @@ export type BicoCadastro = {
   produto_nome: string | null
 }
 
+let bicosMapCache: { at: number; map: Map<string, BicoCadastro> } | null = null
+const BICOS_MAP_TTL_MS = 30_000
+
 /**
  * Índice codigo_concentrador / identificacao_bomba → bico + produto do cadastro.
  */
-export async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>> {
+export async function loadBicosCadastroMap(
+  opts?: { force?: boolean },
+): Promise<Map<string, BicoCadastro>> {
+  if (
+    !opts?.force &&
+    bicosMapCache &&
+    Date.now() - bicosMapCache.at < BICOS_MAP_TTL_MS
+  ) {
+    return bicosMapCache.map
+  }
+
   const sb = getClient()
   const { data, error } = await sb.from('bicos').select(`
       id,
@@ -125,7 +138,7 @@ export async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>>
   const map = new Map<string, BicoCadastro>()
   if (error) {
     console.warn('[abastecimentos] bicos cadastro:', error.message)
-    return map
+    return bicosMapCache?.map ?? map
   }
 
   for (const row of data ?? []) {
@@ -154,6 +167,7 @@ export async function loadBicosCadastroMap(): Promise<Map<string, BicoCadastro>>
       map.set(key, entry)
     }
   }
+  bicosMapCache = { at: Date.now(), map }
   return map
 }
 

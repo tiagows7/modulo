@@ -40,7 +40,7 @@ export const CBC_CONFIG = {
   /** Porta TCP usada pelo CBCManager2K9 (não é 2001 neste equipamento) */
   port: 1771,
   /** Intervalo de varredura no PDV (ms) */
-  pollIntervalMs: 2000,
+  pollIntervalMs: 1500,
   defaultOperator: 'Carlos Silva',
   /** URL HTTP da ponte (ferramentas locais) */
   bridgeUrlHttp: resolved.bridgeUrlHttp,

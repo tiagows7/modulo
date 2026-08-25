@@ -38,8 +38,11 @@ export class CompanytecCbcClient {
   private timer: number | null = null
   private mockTick = 0
   private polling = false
+  private pendingPoll = false
   private wasOffline = false
   private recoverHandlersBound = false
+  private recoverTimer: number | null = null
+  private emptyPolls = 0
   private state: CbcConnectionState
   private stateListeners = new Set<StateListener>()
 
@@ -82,7 +85,7 @@ export class CompanytecCbcClient {
     this.stateListeners.forEach((fn) => fn(snapshot))
   }
 
-  /** Força sync: banco → grid + poll CBC (usado após queda/volta). */
+  /** Sync leve: atualiza grid pelo banco e agenda um poll (sem bloquear). */
   async forceSync() {
     try {
       const rows = await listAbastecimentosAbertos()
@@ -90,18 +93,24 @@ export class CompanytecCbcClient {
     } catch (err) {
       console.warn('[CBC] forceSync DB:', err)
     }
-    await this.poll({ force: true })
+    void this.poll()
+  }
+
+  private scheduleRecoverSync() {
+    if (typeof window === 'undefined') return
+    if (this.recoverTimer != null) window.clearTimeout(this.recoverTimer)
+    this.recoverTimer = window.setTimeout(() => {
+      this.recoverTimer = null
+      void this.forceSync()
+    }, 400)
   }
 
   private bindRecoverHandlers() {
     if (this.recoverHandlersBound || typeof window === 'undefined') return
     this.recoverHandlersBound = true
-    const kick = () => {
-      void this.forceSync()
-    }
-    window.addEventListener('online', kick)
+    window.addEventListener('online', () => this.scheduleRecoverSync())
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') kick()
+      if (document.visibilityState === 'visible') this.scheduleRecoverSync()
     })
   }
 
@@ -133,7 +142,7 @@ export class CompanytecCbcClient {
           ? `CBC simulação · aguardando abastecimentos`
           : `Conectando CBC ${this.config.host}:${this.config.port}…`,
     })
-    void this.poll({ force: true })
+    void this.poll()
     this.timer = window.setInterval(() => {
       void this.poll()
     }, this.config.pollIntervalMs)
@@ -144,6 +153,10 @@ export class CompanytecCbcClient {
       window.clearInterval(this.timer)
       this.timer = null
     }
+    if (this.recoverTimer != null) {
+      window.clearTimeout(this.recoverTimer)
+      this.recoverTimer = null
+    }
     this.setState({
       connected: false,
       message: `CBC ${this.config.host}:${this.config.port} — parado`,
@@ -153,15 +166,10 @@ export class CompanytecCbcClient {
   /**
    * Ciclo de varredura — CBC → public.abastecimentos → grid.
    */
-  async poll(opts?: { force?: boolean }) {
+  async poll() {
     if (this.polling) {
-      if (!opts?.force) return
-      // force: espera o ciclo atual terminar (até ~12s) e tenta de novo
-      const started = Date.now()
-      while (this.polling && Date.now() - started < 12000) {
-        await delay(200)
-      }
-      if (this.polling) return
+      this.pendingPoll = true
+      return
     }
     this.polling = true
     try {
@@ -180,18 +188,17 @@ export class CompanytecCbcClient {
       }
 
       const { supplies, nozzles, online, error } = await this.pollTcpBridge()
-      // Sempre tenta gravar o que veio (inclusive cache da ponte em queda)
-      await this.persistAndReload(supplies)
+      await this.persistAndReload(supplies, {
+        // Reconsulta o banco só com novidade, na volta do offline, ou a cada ~20s
+        refreshDb:
+          this.wasOffline ||
+          supplies.some((s) => s.status !== 'abastecendo') ||
+          this.emptyPolls >= 10,
+      })
 
       if (!online) {
         this.wasOffline = true
-        // Mesmo offline, mantém grid alinhado com o banco
-        try {
-          const rows = await listAbastecimentosAbertos()
-          tempFillingTable.replaceAll(rows.map(rowToTempFilling))
-        } catch {
-          /* ignore */
-        }
+        this.emptyPolls = 0
         this.setState({
           connected: false,
           lastPollAt: new Date().toISOString(),
@@ -203,19 +210,11 @@ export class CompanytecCbcClient {
       }
 
       const mapped = await this.mapNozzlesToCadastro(nozzles)
-      const recovered = this.wasOffline
       this.wasOffline = false
-
-      // Após voltar online, um segundo drain pega o que ficou na fila do CBC
-      if (recovered) {
-        try {
-          const again = await this.pollTcpBridge()
-          if (again.supplies.length) {
-            await this.persistAndReload(again.supplies)
-          }
-        } catch (err) {
-          console.warn('[CBC] poll pós-reconexão:', err)
-        }
+      if (supplies.some((s) => s.status !== 'abastecendo')) {
+        this.emptyPolls = 0
+      } else {
+        this.emptyPolls += 1
       }
 
       this.setState({
@@ -227,8 +226,8 @@ export class CompanytecCbcClient {
       })
     } catch (err) {
       this.wasOffline = true
+      this.emptyPolls = 0
       const message = err instanceof Error ? err.message : 'Erro na comunicação CBC'
-      // Em falha dura, ainda tenta mostrar abertos do banco
       try {
         const rows = await listAbastecimentosAbertos()
         tempFillingTable.replaceAll(rows.map(rowToTempFilling))
@@ -243,19 +242,40 @@ export class CompanytecCbcClient {
       })
     } finally {
       this.polling = false
+      if (this.pendingPoll) {
+        this.pendingPoll = false
+        void this.poll()
+      }
     }
   }
 
   /** Persistência Supabase + refresh do grid (situacao=0). */
-  private async persistAndReload(supplies: CbcSupplyPayload[]) {
-    try {
-      const persistedIds = await upsertFromCbcSupplies(supplies, {
-        defaultOperator: this.config.defaultOperator,
-      })
-      const rows = await listAbastecimentosAbertos()
-      tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+  private async persistAndReload(
+    supplies: CbcSupplyPayload[],
+    opts?: { refreshDb?: boolean },
+  ) {
+    const finished = supplies.filter((s) => s.status !== 'abastecendo')
 
-      // ACK só do que realmente gravou / já estava baixado — senão perde na ponte
+    // Atualiza a tela imediatamente com o que veio do CBC
+    if (finished.length) {
+      tempFillingTable.upsertMany(finished.map((s) => this.toTempFilling(s)))
+    }
+
+    // Poll vazio e sem pedido de refresh → não bate no Supabase
+    if (!finished.length && !opts?.refreshDb) return
+
+    try {
+      const persistedIds = finished.length
+        ? await upsertFromCbcSupplies(finished, {
+            defaultOperator: this.config.defaultOperator,
+          })
+        : []
+
+      if (finished.length || opts?.refreshDb) {
+        const rows = await listAbastecimentosAbertos()
+        tempFillingTable.replaceAll(rows.map(rowToTempFilling))
+      }
+
       if (this.config.mode === 'tcp' && persistedIds.length) {
         try {
           await this.sendBridgeCommand('ACK_SUPPLIES', {
@@ -267,10 +287,9 @@ export class CompanytecCbcClient {
       }
     } catch (err) {
       console.warn('[CBC] Falha ao sincronizar abastecimentos:', err)
-      const local = supplies
-        .filter((s) => s.status !== 'abastecendo')
-        .map((s) => this.toTempFilling(s))
-      if (local.length) tempFillingTable.upsertMany(local)
+      if (finished.length) {
+        tempFillingTable.upsertMany(finished.map((s) => this.toTempFilling(s)))
+      }
     }
   }
 
@@ -442,7 +461,7 @@ export class CompanytecCbcClient {
     for (const url of urls) {
       try {
         const controller = new AbortController()
-        const timeoutId = window.setTimeout(() => controller.abort(), 15000)
+        const timeoutId = window.setTimeout(() => controller.abort(), 8000)
         try {
           response = await fetch(url, {
             method: 'GET',
