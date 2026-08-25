@@ -358,7 +358,7 @@ export function VendaPage() {
             {cart.length === 0 ? (
               <div className="empty">
                 {isLoja
-                  ? 'Nenhum item no cupom. Selecione um produto à esquerda.'
+                  ? 'Nenhum item no cupom. Informe o código de barras ou o código interno à esquerda.'
                   : 'Nenhum item no cupom. Selecione um abastecimento disponível ou um produto.'}
               </div>
             ) : (

@@ -2493,6 +2493,81 @@ button.chip.fullscreen-toggle:hover {
   min-height: 100%;
 }
 
+.loja-scan-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.loja-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  min-height: 64px;
+}
+
+.loja-preview-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.loja-preview-code {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.loja-preview-desc {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.loja-preview-vals {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.loja-preview-vals > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+}
+
+.loja-preview-vals span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.loja-preview-vals strong {
+  font-size: 1rem;
+}
+
+.loja-preview-total {
+  color: var(--accent);
+}
+
+.loja-preview-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.loja-preview-empty code {
+  font-size: 0.85em;
+}
+
 .products-layout .product-grid {
   flex: 1;
   min-height: 0;
