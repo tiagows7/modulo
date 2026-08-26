@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { DbStatusProvider } from "@/components/DbStatusProvider";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/administrativo", group: "geral" },
@@ -265,6 +266,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [notifications] = useState(3);
+  const [loadingSession, setLoadingSession] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+      } else {
+        setLoadingSession(false);
+      }
+    });
+  }, [router]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -280,6 +292,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  if (loadingSession) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)', color: 'var(--text-muted)' }}>
+        Carregando...
+      </div>
+    );
+  }
 
   const sidebarWidth = collapsed ? 72 : 248;
 
@@ -332,7 +352,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           collapsed={!isMobile && collapsed}
           pathname={pathname}
           onNavigate={() => setMobileOpen(false)}
-          onLogout={() => router.push("/")}
+          onLogout={async () => {
+            await supabase.auth.signOut();
+            router.push("/");
+          }}
         />
 
         {!isMobile && (

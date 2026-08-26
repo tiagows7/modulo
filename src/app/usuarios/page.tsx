@@ -118,8 +118,13 @@ export default function UsuariosPage() {
   const loadData = useCallback(async () => {
     await pesquisar(async () => {
       setLoadError("");
+      const sessionRes = await supabase.auth.getSession();
+      const token = sessionRes.data.session?.access_token || "";
+
       const [usersRes, filiaisRes] = await Promise.all([
-        fetch("/api/usuarios"),
+        fetch("/api/usuarios", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
         supabase
           .from("filial")
           .select("id, codigo, fantasia, razao_social")
@@ -226,6 +231,9 @@ export default function UsuariosPage() {
     setFormError("");
     try {
       await gravar(async () => {
+        const sessionRes = await supabase.auth.getSession();
+        const token = sessionRes.data.session?.access_token || "";
+
         if (editing) {
           const payload: Record<string, unknown> = {
             id: editing.id,
@@ -238,7 +246,10 @@ export default function UsuariosPage() {
           if (form.password.trim()) payload.password = form.password.trim();
           const res = await fetch("/api/usuarios", {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}` 
+            },
             body: JSON.stringify(payload),
           });
           const body = await res.json().catch(() => ({}));
@@ -246,7 +257,10 @@ export default function UsuariosPage() {
         } else {
           const res = await fetch("/api/usuarios", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}` 
+            },
             body: JSON.stringify({
               usuario,
               nome,
@@ -273,9 +287,15 @@ export default function UsuariosPage() {
     setActionError("");
     try {
       await gravar(async () => {
+        const sessionRes = await supabase.auth.getSession();
+        const token = sessionRes.data.session?.access_token || "";
+
         const res = await fetch(
           `/api/usuarios?id=${encodeURIComponent(deleting.id)}`,
-          { method: "DELETE" },
+          { 
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` }
+          },
         );
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || "Falha ao excluir.");

@@ -64,11 +64,9 @@ export async function POST(req: Request) {
     });
   }
 
-  // Operador digita pdv/pdv; Supabase exige senha >= 6 caracteres.
+  // Removida regra manual para 'pdv/pdv' para evitar vulnerabilidade de segurança.
+  // As senhas devem sempre ser validadas corretamente via Supabase Auth.
   const userKey = username.toLowerCase();
-  if (userKey === "pdv" && password === "pdv") {
-    password = "pdvpdv";
-  }
 
   const email = username.includes("@") ? username : `${username}@modulo.com`;
   const supabase = createClient(url, anon);
@@ -107,7 +105,7 @@ export async function POST(req: Request) {
   <script>
     (function () {
       try {
-        localStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(sessionJson)});
+        sessionStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(sessionJson)});
       } catch (e) {}
       location.replace(${JSON.stringify(dest)});
     })();

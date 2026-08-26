@@ -18,6 +18,32 @@ const ALLOWED_ROLES = new Set([
   "operador",
 ]);
 
+async function verifyAuth(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { error: "Não autorizado. Token não informado." };
+  }
+  const token = authHeader.substring(7);
+  
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return { error: "Supabase não configurado." };
+  
+  const tempClient = createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  
+  const { data: { user }, error } = await tempClient.auth.getUser(token);
+  if (error || !user) return { error: "Token inválido ou expirado." };
+  
+  const role = user.user_metadata?.role;
+  if (role !== "super_admin" && role !== "admin" && role !== "gerente") {
+    return { error: "Proibido. Privilégios insuficientes." };
+  }
+  
+  return { user };
+}
+
 function normalizeLogin(raw: string) {
   return String(raw || "")
     .trim()
@@ -65,7 +91,12 @@ async function assertFilial(
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const auth = await verifyAuth(req);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.error.includes("Proibido") ? 403 : 401 });
+  }
+
   const supabase = adminClient();
   if (!supabase) {
     return NextResponse.json(
@@ -90,6 +121,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await verifyAuth(req);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.error.includes("Proibido") ? 403 : 401 });
+  }
+
   const supabase = adminClient();
   if (!supabase) {
     return NextResponse.json(
@@ -181,6 +217,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const auth = await verifyAuth(req);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.error.includes("Proibido") ? 403 : 401 });
+  }
+
   const supabase = adminClient();
   if (!supabase) {
     return NextResponse.json(
@@ -293,6 +334,11 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const auth = await verifyAuth(req);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.error.includes("Proibido") ? 403 : 401 });
+  }
+
   const supabase = adminClient();
   if (!supabase) {
     return NextResponse.json(
