@@ -18,6 +18,8 @@ type TabId = "geral" | "outras" | "contabil";
 
 type Opt = { id: string; codigo: string; descricao: string };
 
+type GrupoOpt = Opt & { grupocomissao_id: string | null };
+
 type SubgrupoOpt = Opt & { grupo_id: string };
 
 type Produto = {
@@ -31,6 +33,7 @@ type Produto = {
   controla_estoque: boolean;
   categoria_icm_id: string | null;
   cfop_id: string | null;
+  grupocomissao_id: string | null;
   preco_venda: number | null;
   estoque_atual: number | null;
   volume: number | null;
@@ -46,6 +49,7 @@ type Produto = {
   unidade_medida?: { codigo: string; descricao: string } | null;
   categorias_icm?: { codigo: number; descricao: string } | null;
   produto_cfop?: { codigo: string; descricao: string } | null;
+  produto_grupocomissao?: { codigo: string; descricao: string } | null;
 };
 
 type FormState = {
@@ -57,6 +61,7 @@ type FormState = {
   subgrupo_id: string;
   categoria_icm_id: string;
   cfop_id: string;
+  grupocomissao_id: string;
   volume: string;
   estoque_minimo: string;
   peso: string;
@@ -76,6 +81,7 @@ const emptyForm: FormState = {
   subgrupo_id: "",
   categoria_icm_id: "",
   cfop_id: "",
+  grupocomissao_id: "",
   volume: "0",
   estoque_minimo: "0",
   peso: "0",
@@ -134,13 +140,14 @@ function parseMoney(raw: string) {
 export default function ProdutosPage() {
   const { busy, pesquisar, gravar } = useDbStatus();
   const [items, setItems] = useState<Produto[]>([]);
-  const [grupos, setGrupos] = useState<Opt[]>([]);
+  const [grupos, setGrupos] = useState<GrupoOpt[]>([]);
   const [subgrupos, setSubgrupos] = useState<SubgrupoOpt[]>([]);
   const [unidades, setUnidades] = useState<Opt[]>([]);
   const [categoriasIcm, setCategoriasIcm] = useState<
     { id: string; codigo: number; descricao: string }[]
   >([]);
   const [cfops, setCfops] = useState<Opt[]>([]);
+  const [comissoes, setComissoes] = useState<Opt[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -160,13 +167,14 @@ export default function ProdutosPage() {
         undRes,
         catRes,
         cfopRes,
+        comRes,
       ] = await Promise.all([
         supabase
           .from("produtos")
           .select(
             `
             id, codigo, codigo_barras, descricao, grupo_id, subgrupo_id,
-            unidade_id, controla_estoque, categoria_icm_id, cfop_id,
+            unidade_id, controla_estoque, categoria_icm_id, cfop_id, grupocomissao_id,
             preco_venda, estoque_atual, volume, estoque_minimo, peso, qtd_embalagem,
             status, observacao,
             conta_contabil, centro_custo,
@@ -174,13 +182,14 @@ export default function ProdutosPage() {
             subgrupo_produtos ( codigo, descricao ),
             unidade_medida ( codigo, descricao ),
             categorias_icm ( codigo, descricao ),
-            produto_cfop ( codigo, descricao )
+            produto_cfop ( codigo, descricao ),
+            produto_grupocomissao ( codigo, descricao )
           `,
           )
           .order("created_at", { ascending: false }),
         supabase
           .from("grupo_produtos")
-          .select("id, codigo, descricao")
+          .select("id, codigo, descricao, grupocomissao_id")
           .eq("status", "ativo")
           .order("descricao"),
         supabase
@@ -198,6 +207,10 @@ export default function ProdutosPage() {
           .order("codigo"),
         supabase
           .from("produto_cfop")
+          .select("id, codigo, descricao")
+          .order("codigo"),
+        supabase
+          .from("produto_grupocomissao")
           .select("id, codigo, descricao")
           .order("codigo"),
       ]);
@@ -222,6 +235,8 @@ export default function ProdutosPage() {
           categoria_icm_id:
             r.categoria_icm_id != null ? String(r.categoria_icm_id) : null,
           cfop_id: r.cfop_id != null ? String(r.cfop_id) : null,
+          grupocomissao_id:
+            r.grupocomissao_id != null ? String(r.grupocomissao_id) : null,
           preco_venda: r.preco_venda != null ? Number(r.preco_venda) : 0,
           estoque_atual: r.estoque_atual != null ? Number(r.estoque_atual) : 0,
           volume: r.volume != null ? Number(r.volume) : 0,
@@ -263,11 +278,25 @@ export default function ProdutosPage() {
               | { codigo: string; descricao: string }[]
               | null,
           ),
+          produto_grupocomissao: asOne(
+            r.produto_grupocomissao as
+              | { codigo: string; descricao: string }
+              | { codigo: string; descricao: string }[]
+              | null,
+          ),
         } satisfies Produto;
       });
 
       setItems(rows);
-      setGrupos((grupoRes.data ?? []) as Opt[]);
+      setGrupos(
+        (grupoRes.data ?? []).map((g) => ({
+          id: String(g.id),
+          codigo: String(g.codigo),
+          descricao: String(g.descricao),
+          grupocomissao_id:
+            g.grupocomissao_id != null ? String(g.grupocomissao_id) : null,
+        })),
+      );
       setSubgrupos((subRes.data ?? []) as SubgrupoOpt[]);
       setUnidades((undRes.data ?? []) as Opt[]);
       setCategoriasIcm(
@@ -278,6 +307,7 @@ export default function ProdutosPage() {
         })),
       );
       setCfops((cfopRes.data ?? []) as Opt[]);
+      setComissoes((comRes.data ?? []) as Opt[]);
     });
   }, [pesquisar]);
 
@@ -298,6 +328,10 @@ export default function ProdutosPage() {
           (s) => s.grupo_id === value && s.id === prev.subgrupo_id,
         );
         if (!stillValid) next.subgrupo_id = "";
+        const grupo = grupos.find((g) => g.id === value);
+        if (grupo?.grupocomissao_id) {
+          next.grupocomissao_id = grupo.grupocomissao_id;
+        }
       }
       return next;
     });
@@ -329,6 +363,7 @@ export default function ProdutosPage() {
       subgrupo_id: item.subgrupo_id ?? "",
       categoria_icm_id: item.categoria_icm_id ?? "",
       cfop_id: item.cfop_id ?? "",
+      grupocomissao_id: item.grupocomissao_id ?? "",
       volume: String(item.volume ?? 0),
       estoque_minimo: String(item.estoque_minimo ?? 0),
       peso: String(item.peso ?? 0),
@@ -385,6 +420,7 @@ export default function ProdutosPage() {
       subgrupo_id: form.subgrupo_id || null,
       categoria_icm_id: form.categoria_icm_id || null,
       cfop_id: form.cfop_id || null,
+      grupocomissao_id: form.grupocomissao_id || null,
       volume: parseMoney(form.volume),
       estoque_minimo: parseMoney(form.estoque_minimo),
       peso: parseMoney(form.peso),
@@ -687,6 +723,29 @@ export default function ProdutosPage() {
                     </select>
                   </CadastroField>
                 </div>
+
+                <CadastroField
+                  label="Grupo de comissão"
+                  htmlFor="prod-comissao"
+                  span="full"
+                >
+                  <select
+                    id="prod-comissao"
+                    className="input-base input-compact"
+                    value={form.grupocomissao_id}
+                    onChange={(e) =>
+                      updateForm("grupocomissao_id", e.target.value)
+                    }
+                    disabled={busy}
+                  >
+                    <option value="">— Sem comissão —</option>
+                    {comissoes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {optLabel(c)}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
 
                 <div className="cadastro-form-row cadastro-form-row-2">
                   <CadastroField label="Categoria ICMS" htmlFor="prod-cat-icm">
