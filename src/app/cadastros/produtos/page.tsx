@@ -57,8 +57,6 @@ type FormState = {
   subgrupo_id: string;
   categoria_icm_id: string;
   cfop_id: string;
-  preco_venda: string;
-  estoque_atual: string;
   volume: string;
   estoque_minimo: string;
   peso: string;
@@ -78,8 +76,6 @@ const emptyForm: FormState = {
   subgrupo_id: "",
   categoria_icm_id: "",
   cfop_id: "",
-  preco_venda: "0",
-  estoque_atual: "0",
   volume: "0",
   estoque_minimo: "0",
   peso: "0",
@@ -102,7 +98,6 @@ const columns = [
   { key: "descricao", label: "Descrição" },
   { key: "unidade", label: "Unidade" },
   { key: "grupo", label: "Grupo" },
-  { key: "preco", label: "Preço (R$)", align: "right" as const },
   { key: "status", label: "Status", align: "center" as const },
   { key: "acoes", label: "Ações", align: "center" as const },
 ];
@@ -334,8 +329,6 @@ export default function ProdutosPage() {
       subgrupo_id: item.subgrupo_id ?? "",
       categoria_icm_id: item.categoria_icm_id ?? "",
       cfop_id: item.cfop_id ?? "",
-      preco_venda: String(item.preco_venda ?? 0),
-      estoque_atual: String(item.estoque_atual ?? 0),
       volume: String(item.volume ?? 0),
       estoque_minimo: String(item.estoque_minimo ?? 0),
       peso: String(item.peso ?? 0),
@@ -392,8 +385,6 @@ export default function ProdutosPage() {
       subgrupo_id: form.subgrupo_id || null,
       categoria_icm_id: form.categoria_icm_id || null,
       cfop_id: form.cfop_id || null,
-      preco_venda: parseMoney(form.preco_venda),
-      estoque_atual: parseMoney(form.estoque_atual),
       volume: parseMoney(form.volume),
       estoque_minimo: parseMoney(form.estoque_minimo),
       peso: parseMoney(form.peso),
@@ -417,6 +408,8 @@ export default function ProdutosPage() {
           const { error } = await supabase.from("produtos").insert({
             ...payload,
             codigo,
+            preco_venda: 0,
+            estoque_atual: 0,
           });
           if (error) throw new Error(error.message);
         }
@@ -487,9 +480,6 @@ export default function ProdutosPage() {
     grupo: item.grupo_produtos
       ? `${item.grupo_produtos.codigo} — ${item.grupo_produtos.descricao}`
       : "—",
-    preco: Number(item.preco_venda ?? 0).toLocaleString("pt-BR", {
-      minimumFractionDigits: 2,
-    }),
     status: (
       <span
         className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
@@ -742,28 +732,6 @@ export default function ProdutosPage() {
           {tab === "outras" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
-                <CadastroField label="Preço de venda (R$)" htmlFor="prod-preco">
-                  <input
-                    id="prod-preco"
-                    className="input-base input-compact"
-                    value={form.preco_venda}
-                    onChange={(e) => updateForm("preco_venda", e.target.value)}
-                    disabled={busy}
-                    inputMode="decimal"
-                  />
-                </CadastroField>
-
-                <CadastroField label="Estoque atual" htmlFor="prod-estoque-qtd">
-                  <input
-                    id="prod-estoque-qtd"
-                    className="input-base input-compact"
-                    value={form.estoque_atual}
-                    onChange={(e) => updateForm("estoque_atual", e.target.value)}
-                    disabled={busy || form.controla_estoque === "N"}
-                    inputMode="decimal"
-                  />
-                </CadastroField>
-
                 <CadastroField label="Estoque mínimo" htmlFor="prod-estoque-min">
                   <input
                     id="prod-estoque-min"
