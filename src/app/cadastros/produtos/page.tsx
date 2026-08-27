@@ -564,7 +564,11 @@ export default function ProdutosPage() {
           {tab === "geral" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
-                <CadastroField label="Código de barras" htmlFor="prod-barras">
+                <CadastroField
+                  label="Código de barras"
+                  htmlFor="prod-barras"
+                  span="full"
+                >
                   <input
                     id="prod-barras"
                     className="input-base input-compact"
@@ -595,22 +599,6 @@ export default function ProdutosPage() {
                   </select>
                 </CadastroField>
 
-                <CadastroField
-                  label="Descrição *"
-                  htmlFor="prod-descricao"
-                  span="full"
-                >
-                  <input
-                    id="prod-descricao"
-                    className="input-base input-compact"
-                    value={form.descricao}
-                    onChange={(e) => updateForm("descricao", e.target.value)}
-                    disabled={busy}
-                    required
-                    maxLength={200}
-                  />
-                </CadastroField>
-
                 <CadastroField label="Controla estoque" htmlFor="prod-estoque">
                   <select
                     id="prod-estoque"
@@ -627,6 +615,22 @@ export default function ProdutosPage() {
                     <option value="S">Sim</option>
                     <option value="N">Não</option>
                   </select>
+                </CadastroField>
+
+                <CadastroField
+                  label="Descrição *"
+                  htmlFor="prod-descricao"
+                  span="full"
+                >
+                  <input
+                    id="prod-descricao"
+                    className="input-base input-compact"
+                    value={form.descricao}
+                    onChange={(e) => updateForm("descricao", e.target.value)}
+                    disabled={busy}
+                    required
+                    maxLength={200}
+                  />
                 </CadastroField>
 
                 <CadastroField label="Grupo" htmlFor="prod-grupo">
@@ -665,6 +669,23 @@ export default function ProdutosPage() {
                   </select>
                 </CadastroField>
 
+                <CadastroField label="CFOP" htmlFor="prod-cfop">
+                  <select
+                    id="prod-cfop"
+                    className="input-base input-compact"
+                    value={form.cfop_id}
+                    onChange={(e) => updateForm("cfop_id", e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="">— Selecione —</option>
+                    {cfops.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {optLabel(c)}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
+
                 <CadastroField label="Categoria ICMS" htmlFor="prod-cat-icm">
                   <select
                     id="prod-cat-icm"
@@ -677,23 +698,6 @@ export default function ProdutosPage() {
                   >
                     <option value="">— Selecione —</option>
                     {categoriasIcm.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {optLabel(c)}
-                      </option>
-                    ))}
-                  </select>
-                </CadastroField>
-
-                <CadastroField label="CFOP" htmlFor="prod-cfop" span="full">
-                  <select
-                    id="prod-cfop"
-                    className="input-base input-compact"
-                    value={form.cfop_id}
-                    onChange={(e) => updateForm("cfop_id", e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="">— Selecione —</option>
-                    {cfops.map((c) => (
                       <option key={c.id} value={c.id}>
                         {optLabel(c)}
                       </option>
