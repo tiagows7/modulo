@@ -33,6 +33,10 @@ type Produto = {
   cfop_id: string | null;
   preco_venda: number | null;
   estoque_atual: number | null;
+  volume: number | null;
+  estoque_minimo: number | null;
+  peso: number | null;
+  qtd_embalagem: number | null;
   status: string | null;
   observacao: string | null;
   conta_contabil: string | null;
@@ -55,6 +59,10 @@ type FormState = {
   cfop_id: string;
   preco_venda: string;
   estoque_atual: string;
+  volume: string;
+  estoque_minimo: string;
+  peso: string;
+  qtd_embalagem: string;
   status: string;
   observacao: string;
   conta_contabil: string;
@@ -72,6 +80,10 @@ const emptyForm: FormState = {
   cfop_id: "",
   preco_venda: "0",
   estoque_atual: "0",
+  volume: "0",
+  estoque_minimo: "0",
+  peso: "0",
+  qtd_embalagem: "1",
   status: "ativo",
   observacao: "",
   conta_contabil: "",
@@ -160,7 +172,8 @@ export default function ProdutosPage() {
             `
             id, codigo, codigo_barras, descricao, grupo_id, subgrupo_id,
             unidade_id, controla_estoque, categoria_icm_id, cfop_id,
-            preco_venda, estoque_atual, status, observacao,
+            preco_venda, estoque_atual, volume, estoque_minimo, peso, qtd_embalagem,
+            status, observacao,
             conta_contabil, centro_custo,
             grupo_produtos ( codigo, descricao ),
             subgrupo_produtos ( codigo, descricao ),
@@ -216,6 +229,10 @@ export default function ProdutosPage() {
           cfop_id: r.cfop_id != null ? String(r.cfop_id) : null,
           preco_venda: r.preco_venda != null ? Number(r.preco_venda) : 0,
           estoque_atual: r.estoque_atual != null ? Number(r.estoque_atual) : 0,
+          volume: r.volume != null ? Number(r.volume) : 0,
+          estoque_minimo: r.estoque_minimo != null ? Number(r.estoque_minimo) : 0,
+          peso: r.peso != null ? Number(r.peso) : 0,
+          qtd_embalagem: r.qtd_embalagem != null ? Number(r.qtd_embalagem) : 1,
           status: r.status != null ? String(r.status) : "ativo",
           observacao: r.observacao != null ? String(r.observacao) : null,
           conta_contabil:
@@ -319,6 +336,10 @@ export default function ProdutosPage() {
       cfop_id: item.cfop_id ?? "",
       preco_venda: String(item.preco_venda ?? 0),
       estoque_atual: String(item.estoque_atual ?? 0),
+      volume: String(item.volume ?? 0),
+      estoque_minimo: String(item.estoque_minimo ?? 0),
+      peso: String(item.peso ?? 0),
+      qtd_embalagem: String(item.qtd_embalagem ?? 1),
       status: item.status === "inativo" ? "inativo" : "ativo",
       observacao: item.observacao ?? "",
       conta_contabil: item.conta_contabil ?? "",
@@ -373,6 +394,10 @@ export default function ProdutosPage() {
       cfop_id: form.cfop_id || null,
       preco_venda: parseMoney(form.preco_venda),
       estoque_atual: parseMoney(form.estoque_atual),
+      volume: parseMoney(form.volume),
+      estoque_minimo: parseMoney(form.estoque_minimo),
+      peso: parseMoney(form.peso),
+      qtd_embalagem: parseMoney(form.qtd_embalagem),
       status: form.status === "inativo" ? "inativo" : "ativo",
       observacao: form.observacao.trim() || null,
       conta_contabil: form.conta_contabil.trim() || null,
@@ -735,6 +760,57 @@ export default function ProdutosPage() {
                     value={form.estoque_atual}
                     onChange={(e) => updateForm("estoque_atual", e.target.value)}
                     disabled={busy || form.controla_estoque === "N"}
+                    inputMode="decimal"
+                  />
+                </CadastroField>
+
+                <CadastroField label="Estoque mínimo" htmlFor="prod-estoque-min">
+                  <input
+                    id="prod-estoque-min"
+                    className="input-base input-compact"
+                    value={form.estoque_minimo}
+                    onChange={(e) =>
+                      updateForm("estoque_minimo", e.target.value)
+                    }
+                    disabled={busy || form.controla_estoque === "N"}
+                    inputMode="decimal"
+                  />
+                </CadastroField>
+
+                <CadastroField label="Volume" htmlFor="prod-volume">
+                  <input
+                    id="prod-volume"
+                    className="input-base input-compact"
+                    value={form.volume}
+                    onChange={(e) => updateForm("volume", e.target.value)}
+                    disabled={busy}
+                    inputMode="decimal"
+                  />
+                </CadastroField>
+
+                <CadastroField label="Peso" htmlFor="prod-peso">
+                  <input
+                    id="prod-peso"
+                    className="input-base input-compact"
+                    value={form.peso}
+                    onChange={(e) => updateForm("peso", e.target.value)}
+                    disabled={busy}
+                    inputMode="decimal"
+                  />
+                </CadastroField>
+
+                <CadastroField
+                  label="Quantidade na embalagem"
+                  htmlFor="prod-qtd-emb"
+                >
+                  <input
+                    id="prod-qtd-emb"
+                    className="input-base input-compact"
+                    value={form.qtd_embalagem}
+                    onChange={(e) =>
+                      updateForm("qtd_embalagem", e.target.value)
+                    }
+                    disabled={busy}
                     inputMode="decimal"
                   />
                 </CadastroField>
