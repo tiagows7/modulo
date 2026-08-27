@@ -439,6 +439,28 @@ body {
   gap: 10px;
 }
 
+.cadastro-form-row {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.cadastro-form-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cadastro-form-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .cadastro-form-row-2,
+  .cadastro-form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .cadastro-field {
   display: flex;
   flex-direction: column;

@@ -564,58 +564,58 @@ export default function ProdutosPage() {
           {tab === "geral" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
-                <CadastroField
-                  label="Código de barras"
-                  htmlFor="prod-barras"
-                  span="full"
-                >
-                  <input
-                    id="prod-barras"
-                    className="input-base input-compact"
-                    value={form.codigo_barras}
-                    onChange={(e) => updateForm("codigo_barras", e.target.value)}
-                    disabled={busy}
-                    autoFocus
-                    maxLength={50}
-                    placeholder="EAN / GTIN"
-                  />
-                </CadastroField>
+                <div className="cadastro-form-row cadastro-form-row-3">
+                  <CadastroField label="Código de barras" htmlFor="prod-barras">
+                    <input
+                      id="prod-barras"
+                      className="input-base input-compact"
+                      value={form.codigo_barras}
+                      onChange={(e) =>
+                        updateForm("codigo_barras", e.target.value)
+                      }
+                      disabled={busy}
+                      autoFocus
+                      maxLength={50}
+                      placeholder="EAN / GTIN"
+                    />
+                  </CadastroField>
 
-                <CadastroField label="Unidade *" htmlFor="prod-unidade">
-                  <select
-                    id="prod-unidade"
-                    className="input-base input-compact"
-                    value={form.unidade_id}
-                    onChange={(e) => updateForm("unidade_id", e.target.value)}
-                    disabled={busy}
-                    required
-                  >
-                    <option value="">— Selecione —</option>
-                    {unidades.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {optLabel(u)}
-                      </option>
-                    ))}
-                  </select>
-                </CadastroField>
+                  <CadastroField label="Unidade *" htmlFor="prod-unidade">
+                    <select
+                      id="prod-unidade"
+                      className="input-base input-compact"
+                      value={form.unidade_id}
+                      onChange={(e) => updateForm("unidade_id", e.target.value)}
+                      disabled={busy}
+                      required
+                    >
+                      <option value="">— Selecione —</option>
+                      {unidades.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {optLabel(u)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
 
-                <CadastroField label="Controla estoque" htmlFor="prod-estoque">
-                  <select
-                    id="prod-estoque"
-                    className="input-base input-compact"
-                    value={form.controla_estoque}
-                    onChange={(e) =>
-                      updateForm(
-                        "controla_estoque",
-                        e.target.value === "N" ? "N" : "S",
-                      )
-                    }
-                    disabled={busy}
-                  >
-                    <option value="S">Sim</option>
-                    <option value="N">Não</option>
-                  </select>
-                </CadastroField>
+                  <CadastroField label="Controla estoque" htmlFor="prod-estoque">
+                    <select
+                      id="prod-estoque"
+                      className="input-base input-compact"
+                      value={form.controla_estoque}
+                      onChange={(e) =>
+                        updateForm(
+                          "controla_estoque",
+                          e.target.value === "N" ? "N" : "S",
+                        )
+                      }
+                      disabled={busy}
+                    >
+                      <option value="S">Sim</option>
+                      <option value="N">Não</option>
+                    </select>
+                  </CadastroField>
+                </div>
 
                 <CadastroField
                   label="Descrição *"
@@ -633,77 +633,83 @@ export default function ProdutosPage() {
                   />
                 </CadastroField>
 
-                <CadastroField label="Grupo" htmlFor="prod-grupo">
-                  <select
-                    id="prod-grupo"
-                    className="input-base input-compact"
-                    value={form.grupo_id}
-                    onChange={(e) => updateForm("grupo_id", e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="">— Sem grupo —</option>
-                    {grupos.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {optLabel(g)}
-                      </option>
-                    ))}
-                  </select>
-                </CadastroField>
+                <div className="cadastro-form-row cadastro-form-row-2">
+                  <CadastroField label="Grupo" htmlFor="prod-grupo">
+                    <select
+                      id="prod-grupo"
+                      className="input-base input-compact"
+                      value={form.grupo_id}
+                      onChange={(e) => updateForm("grupo_id", e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">— Sem grupo —</option>
+                      {grupos.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {optLabel(g)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
 
-                <CadastroField label="Sub-grupo" htmlFor="prod-subgrupo">
-                  <select
-                    id="prod-subgrupo"
-                    className="input-base input-compact"
-                    value={form.subgrupo_id}
-                    onChange={(e) => updateForm("subgrupo_id", e.target.value)}
-                    disabled={busy || !form.grupo_id}
-                  >
-                    <option value="">
-                      {form.grupo_id ? "— Sem sub-grupo —" : "— Selecione o grupo —"}
-                    </option>
-                    {subgruposFiltrados.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {optLabel(s)}
+                  <CadastroField label="Sub-grupo" htmlFor="prod-subgrupo">
+                    <select
+                      id="prod-subgrupo"
+                      className="input-base input-compact"
+                      value={form.subgrupo_id}
+                      onChange={(e) => updateForm("subgrupo_id", e.target.value)}
+                      disabled={busy || !form.grupo_id}
+                    >
+                      <option value="">
+                        {form.grupo_id
+                          ? "— Sem sub-grupo —"
+                          : "— Selecione o grupo —"}
                       </option>
-                    ))}
-                  </select>
-                </CadastroField>
+                      {subgruposFiltrados.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {optLabel(s)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+                </div>
 
-                <CadastroField label="CFOP" htmlFor="prod-cfop">
-                  <select
-                    id="prod-cfop"
-                    className="input-base input-compact"
-                    value={form.cfop_id}
-                    onChange={(e) => updateForm("cfop_id", e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="">— Selecione —</option>
-                    {cfops.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {optLabel(c)}
-                      </option>
-                    ))}
-                  </select>
-                </CadastroField>
+                <div className="cadastro-form-row cadastro-form-row-2">
+                  <CadastroField label="Categoria ICMS" htmlFor="prod-cat-icm">
+                    <select
+                      id="prod-cat-icm"
+                      className="input-base input-compact"
+                      value={form.categoria_icm_id}
+                      onChange={(e) =>
+                        updateForm("categoria_icm_id", e.target.value)
+                      }
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {categoriasIcm.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {optLabel(c)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
 
-                <CadastroField label="Categoria ICMS" htmlFor="prod-cat-icm">
-                  <select
-                    id="prod-cat-icm"
-                    className="input-base input-compact"
-                    value={form.categoria_icm_id}
-                    onChange={(e) =>
-                      updateForm("categoria_icm_id", e.target.value)
-                    }
-                    disabled={busy}
-                  >
-                    <option value="">— Selecione —</option>
-                    {categoriasIcm.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {optLabel(c)}
-                      </option>
-                    ))}
-                  </select>
-                </CadastroField>
+                  <CadastroField label="CFOP" htmlFor="prod-cfop">
+                    <select
+                      id="prod-cfop"
+                      className="input-base input-compact"
+                      value={form.cfop_id}
+                      onChange={(e) => updateForm("cfop_id", e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {cfops.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {optLabel(c)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+                </div>
               </CadastroFormGrid>
             </div>
           ) : null}
