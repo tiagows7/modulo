@@ -11,11 +11,12 @@ import {
   BarChart3,
   AlertTriangle,
   CheckCircle,
-  Clock,
   ArrowRight,
   Droplets,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 type KpiCardData = {
@@ -135,14 +136,47 @@ const fuelStock = [
   { name: "Diesel S10", level: 18, capacity: 40000, current: 7200, color: "#F5C518", alert: true },
 ];
 
-const recentMovements = [
-  { id: "MOV-001", hora: "21:14", tipo: "Venda", produto: "Gasolina Comum", qtd: "45,00 L", valor: "R$ 324,00", status: "ok" },
-  { id: "MOV-002", hora: "21:08", tipo: "Venda", produto: "Diesel S10", qtd: "120,00 L", valor: "R$ 756,00", status: "ok" },
-  { id: "MOV-003", hora: "20:55", tipo: "Sangria", produto: "Caixa PDV 01", qtd: "—", valor: "R$ 500,00", status: "warning" },
-  { id: "MOV-004", hora: "20:41", tipo: "Venda", produto: "Etanol", qtd: "35,00 L", valor: "R$ 157,50", status: "ok" },
-  { id: "MOV-005", hora: "20:30", tipo: "Venda", produto: "Gasolina Aditivada", qtd: "52,00 L", valor: "R$ 406,60", status: "ok" },
-  { id: "MOV-006", hora: "20:12", tipo: "Compra", produto: "Gasolina Comum", qtd: "8.000 L", valor: "R$ 51.200,00", status: "info" },
-];
+type DespesaDia = {
+  id: string;
+  fornecedor: string;
+  descricao: string;
+  valor: number;
+  situacao: "aberto" | "vencido" | "pago";
+};
+
+/** Despesas com vencimento no dia (mock até existir tabela contas_pagar). */
+function despesasAPagarHoje(): DespesaDia[] {
+  return [
+    {
+      id: "CP-101",
+      fornecedor: "Petrobras Distribuidora",
+      descricao: "NF combustível — parcela do dia",
+      valor: 12800,
+      situacao: "aberto",
+    },
+    {
+      id: "CP-102",
+      fornecedor: "Energia Elétrica CPFL",
+      descricao: "Fatura vencendo hoje",
+      valor: 3200,
+      situacao: "aberto",
+    },
+    {
+      id: "CP-103",
+      fornecedor: "Limpeza Total",
+      descricao: "Serviço mensal",
+      valor: 850,
+      situacao: "aberto",
+    },
+    {
+      id: "CP-104",
+      fornecedor: "Auto Peças Veloz",
+      descricao: "NF 1102 — lubrificantes",
+      valor: 1340,
+      situacao: "vencido",
+    },
+  ];
+}
 
 const fadeUp = {
   hidden: { opacity: 1, y: 0 },
@@ -382,6 +416,8 @@ export default function DashboardPage() {
   const [kpiCards, setKpiCards] = useState<KpiCardData[]>(() =>
     buildKpiCards(emptyAgg, emptyAgg),
   );
+  const despesasDia = despesasAPagarHoje();
+  const totalDespesasDia = despesasDia.reduce((sum, d) => sum + d.valor, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -563,7 +599,7 @@ export default function DashboardPage() {
                   color: "var(--text-primary)",
                 }}
               >
-                Movimentos Recentes
+                Despesas a pagar no dia
               </h3>
               <p
                 style={{
@@ -572,92 +608,94 @@ export default function DashboardPage() {
                   marginTop: 2,
                 }}
               >
-                Últimas operações do dia
+                Contas com vencimento hoje · {formatMoney(totalDespesasDia)}
               </p>
             </div>
-            <motion.div
-              whileHover={{ x: 3 }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 12,
-                color: "var(--blue-light)",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Ver tudo <ArrowRight size={13} />
-            </motion.div>
+            <Link href="/contas-pagar" style={{ textDecoration: "none" }}>
+              <motion.div
+                whileHover={{ x: 3 }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 12,
+                  color: "var(--blue-light)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Ver tudo <ArrowRight size={13} />
+              </motion.div>
+            </Link>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Hora</th>
-                <th>Tipo</th>
-                <th>Produto</th>
-                <th>Qtd</th>
-                <th style={{ textAlign: "right" }}>Valor</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentMovements.map((m, i) => (
-                <motion.tr
-                  key={m.id}
-                  initial={false}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
-                >
-                  <td>
-                    <span
+          {despesasDia.length === 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                padding: "36px 12px",
+                color: "var(--text-muted)",
+                fontSize: 13,
+              }}
+            >
+              <CreditCard size={28} style={{ opacity: 0.5 }} />
+              Nenhuma despesa com vencimento hoje
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Fornecedor</th>
+                  <th>Descrição</th>
+                  <th style={{ textAlign: "right" }}>Valor</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {despesasDia.map((d, i) => (
+                  <motion.tr
+                    key={d.id}
+                    initial={false}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
+                  >
+                    <td style={{ fontWeight: 500 }}>{d.fornecedor}</td>
+                    <td>{d.descricao}</td>
+                    <td
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        color: "var(--text-muted)",
+                        textAlign: "right",
+                        fontWeight: 600,
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--text-primary)",
                       }}
                     >
-                      <Clock size={12} /> {m.hora}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{m.tipo}</td>
-                  <td>{m.produto}</td>
-                  <td style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {m.qtd}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontWeight: 600,
-                      fontVariantNumeric: "tabular-nums",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {m.valor}
-                  </td>
-                  <td>
-                    <span
-                      className={`badge badge-${
-                        m.status === "ok"
-                          ? "success"
-                          : m.status === "warning"
-                            ? "warning"
-                            : "info"
-                      }`}
-                    >
-                      {m.status === "ok"
-                        ? "OK"
-                        : m.status === "warning"
-                          ? "Atenção"
-                          : "Info"}
-                    </span>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+                      {formatMoney(d.valor)}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge badge-${
+                          d.situacao === "pago"
+                            ? "success"
+                            : d.situacao === "vencido"
+                              ? "danger"
+                              : "warning"
+                        }`}
+                      >
+                        {d.situacao === "pago"
+                          ? "Pago"
+                          : d.situacao === "vencido"
+                            ? "Vencido"
+                            : "A pagar"}
+                      </span>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </motion.div>
       </div>
     </div>
