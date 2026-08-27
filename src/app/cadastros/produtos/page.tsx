@@ -26,6 +26,29 @@ type ComissaoOpt = {
   valor: number;
 };
 
+type IbscbsCstOpt = { id: string; cst: number; descricao: string };
+
+type IbscbsClasstribOpt = {
+  id: string;
+  cst: number;
+  codigo: string;
+  nome: string;
+};
+
+type CestOpt = {
+  id: string;
+  codigo: string;
+  descricao: string;
+  ncm: string | null;
+};
+
+type NcmOpt = {
+  id: string;
+  ibpt_ncm: number;
+  ibpt_ex: string | null;
+  ibpt_des: string;
+};
+
 type GrupoOpt = Opt & { grupocomissao_id: string | null };
 
 type SubgrupoOpt = Opt & { grupo_id: string };
@@ -52,12 +75,24 @@ type Produto = {
   observacao: string | null;
   conta_contabil: string | null;
   centro_custo: string | null;
+  ibscbs_cst_id: string | null;
+  ibscbs_classtrib_id: string | null;
+  ncm_id: string | null;
+  cest_id: string | null;
+  anp_id: string | null;
+  natureza_receita: string | null;
+  ipi_id: string | null;
+  piscofins_id: string | null;
+  pct_base_retida: number | null;
+  pct_fundo_pobreza: number | null;
+  aliquota_monofasica: number | null;
   grupo_produtos?: { codigo: string; descricao: string } | null;
   subgrupo_produtos?: { codigo: string; descricao: string } | null;
   unidade_medida?: { codigo: string; descricao: string } | null;
   categorias_icm?: { codigo: number; descricao: string } | null;
   produto_cfop?: { codigo: string; descricao: string } | null;
   produto_grupocomissao?: { codigo: string; descricao: string } | null;
+  produto_ncm?: NcmOpt | null;
 };
 
 type FormState = {
@@ -78,6 +113,17 @@ type FormState = {
   observacao: string;
   conta_contabil: string;
   centro_custo: string;
+  ibscbs_cst_id: string;
+  ibscbs_classtrib_id: string;
+  ncm_id: string;
+  cest_id: string;
+  anp_id: string;
+  natureza_receita: string;
+  ipi_id: string;
+  piscofins_id: string;
+  pct_base_retida: string;
+  pct_fundo_pobreza: string;
+  aliquota_monofasica: string;
 };
 
 const emptyForm: FormState = {
@@ -98,6 +144,17 @@ const emptyForm: FormState = {
   observacao: "",
   conta_contabil: "",
   centro_custo: "",
+  ibscbs_cst_id: "",
+  ibscbs_classtrib_id: "",
+  ncm_id: "",
+  cest_id: "",
+  anp_id: "",
+  natureza_receita: "",
+  ipi_id: "",
+  piscofins_id: "",
+  pct_base_retida: "0",
+  pct_fundo_pobreza: "0",
+  aliquota_monofasica: "0",
 };
 
 const tabs: { id: TabId; label: string }[] = [
@@ -128,9 +185,30 @@ function comissaoLabel(c: ComissaoOpt) {
   return `${c.codigo} — ${c.descricao} (${sufixo})`;
 }
 
+function formatNcmCode(n: number | string) {
+  return String(n).replace(/\D/g, "").padStart(8, "0");
+}
+
+function ncmLabel(n: NcmOpt) {
+  const ex = n.ibpt_ex ? ` EX ${n.ibpt_ex}` : "";
+  return `${formatNcmCode(n.ibpt_ncm)}${ex} — ${n.ibpt_des}`;
+}
+
+function cestMatchesNcm(cestNcm: string | null, ncmCode: string) {
+  if (!cestNcm) return false;
+  const cn = cestNcm.replace(/\D/g, "");
+  const nn = ncmCode.replace(/\D/g, "");
+  if (!cn || !nn) return false;
+  return nn.startsWith(cn) || cn.startsWith(nn);
+}
+
 function asOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
+}
+
+function uid(v: unknown) {
+  return v != null ? String(v) : null;
 }
 
 async function nextCodigo() {
@@ -164,6 +242,18 @@ export default function ProdutosPage() {
   >([]);
   const [cfops, setCfops] = useState<Opt[]>([]);
   const [comissoes, setComissoes] = useState<ComissaoOpt[]>([]);
+  const [ibscbsCsts, setIbscbsCsts] = useState<IbscbsCstOpt[]>([]);
+  const [ibscbsClasstrib, setIbscbsClasstrib] = useState<IbscbsClasstribOpt[]>(
+    [],
+  );
+  const [cests, setCests] = useState<CestOpt[]>([]);
+  const [anps, setAnps] = useState<Opt[]>([]);
+  const [ipis, setIpis] = useState<Opt[]>([]);
+  const [piscofins, setPiscofins] = useState<Opt[]>([]);
+  const [ncmQuery, setNcmQuery] = useState("");
+  const [ncmResults, setNcmResults] = useState<NcmOpt[]>([]);
+  const [ncmSelected, setNcmSelected] = useState<NcmOpt | null>(null);
+  const [ncmOpen, setNcmOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -184,6 +274,12 @@ export default function ProdutosPage() {
         catRes,
         cfopRes,
         comRes,
+        ibsCstRes,
+        ibsClassRes,
+        cestRes,
+        anpRes,
+        ipiRes,
+        pisRes,
       ] = await Promise.all([
         supabase
           .from("produtos")
@@ -194,12 +290,16 @@ export default function ProdutosPage() {
             preco_venda, estoque_atual, volume, estoque_minimo, peso, qtd_embalagem,
             status, observacao,
             conta_contabil, centro_custo,
+            ibscbs_cst_id, ibscbs_classtrib_id, ncm_id, cest_id, anp_id,
+            natureza_receita, ipi_id, piscofins_id,
+            pct_base_retida, pct_fundo_pobreza, aliquota_monofasica,
             grupo_produtos ( codigo, descricao ),
             subgrupo_produtos ( codigo, descricao ),
             unidade_medida ( codigo, descricao ),
             categorias_icm ( codigo, descricao ),
             produto_cfop ( codigo, descricao ),
-            produto_grupocomissao ( codigo, descricao )
+            produto_grupocomissao ( codigo, descricao ),
+            produto_ncm ( id, ibpt_ncm, ibpt_ex, ibpt_des )
           `,
           )
           .order("created_at", { ascending: false }),
@@ -228,6 +328,30 @@ export default function ProdutosPage() {
         supabase
           .from("produto_grupocomissao")
           .select("id, codigo, descricao, tipo, valor")
+          .order("codigo"),
+        supabase
+          .from("produto_ibscbs_cst")
+          .select("id, cst, descricao")
+          .order("cst"),
+        supabase
+          .from("produto_ibscbs_classtrib")
+          .select("id, cst, codigo, nome")
+          .order("codigo"),
+        supabase
+          .from("produto_cest")
+          .select("id, codigo, descricao, ncm")
+          .order("codigo"),
+        supabase
+          .from("produto_anp")
+          .select("id, codigo, descricao")
+          .order("codigo"),
+        supabase
+          .from("produto_ipi")
+          .select("id, codigo, descricao")
+          .order("codigo"),
+        supabase
+          .from("produto_piscofins")
+          .select("id, codigo, descricao")
           .order("codigo"),
       ]);
 
@@ -264,6 +388,21 @@ export default function ProdutosPage() {
           conta_contabil:
             r.conta_contabil != null ? String(r.conta_contabil) : null,
           centro_custo: r.centro_custo != null ? String(r.centro_custo) : null,
+          ibscbs_cst_id: uid(r.ibscbs_cst_id),
+          ibscbs_classtrib_id: uid(r.ibscbs_classtrib_id),
+          ncm_id: uid(r.ncm_id),
+          cest_id: uid(r.cest_id),
+          anp_id: uid(r.anp_id),
+          natureza_receita:
+            r.natureza_receita != null ? String(r.natureza_receita) : null,
+          ipi_id: uid(r.ipi_id),
+          piscofins_id: uid(r.piscofins_id),
+          pct_base_retida:
+            r.pct_base_retida != null ? Number(r.pct_base_retida) : 0,
+          pct_fundo_pobreza:
+            r.pct_fundo_pobreza != null ? Number(r.pct_fundo_pobreza) : 0,
+          aliquota_monofasica:
+            r.aliquota_monofasica != null ? Number(r.aliquota_monofasica) : 0,
           grupo_produtos: asOne(
             r.grupo_produtos as
               | { codigo: string; descricao: string }
@@ -300,6 +439,9 @@ export default function ProdutosPage() {
               | { codigo: string; descricao: string }[]
               | null,
           ),
+          produto_ncm: asOne(
+            r.produto_ncm as NcmOpt | NcmOpt[] | null,
+          ),
         } satisfies Produto;
       });
 
@@ -332,6 +474,32 @@ export default function ProdutosPage() {
           valor: Number(c.valor) || 0,
         })),
       );
+      setIbscbsCsts(
+        (ibsCstRes.data ?? []).map((c) => ({
+          id: String(c.id),
+          cst: Number(c.cst),
+          descricao: String(c.descricao),
+        })),
+      );
+      setIbscbsClasstrib(
+        (ibsClassRes.data ?? []).map((c) => ({
+          id: String(c.id),
+          cst: Number(c.cst),
+          codigo: String(c.codigo),
+          nome: String(c.nome),
+        })),
+      );
+      setCests(
+        (cestRes.data ?? []).map((c) => ({
+          id: String(c.id),
+          codigo: String(c.codigo),
+          descricao: String(c.descricao ?? ""),
+          ncm: c.ncm != null ? String(c.ncm) : null,
+        })),
+      );
+      setAnps((anpRes.data ?? []) as Opt[]);
+      setIpis((ipiRes.data ?? []) as Opt[]);
+      setPiscofins((pisRes.data ?? []) as Opt[]);
     });
   }, [pesquisar]);
 
@@ -343,6 +511,19 @@ export default function ProdutosPage() {
     if (!form.grupo_id) return [];
     return subgrupos.filter((s) => s.grupo_id === form.grupo_id);
   }, [form.grupo_id, subgrupos]);
+
+  const classtribFiltrados = useMemo(() => {
+    if (!form.ibscbs_cst_id) return [];
+    const cst = ibscbsCsts.find((c) => c.id === form.ibscbs_cst_id)?.cst;
+    if (cst == null) return [];
+    return ibscbsClasstrib.filter((c) => c.cst === cst);
+  }, [form.ibscbs_cst_id, ibscbsCsts, ibscbsClasstrib]);
+
+  const cestsFiltrados = useMemo(() => {
+    if (!ncmSelected) return [];
+    const code = formatNcmCode(ncmSelected.ibpt_ncm);
+    return cests.filter((c) => cestMatchesNcm(c.ncm, code));
+  }, [ncmSelected, cests]);
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => {
@@ -357,9 +538,84 @@ export default function ProdutosPage() {
           next.grupocomissao_id = grupo.grupocomissao_id;
         }
       }
+      if (key === "ibscbs_cst_id") {
+        const cst = ibscbsCsts.find((c) => c.id === value)?.cst;
+        const stillOk = ibscbsClasstrib.some(
+          (c) => c.id === prev.ibscbs_classtrib_id && c.cst === cst,
+        );
+        if (!stillOk) next.ibscbs_classtrib_id = "";
+      }
       return next;
     });
   };
+
+  const selectNcm = (n: NcmOpt | null) => {
+    setNcmSelected(n);
+    setNcmQuery(n ? ncmLabel(n) : "");
+    setNcmResults([]);
+    setNcmOpen(false);
+    setForm((prev) => {
+      const next = { ...prev, ncm_id: n?.id ?? "" };
+      if (!n) {
+        next.cest_id = "";
+        return next;
+      }
+      const code = formatNcmCode(n.ibpt_ncm);
+      const stillOk = cests.some(
+        (c) => c.id === prev.cest_id && cestMatchesNcm(c.ncm, code),
+      );
+      if (!stillOk) next.cest_id = "";
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const q = ncmQuery.trim();
+    if (!ncmOpen || ncmSelected) return;
+    if (q.length < 2) {
+      setNcmResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const digits = q.replace(/\D/g, "");
+        let query = supabase
+          .from("produto_ncm")
+          .select("id, ibpt_ncm, ibpt_ex, ibpt_des")
+          .limit(40);
+
+        if (digits.length >= 4 && /^\d+$/.test(digits)) {
+          const n = Number(digits);
+          const pad = Math.max(0, 8 - digits.length);
+          const factor = 10 ** pad;
+          query = query
+            .gte("ibpt_ncm", n * factor)
+            .lt("ibpt_ncm", (n + 1) * factor)
+            .order("ibpt_ncm");
+        } else {
+          query = query.ilike("ibpt_des", `%${q}%`).order("ibpt_ncm");
+        }
+
+        const { data } = await query;
+        if (cancelled) return;
+        setNcmResults(
+          (data ?? []).map((row) => ({
+            id: String(row.id),
+            ibpt_ncm: Number(row.ibpt_ncm),
+            ibpt_ex: row.ibpt_ex != null ? String(row.ibpt_ex) : null,
+            ibpt_des: String(row.ibpt_des),
+          })),
+        );
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [ncmQuery, ncmOpen, ncmSelected]);
 
   const openCreate = () => {
     setEditing(null);
@@ -371,6 +627,10 @@ export default function ProdutosPage() {
       unidade_id: undPadrao,
       grupo_id: grupos.length === 1 ? grupos[0].id : "",
     });
+    setNcmSelected(null);
+    setNcmQuery("");
+    setNcmResults([]);
+    setNcmOpen(false);
     setTab("geral");
     setFormError("");
     setModalOpen(true);
@@ -396,7 +656,27 @@ export default function ProdutosPage() {
       observacao: item.observacao ?? "",
       conta_contabil: item.conta_contabil ?? "",
       centro_custo: item.centro_custo ?? "",
+      ibscbs_cst_id: item.ibscbs_cst_id ?? "",
+      ibscbs_classtrib_id: item.ibscbs_classtrib_id ?? "",
+      ncm_id: item.ncm_id ?? "",
+      cest_id: item.cest_id ?? "",
+      anp_id: item.anp_id ?? "",
+      natureza_receita: item.natureza_receita ?? "",
+      ipi_id: item.ipi_id ?? "",
+      piscofins_id: item.piscofins_id ?? "",
+      pct_base_retida: String(item.pct_base_retida ?? 0),
+      pct_fundo_pobreza: String(item.pct_fundo_pobreza ?? 0),
+      aliquota_monofasica: String(item.aliquota_monofasica ?? 0),
     });
+    if (item.produto_ncm) {
+      setNcmSelected(item.produto_ncm);
+      setNcmQuery(ncmLabel(item.produto_ncm));
+    } else {
+      setNcmSelected(null);
+      setNcmQuery("");
+    }
+    setNcmResults([]);
+    setNcmOpen(false);
     setTab("geral");
     setFormError("");
     setActionError("");
@@ -453,6 +733,17 @@ export default function ProdutosPage() {
       observacao: form.observacao.trim() || null,
       conta_contabil: form.conta_contabil.trim() || null,
       centro_custo: form.centro_custo.trim() || null,
+      ibscbs_cst_id: form.ibscbs_cst_id || null,
+      ibscbs_classtrib_id: form.ibscbs_classtrib_id || null,
+      ncm_id: form.ncm_id || null,
+      cest_id: form.cest_id || null,
+      anp_id: form.anp_id || null,
+      natureza_receita: form.natureza_receita.trim() || null,
+      ipi_id: form.ipi_id || null,
+      piscofins_id: form.piscofins_id || null,
+      pct_base_retida: parseMoney(form.pct_base_retida),
+      pct_fundo_pobreza: parseMoney(form.pct_fundo_pobreza),
+      aliquota_monofasica: parseMoney(form.aliquota_monofasica),
     };
 
     try {
@@ -602,7 +893,7 @@ export default function ProdutosPage() {
           }
           onClose={closeModal}
           disabled={busy}
-          width={720}
+          width={820}
           asForm
           onSubmit={handleSubmit}
           footer={
@@ -901,30 +1192,283 @@ export default function ProdutosPage() {
           {tab === "contabil" ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
-                <CadastroField label="Conta contábil" htmlFor="prod-conta">
-                  <input
-                    id="prod-conta"
-                    className="input-base input-compact"
-                    value={form.conta_contabil}
-                    onChange={(e) =>
-                      updateForm("conta_contabil", e.target.value)
-                    }
-                    disabled={busy}
-                    maxLength={30}
-                    placeholder="Ex.: 1.1.01.001"
-                  />
+                <div className="cadastro-form-row cadastro-form-row-2">
+                  <CadastroField label="Conta contábil" htmlFor="prod-conta">
+                    <input
+                      id="prod-conta"
+                      className="input-base input-compact"
+                      value={form.conta_contabil}
+                      onChange={(e) =>
+                        updateForm("conta_contabil", e.target.value)
+                      }
+                      disabled={busy}
+                      maxLength={30}
+                      placeholder="Ex.: 1.1.01.001"
+                    />
+                  </CadastroField>
+
+                  <CadastroField label="Centro de custo" htmlFor="prod-ccusto">
+                    <input
+                      id="prod-ccusto"
+                      className="input-base input-compact"
+                      value={form.centro_custo}
+                      onChange={(e) =>
+                        updateForm("centro_custo", e.target.value)
+                      }
+                      disabled={busy}
+                      maxLength={30}
+                    />
+                  </CadastroField>
+                </div>
+
+                <div className="cadastro-form-row cadastro-form-row-2">
+                  <CadastroField label="IBS-CBS CST" htmlFor="prod-ibs-cst">
+                    <select
+                      id="prod-ibs-cst"
+                      className="input-base input-compact"
+                      value={form.ibscbs_cst_id}
+                      onChange={(e) =>
+                        updateForm("ibscbs_cst_id", e.target.value)
+                      }
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {ibscbsCsts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {String(c.cst).padStart(3, "0")} — {c.descricao}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+
+                  <CadastroField
+                    label="IBS-CBS Class. Trib."
+                    htmlFor="prod-ibs-class"
+                  >
+                    <select
+                      id="prod-ibs-class"
+                      className="input-base input-compact"
+                      value={form.ibscbs_classtrib_id}
+                      onChange={(e) =>
+                        updateForm("ibscbs_classtrib_id", e.target.value)
+                      }
+                      disabled={busy || !form.ibscbs_cst_id}
+                    >
+                      <option value="">
+                        {form.ibscbs_cst_id
+                          ? "— Selecione —"
+                          : "— Selecione o CST —"}
+                      </option>
+                      {classtribFiltrados.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo} — {c.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+                </div>
+
+                <CadastroField label="Código NCM" htmlFor="prod-ncm" span="full">
+                  <div className="cadastro-ncm-search">
+                    <input
+                      id="prod-ncm"
+                      className="input-base input-compact"
+                      value={ncmQuery}
+                      placeholder="Digite o NCM ou a descrição para buscar..."
+                      disabled={busy}
+                      autoComplete="off"
+                      onFocus={() => setNcmOpen(true)}
+                      onChange={(e) => {
+                        setNcmQuery(e.target.value);
+                        setNcmOpen(true);
+                        if (ncmSelected) {
+                          setNcmSelected(null);
+                          setForm((prev) => ({
+                            ...prev,
+                            ncm_id: "",
+                            cest_id: "",
+                          }));
+                        }
+                      }}
+                      onBlur={() => {
+                        window.setTimeout(() => setNcmOpen(false), 150);
+                      }}
+                    />
+                    {ncmOpen && ncmResults.length > 0 ? (
+                      <ul className="cadastro-ncm-results" role="listbox">
+                        {ncmResults.map((n) => (
+                          <li key={n.id}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selectNcm(n)}
+                            >
+                              {ncmLabel(n)}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {ncmSelected ? (
+                      <button
+                        type="button"
+                        className="cadastro-ncm-clear"
+                        onClick={() => selectNcm(null)}
+                        disabled={busy}
+                      >
+                        Limpar NCM
+                      </button>
+                    ) : null}
+                  </div>
                 </CadastroField>
 
-                <CadastroField label="Centro de custo" htmlFor="prod-ccusto">
-                  <input
-                    id="prod-ccusto"
-                    className="input-base input-compact"
-                    value={form.centro_custo}
-                    onChange={(e) => updateForm("centro_custo", e.target.value)}
-                    disabled={busy}
-                    maxLength={30}
-                  />
-                </CadastroField>
+                <div className="cadastro-form-row cadastro-form-row-2">
+                  <CadastroField label="Código CEST" htmlFor="prod-cest">
+                    <select
+                      id="prod-cest"
+                      className="input-base input-compact"
+                      value={form.cest_id}
+                      onChange={(e) => updateForm("cest_id", e.target.value)}
+                      disabled={busy || !form.ncm_id}
+                    >
+                      <option value="">
+                        {form.ncm_id
+                          ? cestsFiltrados.length
+                            ? "— Selecione —"
+                            : "— Nenhum CEST para este NCM —"
+                          : "— Informe o NCM —"}
+                      </option>
+                      {cestsFiltrados.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo} — {c.descricao.slice(0, 60)}
+                          {c.descricao.length > 60 ? "…" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+
+                  <CadastroField label="Código ANP" htmlFor="prod-anp">
+                    <select
+                      id="prod-anp"
+                      className="input-base input-compact"
+                      value={form.anp_id}
+                      onChange={(e) => updateForm("anp_id", e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {anps.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {optLabel(a)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+                </div>
+
+                <div className="cadastro-form-row cadastro-form-row-3">
+                  <CadastroField
+                    label="Natureza da receita"
+                    htmlFor="prod-nat-rec"
+                  >
+                    <input
+                      id="prod-nat-rec"
+                      className="input-base input-compact"
+                      value={form.natureza_receita}
+                      onChange={(e) =>
+                        updateForm("natureza_receita", e.target.value)
+                      }
+                      disabled={busy}
+                      maxLength={10}
+                      placeholder="Ex.: 101"
+                    />
+                  </CadastroField>
+
+                  <CadastroField label="CST IPI" htmlFor="prod-ipi">
+                    <select
+                      id="prod-ipi"
+                      className="input-base input-compact"
+                      value={form.ipi_id}
+                      onChange={(e) => updateForm("ipi_id", e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {ipis.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {optLabel(i)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+
+                  <CadastroField label="CST PIS-COFINS" htmlFor="prod-pis">
+                    <select
+                      id="prod-pis"
+                      className="input-base input-compact"
+                      value={form.piscofins_id}
+                      onChange={(e) =>
+                        updateForm("piscofins_id", e.target.value)
+                      }
+                      disabled={busy}
+                    >
+                      <option value="">— Selecione —</option>
+                      {piscofins.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {optLabel(p)}
+                        </option>
+                      ))}
+                    </select>
+                  </CadastroField>
+                </div>
+
+                <div className="cadastro-form-row cadastro-form-row-3">
+                  <CadastroField
+                    label="% base retida"
+                    htmlFor="prod-base-ret"
+                  >
+                    <input
+                      id="prod-base-ret"
+                      className="input-base input-compact"
+                      value={form.pct_base_retida}
+                      onChange={(e) =>
+                        updateForm("pct_base_retida", e.target.value)
+                      }
+                      disabled={busy}
+                      inputMode="decimal"
+                    />
+                  </CadastroField>
+
+                  <CadastroField
+                    label="% fundo pobreza"
+                    htmlFor="prod-fcp"
+                  >
+                    <input
+                      id="prod-fcp"
+                      className="input-base input-compact"
+                      value={form.pct_fundo_pobreza}
+                      onChange={(e) =>
+                        updateForm("pct_fundo_pobreza", e.target.value)
+                      }
+                      disabled={busy}
+                      inputMode="decimal"
+                    />
+                  </CadastroField>
+
+                  <CadastroField
+                    label="Alíquota monofásica"
+                    htmlFor="prod-aliq-mono"
+                  >
+                    <input
+                      id="prod-aliq-mono"
+                      className="input-base input-compact"
+                      value={form.aliquota_monofasica}
+                      onChange={(e) =>
+                        updateForm("aliquota_monofasica", e.target.value)
+                      }
+                      disabled={busy}
+                      inputMode="decimal"
+                    />
+                  </CadastroField>
+                </div>
               </CadastroFormGrid>
             </div>
           ) : null}
