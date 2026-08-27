@@ -14,6 +14,7 @@ import {
   BadgeDollarSign,
   IdCard,
   FolderTree,
+  Percent,
 } from "lucide-react";
 import { useAuthProfile } from "@/lib/authRole";
 
@@ -60,6 +61,12 @@ const submenus = [
     label: "Sub-grupo de Produtos",
     icon: FolderTree,
     description: "Subcategorias vinculadas ao grupo",
+  },
+  {
+    href: "/cadastros/grupo-comissao-produtos",
+    label: "Grupo de Comissão de Produtos",
+    icon: Percent,
+    description: "Comissão percentual ou valor fixo",
   },
   {
     href: "/cadastros/grupo-precos",
