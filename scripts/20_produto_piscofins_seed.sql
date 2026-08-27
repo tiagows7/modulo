@@ -2,7 +2,7 @@
 -- percentual_pis/cofins: alíquota básica não-cumulativa no CST 01; 0 nos CSTs de alíquota zero/isenção/etc.
 -- basezero: S quando a operação tipicamente não gera débito/alíquota
 
-INSERT INTO public.pis_cofins (
+INSERT INTO public.produto_piscofins (
   codigo, descricao,
   percentual_pis, grupo_pis, percentual_cofins, grupo_cofins,
   basezero
