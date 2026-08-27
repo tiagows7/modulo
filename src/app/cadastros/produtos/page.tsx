@@ -73,8 +73,6 @@ type Produto = {
   qtd_embalagem: number | null;
   status: string | null;
   observacao: string | null;
-  conta_contabil: string | null;
-  centro_custo: string | null;
   ibscbs_cst_id: string | null;
   ibscbs_classtrib_id: string | null;
   ncm_id: string | null;
@@ -111,8 +109,6 @@ type FormState = {
   qtd_embalagem: string;
   status: string;
   observacao: string;
-  conta_contabil: string;
-  centro_custo: string;
   ibscbs_cst_id: string;
   ibscbs_classtrib_id: string;
   ncm_id: string;
@@ -142,8 +138,6 @@ const emptyForm: FormState = {
   qtd_embalagem: "1",
   status: "ativo",
   observacao: "",
-  conta_contabil: "",
-  centro_custo: "",
   ibscbs_cst_id: "",
   ibscbs_classtrib_id: "",
   ncm_id: "",
@@ -254,6 +248,8 @@ export default function ProdutosPage() {
   const [ncmResults, setNcmResults] = useState<NcmOpt[]>([]);
   const [ncmSelected, setNcmSelected] = useState<NcmOpt | null>(null);
   const [ncmOpen, setNcmOpen] = useState(false);
+  const [ncmSearching, setNcmSearching] = useState(false);
+  const [ncmSearchError, setNcmSearchError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -289,7 +285,6 @@ export default function ProdutosPage() {
             unidade_id, controla_estoque, categoria_icm_id, cfop_id, grupocomissao_id,
             preco_venda, estoque_atual, volume, estoque_minimo, peso, qtd_embalagem,
             status, observacao,
-            conta_contabil, centro_custo,
             ibscbs_cst_id, ibscbs_classtrib_id, ncm_id, cest_id, anp_id,
             natureza_receita, ipi_id, piscofins_id,
             pct_base_retida, pct_fundo_pobreza, aliquota_monofasica,
@@ -385,9 +380,6 @@ export default function ProdutosPage() {
           qtd_embalagem: r.qtd_embalagem != null ? Number(r.qtd_embalagem) : 1,
           status: r.status != null ? String(r.status) : "ativo",
           observacao: r.observacao != null ? String(r.observacao) : null,
-          conta_contabil:
-            r.conta_contabil != null ? String(r.conta_contabil) : null,
-          centro_custo: r.centro_custo != null ? String(r.centro_custo) : null,
           ibscbs_cst_id: uid(r.ibscbs_cst_id),
           ibscbs_classtrib_id: uid(r.ibscbs_classtrib_id),
           ncm_id: uid(r.ncm_id),
@@ -571,25 +563,32 @@ export default function ProdutosPage() {
 
   useEffect(() => {
     const q = ncmQuery.trim();
-    if (!ncmOpen || ncmSelected) return;
+    if (!ncmOpen || ncmSelected) {
+      setNcmSearching(false);
+      return;
+    }
     if (q.length < 2) {
       setNcmResults([]);
+      setNcmSearchError("");
+      setNcmSearching(false);
       return;
     }
 
     let cancelled = false;
+    setNcmSearching(true);
     const timer = window.setTimeout(() => {
       void (async () => {
         const digits = q.replace(/\D/g, "");
         let query = supabase
           .from("produto_ncm")
           .select("id, ibpt_ncm, ibpt_ex, ibpt_des")
-          .limit(40);
+          .limit(50);
 
-        if (digits.length >= 4 && /^\d+$/.test(digits)) {
+        if (digits.length >= 8) {
+          query = query.eq("ibpt_ncm", Number(digits.slice(0, 8))).order("ibpt_ex");
+        } else if (digits.length >= 4 && /^\d+$/.test(digits)) {
           const n = Number(digits);
-          const pad = Math.max(0, 8 - digits.length);
-          const factor = 10 ** pad;
+          const factor = 10 ** (8 - digits.length);
           query = query
             .gte("ibpt_ncm", n * factor)
             .lt("ibpt_ncm", (n + 1) * factor)
@@ -598,8 +597,15 @@ export default function ProdutosPage() {
           query = query.ilike("ibpt_des", `%${q}%`).order("ibpt_ncm");
         }
 
-        const { data } = await query;
+        const { data, error } = await query;
         if (cancelled) return;
+        setNcmSearching(false);
+        if (error) {
+          setNcmResults([]);
+          setNcmSearchError(error.message);
+          return;
+        }
+        setNcmSearchError("");
         setNcmResults(
           (data ?? []).map((row) => ({
             id: String(row.id),
@@ -654,8 +660,6 @@ export default function ProdutosPage() {
       qtd_embalagem: String(item.qtd_embalagem ?? 1),
       status: item.status === "inativo" ? "inativo" : "ativo",
       observacao: item.observacao ?? "",
-      conta_contabil: item.conta_contabil ?? "",
-      centro_custo: item.centro_custo ?? "",
       ibscbs_cst_id: item.ibscbs_cst_id ?? "",
       ibscbs_classtrib_id: item.ibscbs_classtrib_id ?? "",
       ncm_id: item.ncm_id ?? "",
@@ -731,8 +735,6 @@ export default function ProdutosPage() {
       qtd_embalagem: parseMoney(form.qtd_embalagem),
       status: form.status === "inativo" ? "inativo" : "ativo",
       observacao: form.observacao.trim() || null,
-      conta_contabil: form.conta_contabil.trim() || null,
-      centro_custo: form.centro_custo.trim() || null,
       ibscbs_cst_id: form.ibscbs_cst_id || null,
       ibscbs_classtrib_id: form.ibscbs_classtrib_id || null,
       ncm_id: form.ncm_id || null,
@@ -1193,35 +1195,6 @@ export default function ProdutosPage() {
             <div className="cadastro-tab-panel" role="tabpanel">
               <CadastroFormGrid>
                 <div className="cadastro-form-row cadastro-form-row-2">
-                  <CadastroField label="Conta contábil" htmlFor="prod-conta">
-                    <input
-                      id="prod-conta"
-                      className="input-base input-compact"
-                      value={form.conta_contabil}
-                      onChange={(e) =>
-                        updateForm("conta_contabil", e.target.value)
-                      }
-                      disabled={busy}
-                      maxLength={30}
-                      placeholder="Ex.: 1.1.01.001"
-                    />
-                  </CadastroField>
-
-                  <CadastroField label="Centro de custo" htmlFor="prod-ccusto">
-                    <input
-                      id="prod-ccusto"
-                      className="input-base input-compact"
-                      value={form.centro_custo}
-                      onChange={(e) =>
-                        updateForm("centro_custo", e.target.value)
-                      }
-                      disabled={busy}
-                      maxLength={30}
-                    />
-                  </CadastroField>
-                </div>
-
-                <div className="cadastro-form-row cadastro-form-row-2">
                   <CadastroField label="IBS-CBS CST" htmlFor="prod-ibs-cst">
                     <select
                       id="prod-ibs-cst"
@@ -1270,55 +1243,76 @@ export default function ProdutosPage() {
 
                 <CadastroField label="Código NCM" htmlFor="prod-ncm" span="full">
                   <div className="cadastro-ncm-search">
-                    <input
-                      id="prod-ncm"
-                      className="input-base input-compact"
-                      value={ncmQuery}
-                      placeholder="Digite o NCM ou a descrição para buscar..."
-                      disabled={busy}
-                      autoComplete="off"
-                      onFocus={() => setNcmOpen(true)}
-                      onChange={(e) => {
-                        setNcmQuery(e.target.value);
-                        setNcmOpen(true);
-                        if (ncmSelected) {
-                          setNcmSelected(null);
-                          setForm((prev) => ({
-                            ...prev,
-                            ncm_id: "",
-                            cest_id: "",
-                          }));
-                        }
-                      }}
-                      onBlur={() => {
-                        window.setTimeout(() => setNcmOpen(false), 150);
-                      }}
-                    />
-                    {ncmOpen && ncmResults.length > 0 ? (
-                      <ul className="cadastro-ncm-results" role="listbox">
-                        {ncmResults.map((n) => (
-                          <li key={n.id}>
-                            <button
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => selectNcm(n)}
-                            >
-                              {ncmLabel(n)}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {ncmSelected ? (
-                      <button
-                        type="button"
-                        className="cadastro-ncm-clear"
-                        onClick={() => selectNcm(null)}
-                        disabled={busy}
-                      >
-                        Limpar NCM
-                      </button>
-                    ) : null}
+                    {ncmSelected && form.ncm_id ? (
+                      <div className="cadastro-ncm-selected">
+                        <input
+                          id="prod-ncm"
+                          className="input-base input-compact"
+                          value={ncmLabel(ncmSelected)}
+                          readOnly
+                          disabled={busy}
+                        />
+                        <button
+                          type="button"
+                          className="cadastro-ncm-clear"
+                          onClick={() => selectNcm(null)}
+                          disabled={busy}
+                        >
+                          Alterar / limpar
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          id="prod-ncm"
+                          className="input-base input-compact"
+                          value={ncmQuery}
+                          placeholder="Buscar em produto_ncm (código ou descrição)…"
+                          disabled={busy}
+                          autoComplete="off"
+                          onFocus={() => setNcmOpen(true)}
+                          onChange={(e) => {
+                            setNcmQuery(e.target.value);
+                            setNcmOpen(true);
+                          }}
+                          onBlur={() => {
+                            window.setTimeout(() => setNcmOpen(false), 180);
+                          }}
+                        />
+                        {ncmSearching ? (
+                          <div className="cadastro-ncm-hint">Buscando…</div>
+                        ) : null}
+                        {ncmSearchError ? (
+                          <div className="cadastro-ncm-hint cadastro-ncm-error">
+                            {ncmSearchError}
+                          </div>
+                        ) : null}
+                        {!ncmSearching &&
+                        ncmOpen &&
+                        ncmQuery.trim().length >= 2 &&
+                        ncmResults.length === 0 &&
+                        !ncmSearchError ? (
+                          <div className="cadastro-ncm-hint">
+                            Nenhum NCM encontrado em produto_ncm
+                          </div>
+                        ) : null}
+                        {ncmOpen && ncmResults.length > 0 ? (
+                          <ul className="cadastro-ncm-results" role="listbox">
+                            {ncmResults.map((n) => (
+                              <li key={n.id}>
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => selectNcm(n)}
+                                >
+                                  {ncmLabel(n)}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </CadastroField>
 

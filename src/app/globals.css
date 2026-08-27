@@ -659,6 +659,22 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  z-index: 5;
+}
+
+.cadastro-ncm-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cadastro-ncm-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cadastro-ncm-error {
+  color: #f87171;
 }
 
 .cadastro-ncm-results {
@@ -666,7 +682,7 @@ body {
   top: calc(100% + 2px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: 40;
   margin: 0;
   padding: 4px 0;
   list-style: none;

@@ -939,6 +939,23 @@ button.chip.fullscreen-toggle:hover {
   min-width: 180px;
 }
 
+.caixa-guard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.caixa-guard-actions .btn {
+  min-width: 140px;
+}
+
+.caixa-guard-error {
+  margin: -8px 0 16px !important;
+  color: #f87171 !important;
+  font-size: 0.9rem !important;
+}
+
 .server-connecting-overlay {
   background: rgba(15, 28, 48, 0.88);
 }

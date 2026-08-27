@@ -5,8 +5,10 @@ import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { ServerConnectionGuard } from './components/ServerConnectionGuard'
+import { CaixaStatusGuard } from './components/CaixaStatusGuard'
 import { AlertProvider } from './context/AlertContext'
 import { CartProvider } from './context/CartContext'
+import { CaixaStatusProvider } from './context/CaixaStatusContext'
 import { ConcentradorProvider } from './context/ConcentradorContext'
 import { PreviewProvider } from './context/PreviewContext'
 
@@ -83,11 +85,15 @@ export default function BarraPdvRoot() {
         <AlertProvider>
           <PreviewProvider>
             <ServerConnectionGuard>
-              <CartProvider>
-                <ConcentradorProvider>
-                  <App />
-                </ConcentradorProvider>
-              </CartProvider>
+              <CaixaStatusProvider>
+                <CaixaStatusGuard>
+                  <CartProvider>
+                    <ConcentradorProvider>
+                      <App />
+                    </ConcentradorProvider>
+                  </CartProvider>
+                </CaixaStatusGuard>
+              </CaixaStatusProvider>
             </ServerConnectionGuard>
           </PreviewProvider>
         </AlertProvider>

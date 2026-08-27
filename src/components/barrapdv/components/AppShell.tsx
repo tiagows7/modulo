@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { operators, station } from '../data/mock'
 import { useConcentrador } from '../context/ConcentradorContext'
+import { useCaixaStatus } from '../context/CaixaStatusContext'
 import { startFullscreenLock } from '../utils/fullscreen'
 import { supabase } from '@/lib/supabase'
 import { usePdvModo } from '../hooks/usePdvModo'
@@ -150,6 +151,7 @@ export function AppShell() {
   const operator = operators[0]
   const { fantasia, operatorName } = useHeaderFilial()
   const { connection } = useConcentrador()
+  const { aberto: caixaAberto, caixa } = useCaixaStatus()
   const now = new Date().toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -218,7 +220,18 @@ export function AppShell() {
                 {connection.connected ? 'Concentrador conectado' : 'Concentrador offline'}
               </span>
             )}
-            <span className="chip ok">Caixa aberto</span>
+            <span
+              className={`chip ${caixaAberto ? 'ok' : 'danger'}`}
+              title={
+                caixa
+                  ? `Caixa nº ${caixa.codigo} · situação ${caixa.situacao === 0 ? 'aberto' : 'fechado'}`
+                  : 'Sem caixa'
+              }
+            >
+              {caixaAberto
+                ? `Caixa aberto${caixa ? ` nº ${caixa.codigo}` : ''}`
+                : 'Caixa fechado'}
+            </span>
             <span className="chip">{operatorLabel}</span>
             <span className="chip">{now}</span>
           </div>
