@@ -18,6 +18,14 @@ type TabId = "geral" | "outras" | "contabil";
 
 type Opt = { id: string; codigo: string; descricao: string };
 
+type ComissaoOpt = {
+  id: string;
+  codigo: string;
+  descricao: string;
+  tipo: string;
+  valor: number;
+};
+
 type GrupoOpt = Opt & { grupocomissao_id: string | null };
 
 type SubgrupoOpt = Opt & { grupo_id: string };
@@ -112,6 +120,14 @@ function optLabel(o: { codigo: string | number; descricao: string }) {
   return `${o.codigo} — ${o.descricao}`;
 }
 
+function comissaoLabel(c: ComissaoOpt) {
+  const sufixo =
+    c.tipo === "valor"
+      ? `R$ ${Number(c.valor).toFixed(2)}`
+      : `${Number(c.valor).toFixed(2)}%`;
+  return `${c.codigo} — ${c.descricao} (${sufixo})`;
+}
+
 function asOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -147,7 +163,7 @@ export default function ProdutosPage() {
     { id: string; codigo: number; descricao: string }[]
   >([]);
   const [cfops, setCfops] = useState<Opt[]>([]);
-  const [comissoes, setComissoes] = useState<Opt[]>([]);
+  const [comissoes, setComissoes] = useState<ComissaoOpt[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -211,7 +227,7 @@ export default function ProdutosPage() {
           .order("codigo"),
         supabase
           .from("produto_grupocomissao")
-          .select("id, codigo, descricao")
+          .select("id, codigo, descricao, tipo, valor")
           .order("codigo"),
       ]);
 
@@ -307,7 +323,15 @@ export default function ProdutosPage() {
         })),
       );
       setCfops((cfopRes.data ?? []) as Opt[]);
-      setComissoes((comRes.data ?? []) as Opt[]);
+      setComissoes(
+        (comRes.data ?? []).map((c) => ({
+          id: String(c.id),
+          codigo: String(c.codigo),
+          descricao: String(c.descricao),
+          tipo: String(c.tipo),
+          valor: Number(c.valor) || 0,
+        })),
+      );
     });
   }, [pesquisar]);
 
@@ -741,7 +765,7 @@ export default function ProdutosPage() {
                     <option value="">— Sem comissão —</option>
                     {comissoes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {optLabel(c)}
+                        {comissaoLabel(c)}
                       </option>
                     ))}
                   </select>

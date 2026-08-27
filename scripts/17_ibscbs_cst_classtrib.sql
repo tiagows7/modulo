@@ -1,7 +1,7 @@
 -- Tabelas fiscais IBS/CBS (reforma tributária)
 -- Origem Firebird: IBSCBS_CST / IBSCBS_CLASSTRIB (CCLASTRIB_*)
 
-CREATE TABLE IF NOT EXISTS public.ibscbs_cst (
+CREATE TABLE IF NOT EXISTS public.produto_ibscbs_cst (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     cst INTEGER NOT NULL UNIQUE,
     descricao VARCHAR(100) NOT NULL,
@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS public.ibscbs_cst (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS public.ibscbs_classtrib (
+CREATE TABLE IF NOT EXISTS public.produto_ibscbs_classtrib (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    cst INTEGER NOT NULL REFERENCES public.ibscbs_cst(cst) ON DELETE RESTRICT,
+    cst INTEGER NOT NULL REFERENCES public.produto_ibscbs_cst(cst) ON DELETE RESTRICT,
     codigo VARCHAR(6) NOT NULL,
     nome VARCHAR(300) NOT NULL,
     descricao TEXT,
@@ -60,54 +60,54 @@ CREATE TABLE IF NOT EXISTS public.ibscbs_classtrib (
     UNIQUE (cst, codigo)
 );
 
-CREATE INDEX IF NOT EXISTS idx_ibscbs_cst_descricao
-  ON public.ibscbs_cst (descricao);
+CREATE INDEX IF NOT EXISTS idx_produto_ibscbs_cst_descricao
+  ON public.produto_ibscbs_cst (descricao);
 
-CREATE INDEX IF NOT EXISTS idx_ibscbs_classtrib_cst
-  ON public.ibscbs_classtrib (cst);
+CREATE INDEX IF NOT EXISTS idx_produto_ibscbs_classtrib_cst
+  ON public.produto_ibscbs_classtrib (cst);
 
-CREATE INDEX IF NOT EXISTS idx_ibscbs_classtrib_codigo
-  ON public.ibscbs_classtrib (codigo);
+CREATE INDEX IF NOT EXISTS idx_produto_ibscbs_classtrib_codigo
+  ON public.produto_ibscbs_classtrib (codigo);
 
-DROP TRIGGER IF EXISTS update_ibscbs_cst_modtime ON public.ibscbs_cst;
-CREATE TRIGGER update_ibscbs_cst_modtime
-    BEFORE UPDATE ON public.ibscbs_cst
+DROP TRIGGER IF EXISTS update_produto_ibscbs_cst_modtime ON public.produto_ibscbs_cst;
+CREATE TRIGGER update_produto_ibscbs_cst_modtime
+    BEFORE UPDATE ON public.produto_ibscbs_cst
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_ibscbs_classtrib_modtime ON public.ibscbs_classtrib;
-CREATE TRIGGER update_ibscbs_classtrib_modtime
-    BEFORE UPDATE ON public.ibscbs_classtrib
+DROP TRIGGER IF EXISTS update_produto_ibscbs_classtrib_modtime ON public.produto_ibscbs_classtrib;
+CREATE TRIGGER update_produto_ibscbs_classtrib_modtime
+    BEFORE UPDATE ON public.produto_ibscbs_classtrib
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.ibscbs_cst
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.produto_ibscbs_cst
   TO authenticated, anon, service_role;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.ibscbs_classtrib
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.produto_ibscbs_classtrib
   TO authenticated, anon, service_role;
 
-ALTER TABLE public.ibscbs_cst ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ibscbs_classtrib ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.produto_ibscbs_cst ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.produto_ibscbs_classtrib ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Permitir acesso autenticado - ibscbs_cst" ON public.ibscbs_cst;
-CREATE POLICY "Permitir acesso autenticado - ibscbs_cst"
-  ON public.ibscbs_cst FOR ALL
+DROP POLICY IF EXISTS "Permitir acesso autenticado - produto_ibscbs_cst" ON public.produto_ibscbs_cst;
+CREATE POLICY "Permitir acesso autenticado - produto_ibscbs_cst"
+  ON public.produto_ibscbs_cst FOR ALL
   USING (auth.role() = 'authenticated');
 
-DROP POLICY IF EXISTS "Permitir leitura anon - ibscbs_cst" ON public.ibscbs_cst;
-CREATE POLICY "Permitir leitura anon - ibscbs_cst"
-  ON public.ibscbs_cst FOR SELECT
+DROP POLICY IF EXISTS "Permitir leitura anon - produto_ibscbs_cst" ON public.produto_ibscbs_cst;
+CREATE POLICY "Permitir leitura anon - produto_ibscbs_cst"
+  ON public.produto_ibscbs_cst FOR SELECT
   USING (true);
 
-DROP POLICY IF EXISTS "Permitir acesso autenticado - ibscbs_classtrib" ON public.ibscbs_classtrib;
-CREATE POLICY "Permitir acesso autenticado - ibscbs_classtrib"
-  ON public.ibscbs_classtrib FOR ALL
+DROP POLICY IF EXISTS "Permitir acesso autenticado - produto_ibscbs_classtrib" ON public.produto_ibscbs_classtrib;
+CREATE POLICY "Permitir acesso autenticado - produto_ibscbs_classtrib"
+  ON public.produto_ibscbs_classtrib FOR ALL
   USING (auth.role() = 'authenticated');
 
-DROP POLICY IF EXISTS "Permitir leitura anon - ibscbs_classtrib" ON public.ibscbs_classtrib;
-CREATE POLICY "Permitir leitura anon - ibscbs_classtrib"
-  ON public.ibscbs_classtrib FOR SELECT
+DROP POLICY IF EXISTS "Permitir leitura anon - produto_ibscbs_classtrib" ON public.produto_ibscbs_classtrib;
+CREATE POLICY "Permitir leitura anon - produto_ibscbs_classtrib"
+  ON public.produto_ibscbs_classtrib FOR SELECT
   USING (true);
 
-COMMENT ON TABLE public.ibscbs_cst IS 'CSTs do IBS/CBS (grupos de informação da reforma tributária)';
-COMMENT ON TABLE public.ibscbs_classtrib IS 'Classificação tributária IBS/CBS vinculada ao CST';
-COMMENT ON COLUMN public.ibscbs_cst.ind_gcredpresibszfm IS 'Original Firebird: IBSCBSCST_IND_ GCREDPRESIBSZFM';
+COMMENT ON TABLE public.produto_ibscbs_cst IS 'CSTs do IBS/CBS (grupos de informação da reforma tributária)';
+COMMENT ON TABLE public.produto_ibscbs_classtrib IS 'Classificação tributária IBS/CBS vinculada ao CST';
+COMMENT ON COLUMN public.produto_ibscbs_cst.ind_gcredpresibszfm IS 'Original Firebird: IBSCBSCST_IND_ GCREDPRESIBSZFM';
