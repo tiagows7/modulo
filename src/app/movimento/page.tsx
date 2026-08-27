@@ -1,36 +1,163 @@
 "use client";
-import { ArrowLeftRight } from "lucide-react";
-import { ModulePage } from "@/components/ModulePage";
 
-const columns = [
-  { key: "numero", label: "Nº" },
-  { key: "data", label: "Data/Hora" },
-  { key: "tipo", label: "Tipo" },
-  { key: "produto", label: "Produto" },
-  { key: "quantidade", label: "Quantidade", align: "right" as const },
-  { key: "valor", label: "Valor Total", align: "right" as const },
-  { key: "operador", label: "Operador" },
-  { key: "status", label: "Status", align: "center" as const },
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowLeftRight, Gauge, Landmark } from "lucide-react";
+
+const submenus = [
+  {
+    href: "/movimento/medicao-tanques",
+    label: "Medição de Tanques",
+    icon: Gauge,
+    description: "Registro e conferência do volume dos tanques",
+  },
+  {
+    href: "/movimento/fechamento-caixa",
+    label: "Fechamento de Caixa",
+    icon: Landmark,
+    description: "Fechamento e conferência do caixa do turno",
+  },
 ];
 
-const rows = [
-  { numero: "3401", data: "21/07/2025 21:14", tipo: "Venda", produto: "Gasolina Comum", quantidade: "45,00 L", valor: "R$ 324,00", operador: "Carlos", status: <span className="badge badge-success">Concluído</span> },
-  { numero: "3400", data: "21/07/2025 21:08", tipo: "Venda", produto: "Diesel S10", quantidade: "120,00 L", valor: "R$ 756,00", operador: "Carlos", status: <span className="badge badge-success">Concluído</span> },
-  { numero: "3399", data: "21/07/2025 20:55", tipo: "Sangria", produto: "Caixa PDV 01", quantidade: "—", valor: "R$ 500,00", operador: "Ana", status: <span className="badge badge-warning">Pendente</span> },
-  { numero: "3398", data: "21/07/2025 20:41", tipo: "Venda", produto: "Etanol", quantidade: "35,00 L", valor: "R$ 157,50", operador: "Ana", status: <span className="badge badge-success">Concluído</span> },
-  { numero: "3397", data: "21/07/2025 20:30", tipo: "Venda", produto: "Gasolina Aditivada", quantidade: "52,00 L", valor: "R$ 406,60", operador: "Roberto", status: <span className="badge badge-success">Concluído</span> },
-  { numero: "3396", data: "21/07/2025 20:12", tipo: "Compra", produto: "Gasolina Comum", quantidade: "8.000 L", valor: "R$ 51.200,00", operador: "Admin", status: <span className="badge badge-info">Lançado</span> },
-];
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.06,
+      duration: 0.4,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  }),
+};
 
-export default function MovimentoPage() {
+export default function MovimentoMenuPage() {
   return (
-    <ModulePage
-      title="Movimento"
-      description="Histórico de movimentações, vendas e compras"
-      icon={<ArrowLeftRight size={22} />}
-      columns={columns}
-      rows={rows}
-      addLabel="Novo Movimento"
-    />
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ display: "flex", alignItems: "center", gap: 14 }}
+      >
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            background:
+              "linear-gradient(135deg, rgba(26,111,216,0.3), rgba(13,59,142,0.2))",
+            border: "1px solid rgba(74,159,232,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--blue-light)",
+          }}
+        >
+          <ArrowLeftRight size={22} />
+        </div>
+        <div>
+          <h1
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 24,
+              fontWeight: 800,
+              color: "var(--text-primary)",
+              lineHeight: 1.1,
+            }}
+          >
+            Movimento
+          </h1>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--text-muted)",
+              marginTop: 2,
+            }}
+          >
+            Selecione uma das opções abaixo para lançar movimentos do posto
+          </p>
+        </div>
+      </motion.div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 16,
+          marginTop: 8,
+        }}
+      >
+        {submenus.map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <motion.div
+              key={item.href}
+              custom={i}
+              variants={fadeUp}
+              initial="hidden"
+              animate="visible"
+            >
+              <Link href={item.href} style={{ textDecoration: "none" }}>
+                <motion.div
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 14,
+                    padding: 20,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 16,
+                    cursor: "pointer",
+                    height: "100%",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 10,
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-default)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--text-primary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon size={20} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {item.label}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-muted)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {item.description}
+                    </p>
+                  </div>
+                </motion.div>
+              </Link>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
