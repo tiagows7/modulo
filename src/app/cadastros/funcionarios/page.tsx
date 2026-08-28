@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase";
 
 type Funcionario = {
   id: string;
-  codigo: string;
+  codigo: number;
   nome: string;
   cpf: string | null;
   cargo: string | null;
@@ -26,6 +26,7 @@ type Funcionario = {
 };
 
 type FuncionarioForm = {
+  codigo: string;
   nome: string;
   cpf: string;
   cargo: string;
@@ -35,6 +36,7 @@ type FuncionarioForm = {
 };
 
 const emptyForm: FuncionarioForm = {
+  codigo: "",
   nome: "",
   cpf: "",
   cargo: "",
@@ -44,7 +46,7 @@ const emptyForm: FuncionarioForm = {
 };
 
 const columns = [
-  { key: "codigo", label: "Código" },
+  { key: "codigo", label: "Código", align: "right" as const },
   { key: "nome", label: "Nome" },
   { key: "cpf", label: "CPF" },
   { key: "cargo", label: "Cargo" },
@@ -58,19 +60,24 @@ function blank(v: string) {
   return t ? t : null;
 }
 
-async function nextCodigo() {
+function parseCodigo(raw: string): number | null {
+  const t = raw.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n;
+}
+
+async function nextCodigo(): Promise<number> {
   const { data } = await supabase
     .from("funcionarios")
     .select("codigo")
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("codigo", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  let max = 0;
-  for (const row of data ?? []) {
-    const match = String(row.codigo ?? "").match(/(\d+)/);
-    if (match) max = Math.max(max, Number(match[1]));
-  }
-  return `FUN-${String(max + 1).padStart(3, "0")}`;
+  const max = data?.codigo != null ? Number(data.codigo) : 0;
+  return (Number.isFinite(max) ? max : 0) + 1;
 }
 
 export default function FuncionariosPage() {
@@ -90,14 +97,25 @@ export default function FuncionariosPage() {
       const { data, error } = await supabase
         .from("funcionarios")
         .select("id, codigo, nome, cpf, cargo, telefone, email, status")
-        .order("created_at", { ascending: false });
+        .order("codigo", { ascending: true });
 
       if (error) {
         setLoadError(error.message);
         setItems([]);
         return;
       }
-      setItems((data ?? []) as Funcionario[]);
+      setItems(
+        (data ?? []).map((row) => ({
+          id: String(row.id),
+          codigo: Number(row.codigo),
+          nome: String(row.nome ?? ""),
+          cpf: row.cpf != null ? String(row.cpf) : null,
+          cargo: row.cargo != null ? String(row.cargo) : null,
+          telefone: row.telefone != null ? String(row.telefone) : null,
+          email: row.email != null ? String(row.email) : null,
+          status: row.status != null ? String(row.status) : null,
+        })),
+      );
     });
   }, [pesquisar]);
 
@@ -105,16 +123,18 @@ export default function FuncionariosPage() {
     void loadData();
   }, [loadData]);
 
-  const openCreate = () => {
+  const openCreate = async () => {
     setEditing(null);
-    setForm(emptyForm);
     setFormError("");
     setModalOpen(true);
+    const next = await nextCodigo();
+    setForm({ ...emptyForm, codigo: String(next) });
   };
 
   const openEdit = (item: Funcionario) => {
     setEditing(item);
     setForm({
+      codigo: String(item.codigo),
       nome: item.nome ?? "",
       cpf: item.cpf ?? "",
       cargo: item.cargo ?? "",
@@ -151,6 +171,11 @@ export default function FuncionariosPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const nome = form.nome.trim();
+    const codigo = parseCodigo(form.codigo);
+    if (codigo == null) {
+      setFormError("Informe o código numérico do funcionário (inteiro > 0).");
+      return;
+    }
     if (!nome) {
       setFormError("Informe o nome do funcionário.");
       return;
@@ -158,6 +183,7 @@ export default function FuncionariosPage() {
 
     setFormError("");
     const payload = {
+      codigo,
       nome,
       cpf: blank(form.cpf),
       cargo: blank(form.cargo),
@@ -175,11 +201,7 @@ export default function FuncionariosPage() {
             .eq("id", editing.id);
           if (error) throw new Error(error.message);
         } else {
-          const codigo = await nextCodigo();
-          const { error } = await supabase.from("funcionarios").insert({
-            ...payload,
-            codigo,
-          });
+          const { error } = await supabase.from("funcionarios").insert(payload);
           if (error) throw new Error(error.message);
         }
       });
@@ -189,7 +211,12 @@ export default function FuncionariosPage() {
       setForm(emptyForm);
       await loadData();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
+      const msg = err instanceof Error ? err.message : "Falha ao gravar.";
+      if (/unique|duplicate|codigo/i.test(msg)) {
+        setFormError("Já existe um funcionário com este código.");
+      } else {
+        setFormError(msg);
+      }
     }
   };
 
@@ -256,31 +283,20 @@ export default function FuncionariosPage() {
 
       <ModulePage
         title="Funcionários"
-        description="Cadastro de funcionários do posto"
+        description="Código numérico usado na abertura de caixa e nas vendas do PDV"
         icon={<IdCard size={22} />}
         columns={columns}
         rows={rows}
         addLabel="Novo Funcionário"
         backUrl="/cadastros"
-        onAdd={busy ? undefined : openCreate}
+        onAdd={busy ? undefined : () => void openCreate()}
       />
 
       {modalOpen ? (
         <CadastroModal
           title={editing ? "Editar Funcionário" : "Novo Funcionário"}
           titleId="funcionario-title"
-          subtitle={
-            editing ? (
-              <>
-                Código:{" "}
-                <strong style={{ color: "var(--text-secondary)" }}>
-                  {editing.codigo}
-                </strong>
-              </>
-            ) : (
-              "Código gerado automaticamente ao salvar"
-            )
-          }
+          subtitle="O código inteiro identifica o operador no caixa e nas vendas"
           onClose={closeModal}
           disabled={busy}
           width={520}
@@ -295,13 +311,27 @@ export default function FuncionariosPage() {
           }
         >
           <CadastroFormGrid>
-            <CadastroField label="Nome *" htmlFor="fun-nome" span="full">
+            <CadastroField label="Código *" htmlFor="fun-codigo">
+              <input
+                id="fun-codigo"
+                className="input-base input-compact"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={form.codigo}
+                onChange={(e) =>
+                  setField("codigo", e.target.value.replace(/\D/g, ""))
+                }
+                autoFocus
+                required
+                disabled={busy}
+              />
+            </CadastroField>
+            <CadastroField label="Nome *" htmlFor="fun-nome" span={2}>
               <input
                 id="fun-nome"
                 className="input-base input-compact"
                 value={form.nome}
                 onChange={(e) => setField("nome", e.target.value)}
-                autoFocus
                 maxLength={255}
                 required
                 disabled={busy}

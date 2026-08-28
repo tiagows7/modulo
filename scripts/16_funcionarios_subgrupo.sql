@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS public.funcionarios (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    codigo VARCHAR(50) UNIQUE NOT NULL,
+    codigo INTEGER UNIQUE NOT NULL,
     nome VARCHAR(255) NOT NULL,
     cpf VARCHAR(14),
     cargo VARCHAR(100),
@@ -28,6 +28,7 @@ ALTER TABLE public.produtos
   REFERENCES public.subgrupo_produtos(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_funcionarios_nome ON public.funcionarios (nome);
+CREATE INDEX IF NOT EXISTS idx_funcionarios_codigo ON public.funcionarios (codigo);
 CREATE INDEX IF NOT EXISTS idx_subgrupo_produtos_grupo ON public.subgrupo_produtos (grupo_id);
 CREATE INDEX IF NOT EXISTS idx_produtos_subgrupo ON public.produtos (subgrupo_id);
 
@@ -71,5 +72,7 @@ CREATE POLICY "Permitir leitura anon - subgrupo_produtos"
   USING (true);
 
 COMMENT ON TABLE public.funcionarios IS 'Cadastro de funcionários';
+COMMENT ON COLUMN public.funcionarios.codigo IS
+  'Código numérico do funcionário (abertura de caixa e vendas no PDV)';
 COMMENT ON TABLE public.subgrupo_produtos IS 'Sub-grupos de produtos vinculados a grupo_produtos';
 COMMENT ON COLUMN public.produtos.subgrupo_id IS 'Sub-grupo do produto (opcional)';
