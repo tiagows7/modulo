@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { FileInput, FileUp, RefreshCw } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
-import { CadastroFormError } from "@/components/CadastroUi";
+import {
+  CadastroFormActions,
+  CadastroFormError,
+  CadastroModal,
+} from "@/components/CadastroUi";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
 import { ensureFornecedorFromNfe } from "@/lib/nfe/ensureFornecedorFromNfe";
 import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
@@ -36,6 +40,7 @@ type ManifestoRow = {
   nsu: string | null;
   xml: number;
   digitada: number;
+  despesa: number;
   nota_compra: string | null;
 };
 
@@ -48,6 +53,7 @@ const columns = [
   { key: "nsu", label: "NSU" },
   { key: "xml", label: "XML", align: "center" as const },
   { key: "digitada", label: "Digitada", align: "center" as const },
+  { key: "despesa", label: "Despesa", align: "center" as const },
   { key: "chave", label: "Chave" },
   { key: "acoes", label: "Ações", align: "center" as const },
 ];
@@ -89,7 +95,7 @@ function shortChave(chave: string | null) {
 
 export default function NotaEntradaNovaPage() {
   const router = useRouter();
-  const { busy, pesquisar } = useDbStatus();
+  const { busy, pesquisar, gravar } = useDbStatus();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [filialId, setFilialId] = useState("");
@@ -99,6 +105,8 @@ export default function NotaEntradaNovaPage() {
   const [infoMsg, setInfoMsg] = useState("");
   const [consultando, setConsultando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [deleting, setDeleting] = useState<ManifestoRow | null>(null);
+  const [despesaItem, setDespesaItem] = useState<ManifestoRow | null>(null);
 
   const filialSel = useMemo(
     () => filiais.find((f) => f.id === filialId) ?? null,
@@ -132,7 +140,7 @@ export default function NotaEntradaNovaPage() {
           `
           id, filial, chave, fornecedor, fornecedor_nome, fornecedor_cnpj,
           fornecedor_ie, emissao, numero, valor, caminho, manifesto_registro,
-          manifesto_protocolo, nsu, xml, digitada, nota_compra
+          manifesto_protocolo, nsu, xml, digitada, despesa, nota_compra
         `,
         )
         .order("emissao", { ascending: false })
@@ -174,6 +182,7 @@ export default function NotaEntradaNovaPage() {
           nsu: row.nsu != null ? String(row.nsu) : null,
           xml: Number(row.xml) || 0,
           digitada: Number(row.digitada) || 0,
+          despesa: Number(row.despesa) || 0,
           nota_compra:
             row.nota_compra != null ? String(row.nota_compra) : null,
         })),
@@ -358,6 +367,52 @@ export default function NotaEntradaNovaPage() {
     }
   };
 
+  const marcarDespesa = async () => {
+    if (!despesaItem) return;
+    setActionError("");
+    try {
+      await gravar(async () => {
+        const { error } = await supabase
+          .from("nota_entradamanifesto")
+          .update({
+            despesa: 1,
+            digitada: 1,
+          })
+          .eq("id", despesaItem.id);
+        if (error) throw new Error(error.message);
+      });
+      setDespesaItem(null);
+      setInfoMsg(
+        `Nota ${despesaItem.numero ?? "—"} marcada como despesa do posto (sem entrada de estoque).`,
+      );
+      await loadData();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Falha ao marcar como despesa.",
+      );
+    }
+  };
+
+  const excluirManifesto = async () => {
+    if (!deleting) return;
+    setActionError("");
+    try {
+      await gravar(async () => {
+        const { error } = await supabase
+          .from("nota_entradamanifesto")
+          .delete()
+          .eq("id", deleting.id);
+        if (error) throw new Error(error.message);
+      });
+      setDeleting(null);
+      await loadData();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Falha ao excluir o manifesto.",
+      );
+    }
+  };
+
   const rows = items.map((item) => ({
     numero: item.numero != null ? String(item.numero) : "—",
     emissao: formatDateBr(item.emissao),
@@ -377,20 +432,56 @@ export default function NotaEntradaNovaPage() {
         {item.digitada ? "Sim" : "Não"}
       </span>
     ),
+    despesa: (
+      <span
+        className={`badge ${item.despesa ? "badge-success" : "badge-warning"}`}
+      >
+        {item.despesa ? "Sim" : "Não"}
+      </span>
+    ),
     chave: (
       <span title={item.chave || undefined} style={{ fontFamily: "monospace" }}>
         {shortChave(item.chave)}
       </span>
     ),
     acoes: (
-      <button
-        type="button"
-        className="cadastro-btn-edit"
-        disabled={busy || consultando || importando}
-        onClick={() => abrirDigitar(item.id)}
-      >
-        {item.digitada ? "Abrir" : "Digitar"}
-      </button>
+      <div className="cadastro-row-actions">
+        {!item.despesa ? (
+          <button
+            type="button"
+            className="cadastro-btn-edit"
+            disabled={busy || consultando || importando}
+            onClick={() => void abrirDigitar(item.id)}
+          >
+            {item.digitada ? "Abrir" : "Digitar"}
+          </button>
+        ) : null}
+        {!item.despesa && !item.digitada ? (
+          <button
+            type="button"
+            className="cadastro-btn-edit"
+            disabled={busy || consultando || importando}
+            onClick={() => {
+              setActionError("");
+              setDespesaItem(item);
+            }}
+            title="Marcar como despesa do posto (sem estoque)"
+          >
+            Despesa
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="cadastro-btn-delete"
+          disabled={busy || consultando || importando}
+          onClick={() => {
+            setActionError("");
+            setDeleting(item);
+          }}
+        >
+          Excluir
+        </button>
+      </div>
     ),
   }));
 
@@ -417,7 +508,7 @@ export default function NotaEntradaNovaPage() {
         />
       ) : null}
 
-      {actionError ? (
+      {actionError && !deleting && !despesaItem ? (
         <CadastroFormError
           message={actionError}
           onClose={() => setActionError("")}
@@ -511,6 +602,96 @@ export default function NotaEntradaNovaPage() {
           </>
         }
       />
+
+      {despesaItem ? (
+        <CadastroModal
+          title="Marcar como despesa"
+          titleId="manifesto-despesa-title"
+          onClose={() => {
+            if (busy) return;
+            setDespesaItem(null);
+          }}
+          disabled={busy}
+          width={440}
+          footer={
+            <CadastroFormActions
+              onCancel={() => setDespesaItem(null)}
+              disabled={busy}
+              busy={busy}
+              submitLabel="Confirmar despesa"
+              onConfirm={() => void marcarDespesa()}
+              danger
+            />
+          }
+        >
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+            Confirma que a nota{" "}
+            <strong>{despesaItem.numero ?? "—"}</strong>
+            {despesaItem.fornecedor_nome
+              ? ` — ${despesaItem.fornecedor_nome}`
+              : ""}{" "}
+            é apenas <strong>despesa do posto</strong>, sem entrada de estoque?
+          </p>
+          {actionError ? (
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: 12,
+                color: "var(--danger, #e35d6a)",
+              }}
+            >
+              {actionError}
+            </p>
+          ) : null}
+        </CadastroModal>
+      ) : null}
+
+      {deleting ? (
+        <CadastroModal
+          title="Excluir do manifesto"
+          titleId="manifesto-delete-title"
+          onClose={() => {
+            if (busy) return;
+            setDeleting(null);
+          }}
+          disabled={busy}
+          width={420}
+          footer={
+            <CadastroFormActions
+              onCancel={() => setDeleting(null)}
+              disabled={busy}
+              busy={busy}
+              submitLabel="Excluir"
+              onConfirm={() => void excluirManifesto()}
+              danger
+            />
+          }
+        >
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+            Excluir a nota <strong>{deleting.numero ?? "—"}</strong> do manifesto
+            SEFAZ?
+            {deleting.chave ? (
+              <>
+                <br />
+                <span style={{ fontFamily: "monospace", fontSize: 11 }}>
+                  {deleting.chave}
+                </span>
+              </>
+            ) : null}
+          </p>
+          {actionError ? (
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: 12,
+                color: "var(--danger, #e35d6a)",
+              }}
+            >
+              {actionError}
+            </p>
+          ) : null}
+        </CadastroModal>
+      ) : null}
     </>
   );
 }
