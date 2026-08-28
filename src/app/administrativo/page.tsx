@@ -257,12 +257,158 @@ function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
   ];
 }
 
-const fuelStock = [
-  { name: "Gasolina Comum", level: 72, capacity: 30000, current: 21600, color: "#1A6FD8", alert: false },
-  { name: "Gasolina Aditivada", level: 45, capacity: 20000, current: 9000, color: "#4A9FE8", alert: false },
-  { name: "Etanol", level: 28, capacity: 25000, current: 7000, color: "#22C55E", alert: true },
-  { name: "Diesel S10", level: 18, capacity: 40000, current: 7200, color: "#F5C518", alert: true },
-];
+const FUEL_COLORS = ["#1A6FD8", "#4A9FE8", "#22C55E", "#F5C518", "#A78BFA", "#F97316"];
+
+type FuelStockItem = {
+  id: string;
+  name: string;
+  level: number;
+  capacity: number;
+  current: number;
+  color: string;
+  alert: boolean;
+};
+
+type FuelStockResult = {
+  items: FuelStockItem[];
+  refDate: string | null;
+  fromToday: boolean;
+};
+
+async function loadFuelStockFromMarcacao(): Promise<FuelStockResult> {
+  const today = isoDateLocal(new Date());
+  const selectCols = `
+    produto, marcacao_final, tanque, data,
+    produtos ( codigo, descricao ),
+    tanques ( capacidade, numero )
+  `;
+
+  const todayRes = await supabase
+    .from("marcacao_tanques")
+    .select(selectCols)
+    .eq("data", today);
+
+  if (todayRes.error) {
+    console.warn("[dashboard] marcacao_tanques:", todayRes.error.message);
+  }
+
+  let rows = todayRes.data ?? [];
+  let refDate: string | null = today;
+  let fromToday = true;
+
+  if (!rows.length) {
+    fromToday = false;
+    const lastRes = await supabase
+      .from("marcacao_tanques")
+      .select("data")
+      .lt("data", today)
+      .order("data", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastRes.error) {
+      console.warn("[dashboard] marcacao_tanques last:", lastRes.error.message);
+    }
+
+    const lastDate =
+      lastRes.data?.data != null
+        ? String(lastRes.data.data).slice(0, 10)
+        : null;
+
+    if (!lastDate) {
+      return { items: [], refDate: null, fromToday: false };
+    }
+
+    refDate = lastDate;
+    const prevRes = await supabase
+      .from("marcacao_tanques")
+      .select(selectCols)
+      .eq("data", lastDate);
+
+    if (prevRes.error) {
+      console.warn("[dashboard] marcacao_tanques prev:", prevRes.error.message);
+      return { items: [], refDate: lastDate, fromToday: false };
+    }
+    rows = prevRes.data ?? [];
+  }
+
+  type Acc = {
+    id: string;
+    name: string;
+    current: number;
+    capacity: number;
+  };
+
+  const byProduto = new Map<string, Acc>();
+
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    const produtoId = r.produto != null ? String(r.produto) : "sem-produto";
+    const prod = asOne(
+      r.produtos as
+        | { codigo: string; descricao: string }
+        | { codigo: string; descricao: string }[]
+        | null,
+    );
+    const tanque = asOne(
+      r.tanques as
+        | { capacidade: number | null; numero: string }
+        | { capacidade: number | null; numero: string }[]
+        | null,
+    );
+
+    const name = prod
+      ? String(prod.descricao || prod.codigo)
+      : "Sem produto";
+    const current = Number(r.marcacao_final) || 0;
+    const capacity = Number(tanque?.capacidade) || 0;
+
+    const prev = byProduto.get(produtoId);
+    if (prev) {
+      prev.current += current;
+      prev.capacity += capacity;
+    } else {
+      byProduto.set(produtoId, {
+        id: produtoId,
+        name,
+        current,
+        capacity,
+      });
+    }
+  }
+
+  const items: FuelStockItem[] = [...byProduto.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+    .map((p, i) => {
+      const capacity = p.capacity > 0 ? p.capacity : Math.max(p.current, 1);
+      const level = Math.min(
+        100,
+        Math.max(0, Math.round((p.current / capacity) * 100)),
+      );
+      return {
+        id: p.id,
+        name: p.name,
+        current: p.current,
+        capacity: p.capacity > 0 ? p.capacity : p.current,
+        level,
+        color: FUEL_COLORS[i % FUEL_COLORS.length],
+        alert: level < 40,
+      };
+    });
+
+  return { items, refDate, fromToday };
+}
+
+function asOne<T>(v: T | T[] | null | undefined): T | null {
+  if (v == null) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
+}
+
+function formatDateBr(iso: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
 
 type DespesaDia = {
   id: string;
@@ -615,7 +761,7 @@ function FuelGauge({
   fuel,
   index,
 }: {
-  fuel: (typeof fuelStock)[0];
+  fuel: FuelStockItem;
   index: number;
 }) {
   return (
@@ -717,6 +863,9 @@ export default function DashboardPage() {
     buildKpiCards(emptyAgg, emptyAgg),
   );
   const [monthPoints, setMonthPoints] = useState<MonthPoint[]>([]);
+  const [fuelStock, setFuelStock] = useState<FuelStockItem[]>([]);
+  const [fuelRefDate, setFuelRefDate] = useState<string | null>(null);
+  const [fuelFromToday, setFuelFromToday] = useState(true);
   const despesasDia = despesasAPagarHoje();
   const totalDespesasDia = despesasDia.reduce((sum, d) => sum + d.valor, 0);
 
@@ -730,14 +879,18 @@ export default function DashboardPage() {
       y.setDate(y.getDate() - 1);
       const yesterdayIso = isoDateLocal(y);
 
-      const [today, yesterday, months] = await Promise.all([
+      const [today, yesterday, months, fuel] = await Promise.all([
         loadDayAgg(todayIso),
         loadDayAgg(yesterdayIso),
         loadMonthlySales(),
+        loadFuelStockFromMarcacao(),
       ]);
       if (cancelled) return;
       setKpiCards(buildKpiCards(today, yesterday));
       setMonthPoints(months);
+      setFuelStock(fuel.items);
+      setFuelRefDate(fuel.refDate);
+      setFuelFromToday(fuel.fromToday);
     }
 
     void load();
@@ -863,16 +1016,34 @@ export default function DashboardPage() {
                   marginTop: 2,
                 }}
               >
-                Nível atual dos tanques
+                {fuelRefDate
+                  ? fuelFromToday
+                    ? `Marcação de hoje (${formatDateBr(fuelRefDate)}) · por produto`
+                    : `Sem medição hoje · último dia ${formatDateBr(fuelRefDate)}`
+                  : "Sem medições em marcacao_tanques"}
               </p>
             </div>
             <BarChart3 size={18} style={{ color: "var(--blue-light)" }} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {fuelStock.map((f, i) => (
-              <FuelGauge key={f.name} fuel={f} index={i} />
-            ))}
+            {fuelStock.length === 0 ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  textAlign: "center",
+                  padding: "20px 8px",
+                }}
+              >
+                Nenhuma marcação de tanque encontrada.
+              </p>
+            ) : (
+              fuelStock.map((f, i) => (
+                <FuelGauge key={f.id} fuel={f} index={i} />
+              ))
+            )}
           </div>
         </motion.div>
 
