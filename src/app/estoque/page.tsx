@@ -1,36 +1,157 @@
 "use client";
-import { Package } from "lucide-react";
-import { ModulePage } from "@/components/ModulePage";
 
-const columns = [
-  { key: "codigo", label: "Código" },
-  { key: "produto", label: "Produto" },
-  { key: "unidade", label: "Un." },
-  { key: "estoqueAtual", label: "Estoque Atual", align: "right" as const },
-  { key: "estoqueMin", label: "Mín.", align: "right" as const },
-  { key: "estoqueMax", label: "Máx.", align: "right" as const },
-  { key: "ultimaMovimento", label: "Última Movimentação" },
-  { key: "status", label: "Situação", align: "center" as const },
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { FileInput, Package } from "lucide-react";
+
+const submenus = [
+  {
+    href: "/estoque/nota-entrada",
+    label: "Nota de Entrada",
+    icon: FileInput,
+    description: "Lançamento de notas fiscais de entrada de mercadorias",
+  },
 ];
 
-const rows = [
-  { codigo: "GC001", produto: "Gasolina Comum", unidade: "L", estoqueAtual: "21.600", estoqueMin: "5.000", estoqueMax: "30.000", ultimaMovimento: "21/07/2025 20:30", status: <span className="badge badge-success">Normal</span> },
-  { codigo: "GA002", produto: "Gasolina Aditivada", unidade: "L", estoqueAtual: "9.000", estoqueMin: "4.000", estoqueMax: "20.000", ultimaMovimento: "21/07/2025 19:15", status: <span className="badge badge-warning">Atenção</span> },
-  { codigo: "ET003", produto: "Etanol Hidratado", unidade: "L", estoqueAtual: "7.000", estoqueMin: "5.000", estoqueMax: "25.000", ultimaMovimento: "21/07/2025 18:40", status: <span className="badge badge-danger">Crítico</span> },
-  { codigo: "DS004", produto: "Diesel S10", unidade: "L", estoqueAtual: "7.200", estoqueMin: "8.000", estoqueMax: "40.000", ultimaMovimento: "21/07/2025 17:00", status: <span className="badge badge-danger">Crítico</span> },
-  { codigo: "OL005", produto: "Óleo Lubrificante 5W30", unidade: "Qtd", estoqueAtual: "48", estoqueMin: "10", estoqueMax: "200", ultimaMovimento: "20/07/2025 14:20", status: <span className="badge badge-success">Normal</span> },
-  { codigo: "OL006", produto: "Óleo Lubrificante 10W40", unidade: "Qtd", estoqueAtual: "22", estoqueMin: "10", estoqueMax: "150", ultimaMovimento: "19/07/2025 11:00", status: <span className="badge badge-success">Normal</span> },
-];
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.06,
+      duration: 0.4,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  }),
+};
 
-export default function EstoquePage() {
+export default function EstoqueMenuPage() {
   return (
-    <ModulePage
-      title="Estoque"
-      description="Controle de produtos e combustíveis em estoque"
-      icon={<Package size={22} />}
-      columns={columns}
-      rows={rows}
-      addLabel="Nova Entrada"
-    />
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ display: "flex", alignItems: "center", gap: 14 }}
+      >
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            background:
+              "linear-gradient(135deg, rgba(26,111,216,0.3), rgba(13,59,142,0.2))",
+            border: "1px solid rgba(74,159,232,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--blue-light)",
+          }}
+        >
+          <Package size={22} />
+        </div>
+        <div>
+          <h1
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 24,
+              fontWeight: 800,
+              color: "var(--text-primary)",
+              lineHeight: 1.1,
+            }}
+          >
+            Estoque
+          </h1>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--text-muted)",
+              marginTop: 2,
+            }}
+          >
+            Selecione uma das opções abaixo para gerenciar o estoque
+          </p>
+        </div>
+      </motion.div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 16,
+          marginTop: 8,
+        }}
+      >
+        {submenus.map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <motion.div
+              key={item.href}
+              custom={i}
+              variants={fadeUp}
+              initial="hidden"
+              animate="visible"
+            >
+              <Link href={item.href} style={{ textDecoration: "none" }}>
+                <motion.div
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 14,
+                    padding: 20,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 16,
+                    cursor: "pointer",
+                    height: "100%",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 10,
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-default)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--text-primary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon size={20} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {item.label}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-muted)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {item.description}
+                    </p>
+                  </div>
+                </motion.div>
+              </Link>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
