@@ -112,7 +112,7 @@ export function ProductSaleGrid({ embedded = false }: Props) {
         setPreview(null)
         showAlert({
           title: 'Produto não encontrado',
-          message: `Nenhum produto ativo com código ou código de barras "${code}".`,
+          message: `Nenhum produto ativo com preço na filial do operador para o código "${code}".`,
         })
         return
       }
