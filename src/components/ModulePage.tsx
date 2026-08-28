@@ -138,14 +138,35 @@ export function ModulePage({
         variants={fadeUp}
         initial="hidden"
         animate="visible"
-        style={{ display: "flex", gap: 10 }}
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
       >
-        <div style={{ position: "relative", flex: 1, maxWidth: 380 }}>
+        <div
+          style={{
+            position: "relative",
+            flex: "1 1 220px",
+            maxWidth: 380,
+            minWidth: 180,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
           <Search
             size={15}
+            aria-hidden
             style={{
-              position: "absolute", left: 12, top: "50%",
-              transform: "translateY(-50%)", color: "var(--text-muted)",
+              position: "absolute",
+              left: 12,
+              top: 0,
+              bottom: 0,
+              margin: "auto 0",
+              color: "var(--text-muted)",
+              pointerEvents: "none",
+              zIndex: 1,
             }}
           />
           <input
@@ -153,25 +174,48 @@ export function ModulePage({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-base"
-            style={{ paddingLeft: 38 }}
+            style={{ paddingLeft: 38, width: "100%" }}
           />
         </div>
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "9px 16px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: 8,
-            color: "var(--text-secondary)",
-            fontSize: 13, fontWeight: 500, cursor: "pointer",
-          }}
-        >
-          <Filter size={14} /> Filtros
-        </motion.button>
-        {filters}
+        {!filters ? (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "9px 16px",
+              height: 40,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 8,
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <Filter size={14} /> Filtros
+          </motion.button>
+        ) : null}
+        {filters ? (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              flex: "1 1 auto",
+              minWidth: 0,
+            }}
+          >
+            {filters}
+          </div>
+        ) : null}
       </motion.div>
 
       {/* Table */}

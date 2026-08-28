@@ -431,20 +431,14 @@ export default function NotaEntradaNovaPage() {
         backUrl="/estoque/nota-entrada"
         onAdd={bloqueado ? undefined : () => void consultarSefaz()}
         filters={
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
+          <>
             <select
-              className="input-base"
-              style={{ minWidth: 260 }}
+              className="input-base input-compact"
+              style={{ minWidth: 240, width: "auto", flex: "0 1 280px" }}
               value={filialId}
               onChange={(e) => setFilialId(e.target.value)}
               disabled={bloqueado}
+              aria-label="Filial destinatária"
             >
               <option value="">Selecione a filial…</option>
               {filiais.map((f) => (
@@ -453,8 +447,14 @@ export default function NotaEntradaNovaPage() {
                 </option>
               ))}
             </select>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              CNPJ destinatário:{" "}
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              CNPJ:{" "}
               <strong style={{ color: "var(--text-secondary)" }}>
                 {filialSel ? formatCnpj(filialSel.cnpj) : "—"}
               </strong>
@@ -496,7 +496,7 @@ export default function NotaEntradaNovaPage() {
             >
               Nota manual
             </button>
-          </div>
+          </>
         }
       />
     </>
