@@ -89,6 +89,7 @@ export function CaixaStatusProvider({ children }: { children: ReactNode }) {
         operador,
         turno: '1',
         filial,
+        pdv: meta.pdv ? String(meta.pdv) : undefined,
       })
       setCaixa(novo)
       setStatus('aberto')

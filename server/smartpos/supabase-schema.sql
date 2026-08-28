@@ -10,12 +10,18 @@ create table if not exists public.caixa (
   operador text,
   parametro integer,
   filial text, -- codigo da filial (public.filial.codigo)
-  situacao integer not null default 0, -- 0 = aberto
+  situacao integer not null default 0, -- 0 = aberto no PDV, 1 = operador fechou no PDV
+  sobra_falta numeric(15, 2),          -- diferença no fechamento da retaguarda (R$)
+  fechado boolean not null default false, -- true = fechado na retaguarda
+  pdv text,                            -- identificação do PDV/terminal
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_caixa_aberto
   on public.caixa (situacao, data desc, codigo desc);
+
+create index if not exists idx_caixa_fechado
+  on public.caixa (fechado, data desc, codigo desc);
 
 -- Abastecimentos pendentes / baixados (equiv. PISABA)
 create table if not exists public.abastecimentos (
