@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { IdCard } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
@@ -14,6 +14,13 @@ import {
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 
+type FilialOpt = {
+  id: string;
+  codigo: string;
+  fantasia: string | null;
+  razao_social: string;
+};
+
 type Funcionario = {
   id: string;
   codigo: number;
@@ -23,6 +30,7 @@ type Funcionario = {
   telefone: string | null;
   email: string | null;
   status: string | null;
+  filial: string | null;
 };
 
 type FuncionarioForm = {
@@ -32,6 +40,7 @@ type FuncionarioForm = {
   telefone: string;
   email: string;
   status: string;
+  filial: string;
 };
 
 const emptyForm: FuncionarioForm = {
@@ -41,11 +50,13 @@ const emptyForm: FuncionarioForm = {
   telefone: "",
   email: "",
   status: "ativo",
+  filial: "",
 };
 
 const columns = [
   { key: "codigo", label: "Código", align: "right" as const },
   { key: "nome", label: "Nome" },
+  { key: "filial", label: "Filial" },
   { key: "cpf", label: "CPF" },
   { key: "cargo", label: "Cargo" },
   { key: "telefone", label: "Telefone" },
@@ -56,6 +67,11 @@ const columns = [
 function blank(v: string) {
   const t = v.trim();
   return t ? t : null;
+}
+
+function filialLabel(f: FilialOpt) {
+  const nome = (f.fantasia || f.razao_social || "").trim();
+  return nome ? `${f.codigo} — ${nome}` : f.codigo;
 }
 
 async function nextCodigo(): Promise<number> {
@@ -72,6 +88,7 @@ async function nextCodigo(): Promise<number> {
 
 export default function FuncionariosPage() {
   const { busy, pesquisar, gravar } = useDbStatus();
+  const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [items, setItems] = useState<Funcionario[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -81,12 +98,34 @@ export default function FuncionariosPage() {
   const [form, setForm] = useState<FuncionarioForm>(emptyForm);
   const [formError, setFormError] = useState("");
 
+  const filialById = useMemo(() => {
+    const map = new Map<string, FilialOpt>();
+    for (const f of filiais) map.set(f.id, f);
+    return map;
+  }, [filiais]);
+
+  const loadLookups = useCallback(async () => {
+    const { data } = await supabase
+      .from("filial")
+      .select("id, codigo, fantasia, razao_social")
+      .eq("status", "ativo")
+      .order("codigo");
+    setFiliais(
+      (data ?? []).map((f) => ({
+        id: String(f.id),
+        codigo: String(f.codigo),
+        fantasia: f.fantasia != null ? String(f.fantasia) : null,
+        razao_social: String(f.razao_social ?? ""),
+      })),
+    );
+  }, []);
+
   const loadData = useCallback(async () => {
     await pesquisar(async () => {
       setLoadError("");
       const { data, error } = await supabase
         .from("funcionarios")
-        .select("id, codigo, nome, cpf, cargo, telefone, email, status")
+        .select("id, codigo, nome, cpf, cargo, telefone, email, status, filial")
         .order("codigo", { ascending: true });
 
       if (error) {
@@ -104,10 +143,15 @@ export default function FuncionariosPage() {
           telefone: row.telefone != null ? String(row.telefone) : null,
           email: row.email != null ? String(row.email) : null,
           status: row.status != null ? String(row.status) : null,
+          filial: row.filial != null ? String(row.filial) : null,
         })),
       );
     });
   }, [pesquisar]);
+
+  useEffect(() => {
+    void loadLookups();
+  }, [loadLookups]);
 
   useEffect(() => {
     void loadData();
@@ -129,6 +173,7 @@ export default function FuncionariosPage() {
       telefone: item.telefone ?? "",
       email: item.email ?? "",
       status: item.status === "inativo" ? "inativo" : "ativo",
+      filial: item.filial ?? "",
     });
     setFormError("");
     setActionError("");
@@ -172,6 +217,8 @@ export default function FuncionariosPage() {
       telefone: blank(form.telefone),
       email: blank(form.email),
       status: form.status === "inativo" ? "inativo" : "ativo",
+      // NULL = todas as filiais
+      filial: blank(form.filial),
     };
 
     try {
@@ -228,27 +275,31 @@ export default function FuncionariosPage() {
     }
   };
 
-  const rows = items.map((item) => ({
-    codigo: item.codigo,
-    nome: item.nome,
-    cpf: item.cpf || "—",
-    cargo: item.cargo || "—",
-    telefone: item.telefone || "—",
-    status: (
-      <span
-        className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
-      >
-        {item.status || "—"}
-      </span>
-    ),
-    acoes: (
-      <CadastroRowActions
-        disabled={busy}
-        onEdit={() => openEdit(item)}
-        onDelete={() => openDelete(item)}
-      />
-    ),
-  }));
+  const rows = items.map((item) => {
+    const fil = item.filial ? filialById.get(item.filial) : null;
+    return {
+      codigo: item.codigo,
+      nome: item.nome,
+      filial: fil ? filialLabel(fil) : "Todas",
+      cpf: item.cpf || "—",
+      cargo: item.cargo || "—",
+      telefone: item.telefone || "—",
+      status: (
+        <span
+          className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
+        >
+          {item.status || "—"}
+        </span>
+      ),
+      acoes: (
+        <CadastroRowActions
+          disabled={busy}
+          onEdit={() => openEdit(item)}
+          onDelete={() => openDelete(item)}
+        />
+      ),
+    };
+  });
 
   return (
     <>
@@ -269,7 +320,7 @@ export default function FuncionariosPage() {
 
       <ModulePage
         title="Funcionários"
-        description="Código sequencial gerado automaticamente para o PDV"
+        description="Sem filial = disponível em todas as filiais"
         icon={<IdCard size={22} />}
         columns={columns}
         rows={rows}
@@ -319,6 +370,22 @@ export default function FuncionariosPage() {
                 required
                 disabled={busy}
               />
+            </CadastroField>
+            <CadastroField label="Filial" htmlFor="fun-filial" span="full">
+              <select
+                id="fun-filial"
+                className="input-base input-compact"
+                value={form.filial}
+                onChange={(e) => setField("filial", e.target.value)}
+                disabled={busy}
+              >
+                <option value="">Todas as filiais</option>
+                {filiais.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {filialLabel(f)}
+                  </option>
+                ))}
+              </select>
             </CadastroField>
             <CadastroField label="CPF" htmlFor="fun-cpf">
               <input

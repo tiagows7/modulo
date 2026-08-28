@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.funcionarios (
     telefone VARCHAR(20),
     email VARCHAR(180),
     status VARCHAR(20) DEFAULT 'ativo',
+    filial UUID REFERENCES public.filial(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -29,6 +30,7 @@ ALTER TABLE public.produtos
 
 CREATE INDEX IF NOT EXISTS idx_funcionarios_nome ON public.funcionarios (nome);
 CREATE INDEX IF NOT EXISTS idx_funcionarios_codigo ON public.funcionarios (codigo);
+CREATE INDEX IF NOT EXISTS idx_funcionarios_filial ON public.funcionarios (filial);
 CREATE INDEX IF NOT EXISTS idx_subgrupo_produtos_grupo ON public.subgrupo_produtos (grupo_id);
 CREATE INDEX IF NOT EXISTS idx_produtos_subgrupo ON public.produtos (subgrupo_id);
 
@@ -74,5 +76,7 @@ CREATE POLICY "Permitir leitura anon - subgrupo_produtos"
 COMMENT ON TABLE public.funcionarios IS 'Cadastro de funcionários';
 COMMENT ON COLUMN public.funcionarios.codigo IS
   'Código numérico do funcionário (abertura de caixa e vendas no PDV)';
+COMMENT ON COLUMN public.funcionarios.filial IS
+  'Filial do funcionário (public.filial.id). NULL = todas as filiais';
 COMMENT ON TABLE public.subgrupo_produtos IS 'Sub-grupos de produtos vinculados a grupo_produtos';
 COMMENT ON COLUMN public.produtos.subgrupo_id IS 'Sub-grupo do produto (opcional)';
