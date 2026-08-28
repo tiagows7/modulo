@@ -9,7 +9,7 @@ const submenus = [
     href: "/estoque/nota-entrada",
     label: "Nota de Entrada",
     icon: FileInput,
-    description: "Consulta SEFAZ (manifesto) e lançamento de notas de entrada",
+    description: "Notas digitadas, consulta SEFAZ e importação de XML",
   },
 ];
 
