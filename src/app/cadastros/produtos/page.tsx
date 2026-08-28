@@ -225,9 +225,94 @@ function parseMoney(raw: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
+type FilialOpt = {
+  id: string;
+  codigo: string;
+  fantasia: string | null;
+  razao_social: string;
+};
+
+type ProdutoFilialRow = {
+  filialId: string;
+  filialLabel: string;
+  existingId: string | null;
+  valor_venda: string;
+  valor_compra: string;
+  valor_ultima_venda: string;
+  margem_venda: string;
+  margem_oferta: string;
+  estoque: string;
+  situacao: string;
+  ultima_compra: string | null;
+  ultima_venda: string | null;
+  ultimo_acerto: string | null;
+};
+
+function filialOptLabel(f: FilialOpt) {
+  const nome = (f.fantasia || f.razao_social || "").trim();
+  return nome ? `${f.codigo} — ${nome}` : f.codigo;
+}
+
+function formatDateBr(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  if (!m) return String(iso);
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function emptyFilialRows(filiais: FilialOpt[]): ProdutoFilialRow[] {
+  return filiais.map((f) => ({
+    filialId: f.id,
+    filialLabel: filialOptLabel(f),
+    existingId: null,
+    valor_venda: "0",
+    valor_compra: "0",
+    valor_ultima_venda: "0",
+    margem_venda: "0",
+    margem_oferta: "0",
+    estoque: "0",
+    situacao: "ativo",
+    ultima_compra: null,
+    ultima_venda: null,
+    ultimo_acerto: null,
+  }));
+}
+
+function mergeFilialRows(
+  filiais: FilialOpt[],
+  saved: Array<Record<string, unknown>>,
+): ProdutoFilialRow[] {
+  const byFilial = new Map(
+    saved.map((r) => [String(r.filial), r] as const),
+  );
+  return filiais.map((f) => {
+    const row = byFilial.get(f.id);
+    if (!row) {
+      return emptyFilialRows([f])[0];
+    }
+    return {
+      filialId: f.id,
+      filialLabel: filialOptLabel(f),
+      existingId: row.id != null ? String(row.id) : null,
+      valor_venda: String(Number(row.valor_venda) || 0),
+      valor_compra: String(Number(row.valor_compra) || 0),
+      valor_ultima_venda: String(Number(row.valor_ultima_venda) || 0),
+      margem_venda: String(Number(row.margem_venda) || 0),
+      margem_oferta: String(Number(row.margem_oferta) || 0),
+      estoque: String(Number(row.estoque) || 0),
+      situacao: String(row.situacao || "ativo") === "inativo" ? "inativo" : "ativo",
+      ultima_compra: row.ultima_compra != null ? String(row.ultima_compra).slice(0, 10) : null,
+      ultima_venda: row.ultima_venda != null ? String(row.ultima_venda).slice(0, 10) : null,
+      ultimo_acerto: row.ultimo_acerto != null ? String(row.ultimo_acerto).slice(0, 10) : null,
+    };
+  });
+}
+
 export default function ProdutosPage() {
   const { busy, pesquisar, gravar } = useDbStatus();
   const [items, setItems] = useState<Produto[]>([]);
+  const [filiais, setFiliais] = useState<FilialOpt[]>([]);
+  const [filialRows, setFilialRows] = useState<ProdutoFilialRow[]>([]);
   const [grupos, setGrupos] = useState<GrupoOpt[]>([]);
   const [subgrupos, setSubgrupos] = useState<SubgrupoOpt[]>([]);
   const [unidades, setUnidades] = useState<Opt[]>([]);
@@ -276,6 +361,7 @@ export default function ProdutosPage() {
         anpRes,
         ipiRes,
         pisRes,
+        filialRes,
       ] = await Promise.all([
         supabase
           .from("produtos")
@@ -347,6 +433,11 @@ export default function ProdutosPage() {
         supabase
           .from("produto_piscofins")
           .select("id, codigo, descricao")
+          .order("codigo"),
+        supabase
+          .from("filial")
+          .select("id, codigo, fantasia, razao_social")
+          .eq("status", "ativo")
           .order("codigo"),
       ]);
 
@@ -492,6 +583,14 @@ export default function ProdutosPage() {
       setAnps((anpRes.data ?? []) as Opt[]);
       setIpis((ipiRes.data ?? []) as Opt[]);
       setPiscofins((pisRes.data ?? []) as Opt[]);
+      setFiliais(
+        (filialRes.data ?? []).map((f) => ({
+          id: String(f.id),
+          codigo: String(f.codigo),
+          fantasia: f.fantasia != null ? String(f.fantasia) : null,
+          razao_social: String(f.razao_social ?? ""),
+        })),
+      );
     });
   }, [pesquisar]);
 
@@ -633,6 +732,7 @@ export default function ProdutosPage() {
       unidade_id: undPadrao,
       grupo_id: grupos.length === 1 ? grupos[0].id : "",
     });
+    setFilialRows(emptyFilialRows(filiais));
     setNcmSelected(null);
     setNcmQuery("");
     setNcmResults([]);
@@ -642,7 +742,7 @@ export default function ProdutosPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (item: Produto) => {
+  const openEdit = async (item: Produto) => {
     setEditing(item);
     setForm({
       codigo_barras: item.codigo_barras ?? "",
@@ -684,7 +784,20 @@ export default function ProdutosPage() {
     setTab("geral");
     setFormError("");
     setActionError("");
+    setFilialRows(emptyFilialRows(filiais));
     setModalOpen(true);
+
+    const { data } = await supabase
+      .from("produto_filial")
+      .select(
+        `
+        id, filial, valor_venda, ultima_compra, fornecedor_compra, valor_compra,
+        ultima_venda, cliente_venda, valor_ultima_venda, margem_venda, situacao,
+        estoque, ultimo_acerto, margem_oferta
+      `,
+      )
+      .eq("produto", item.id);
+    setFilialRows(mergeFilialRows(filiais, (data ?? []) as Record<string, unknown>[]));
   };
 
   const openDelete = (item: Produto) => {
@@ -701,7 +814,44 @@ export default function ProdutosPage() {
     if (busy) return;
     setModalOpen(false);
     setEditing(null);
+    setFilialRows([]);
     setFormError("");
+  };
+
+  const updateFilialRow = (
+    filialId: string,
+    key: keyof ProdutoFilialRow,
+    value: string,
+  ) => {
+    setFilialRows((prev) =>
+      prev.map((row) =>
+        row.filialId === filialId ? { ...row, [key]: value } : row,
+      ),
+    );
+  };
+
+  const syncProdutoFilial = async (produtoId: string) => {
+    for (const row of filialRows) {
+      const payload = {
+        filial: row.filialId,
+        produto: produtoId,
+        valor_venda: parseMoney(row.valor_venda),
+        margem_venda: parseMoney(row.margem_venda),
+        margem_oferta: parseMoney(row.margem_oferta),
+        estoque: parseMoney(row.estoque),
+        situacao: row.situacao === "inativo" ? "inativo" : "ativo",
+      };
+      if (row.existingId) {
+        const { error } = await supabase
+          .from("produto_filial")
+          .update(payload)
+          .eq("id", row.existingId);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase.from("produto_filial").insert(payload);
+        if (error) throw new Error(error.message);
+      }
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -750,6 +900,7 @@ export default function ProdutosPage() {
 
     try {
       await gravar(async () => {
+        let produtoId = editing?.id ?? null;
         if (editing) {
           const { error } = await supabase
             .from("produtos")
@@ -758,18 +909,25 @@ export default function ProdutosPage() {
           if (error) throw new Error(error.message);
         } else {
           const codigo = await nextCodigo();
-          const { error } = await supabase.from("produtos").insert({
-            ...payload,
-            codigo,
-            preco_venda: 0,
-            estoque_atual: 0,
-          });
+          const { data, error } = await supabase
+            .from("produtos")
+            .insert({
+              ...payload,
+              codigo,
+              preco_venda: 0,
+              estoque_atual: 0,
+            })
+            .select("id")
+            .single();
           if (error) throw new Error(error.message);
+          produtoId = String(data.id);
         }
+        if (produtoId) await syncProdutoFilial(produtoId);
       });
 
       setModalOpen(false);
       setEditing(null);
+      setFilialRows([]);
       await loadData();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
@@ -843,7 +1001,7 @@ export default function ProdutosPage() {
     acoes: (
       <CadastroRowActions
         disabled={busy}
-        onEdit={() => openEdit(item)}
+        onEdit={() => void openEdit(item)}
         onDelete={() => openDelete(item)}
       />
     ),
@@ -895,7 +1053,7 @@ export default function ProdutosPage() {
           }
           onClose={closeModal}
           disabled={busy}
-          width={820}
+          width={960}
           asForm
           onSubmit={handleSubmit}
           footer={
@@ -1466,6 +1624,163 @@ export default function ProdutosPage() {
               </CadastroFormGrid>
             </div>
           ) : null}
+
+          <div className="cadastro-options-panel" style={{ marginTop: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <strong style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                Filiais
+              </strong>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Preço, estoque e situação por filial
+              </span>
+            </div>
+            {filialRows.length === 0 ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  textAlign: "center",
+                  padding: "10px 0",
+                }}
+              >
+                Nenhuma filial ativa cadastrada.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="cadastro-mini-table">
+                  <thead>
+                    <tr>
+                      <th>Filial</th>
+                      <th>Situação</th>
+                      <th style={{ textAlign: "right" }}>Vlr venda</th>
+                      <th style={{ textAlign: "right" }}>Estoque</th>
+                      <th style={{ textAlign: "right" }}>Margem</th>
+                      <th style={{ textAlign: "right" }}>Marg. oferta</th>
+                      <th style={{ textAlign: "right" }}>Vlr compra</th>
+                      <th>Últ. compra</th>
+                      <th>Últ. venda</th>
+                      <th>Últ. acerto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filialRows.map((row) => (
+                      <tr key={row.filialId}>
+                        <td style={{ whiteSpace: "nowrap", minWidth: 140 }}>
+                          {row.filialLabel}
+                        </td>
+                        <td>
+                          <select
+                            className="input-base input-compact"
+                            value={row.situacao}
+                            onChange={(e) =>
+                              updateFilialRow(
+                                row.filialId,
+                                "situacao",
+                                e.target.value,
+                              )
+                            }
+                            disabled={busy}
+                            style={{ minWidth: 100 }}
+                          >
+                            <option value="ativo">Ativo</option>
+                            <option value="inativo">Inativo</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            className="input-base input-compact"
+                            value={row.valor_venda}
+                            onChange={(e) =>
+                              updateFilialRow(
+                                row.filialId,
+                                "valor_venda",
+                                e.target.value,
+                              )
+                            }
+                            disabled={busy}
+                            inputMode="decimal"
+                            style={{ width: 90, textAlign: "right" }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="input-base input-compact"
+                            value={row.estoque}
+                            onChange={(e) =>
+                              updateFilialRow(
+                                row.filialId,
+                                "estoque",
+                                e.target.value,
+                              )
+                            }
+                            disabled={busy}
+                            inputMode="decimal"
+                            style={{ width: 80, textAlign: "right" }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="input-base input-compact"
+                            value={row.margem_venda}
+                            onChange={(e) =>
+                              updateFilialRow(
+                                row.filialId,
+                                "margem_venda",
+                                e.target.value,
+                              )
+                            }
+                            disabled={busy}
+                            inputMode="decimal"
+                            style={{ width: 70, textAlign: "right" }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="input-base input-compact"
+                            value={row.margem_oferta}
+                            onChange={(e) =>
+                              updateFilialRow(
+                                row.filialId,
+                                "margem_oferta",
+                                e.target.value,
+                              )
+                            }
+                            disabled={busy}
+                            inputMode="decimal"
+                            style={{ width: 70, textAlign: "right" }}
+                          />
+                        </td>
+                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                          {Number(row.valor_compra || 0).toLocaleString("pt-BR", {
+                            minimumFractionDigits: 3,
+                            maximumFractionDigits: 3,
+                          })}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {formatDateBr(row.ultima_compra)}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {formatDateBr(row.ultima_venda)}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {formatDateBr(row.ultimo_acerto)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </CadastroModal>
       ) : null}
 
