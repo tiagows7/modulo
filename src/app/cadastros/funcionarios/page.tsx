@@ -26,7 +26,6 @@ type Funcionario = {
 };
 
 type FuncionarioForm = {
-  codigo: string;
   nome: string;
   cpf: string;
   cargo: string;
@@ -36,7 +35,6 @@ type FuncionarioForm = {
 };
 
 const emptyForm: FuncionarioForm = {
-  codigo: "",
   nome: "",
   cpf: "",
   cargo: "",
@@ -58,14 +56,6 @@ const columns = [
 function blank(v: string) {
   const t = v.trim();
   return t ? t : null;
-}
-
-function parseCodigo(raw: string): number | null {
-  const t = raw.trim();
-  if (!/^\d+$/.test(t)) return null;
-  const n = Number(t);
-  if (!Number.isInteger(n) || n <= 0) return null;
-  return n;
 }
 
 async function nextCodigo(): Promise<number> {
@@ -123,18 +113,16 @@ export default function FuncionariosPage() {
     void loadData();
   }, [loadData]);
 
-  const openCreate = async () => {
+  const openCreate = () => {
     setEditing(null);
+    setForm(emptyForm);
     setFormError("");
     setModalOpen(true);
-    const next = await nextCodigo();
-    setForm({ ...emptyForm, codigo: String(next) });
   };
 
   const openEdit = (item: Funcionario) => {
     setEditing(item);
     setForm({
-      codigo: String(item.codigo),
       nome: item.nome ?? "",
       cpf: item.cpf ?? "",
       cargo: item.cargo ?? "",
@@ -171,11 +159,6 @@ export default function FuncionariosPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const nome = form.nome.trim();
-    const codigo = parseCodigo(form.codigo);
-    if (codigo == null) {
-      setFormError("Informe o código numérico do funcionário (inteiro > 0).");
-      return;
-    }
     if (!nome) {
       setFormError("Informe o nome do funcionário.");
       return;
@@ -183,7 +166,6 @@ export default function FuncionariosPage() {
 
     setFormError("");
     const payload = {
-      codigo,
       nome,
       cpf: blank(form.cpf),
       cargo: blank(form.cargo),
@@ -201,7 +183,11 @@ export default function FuncionariosPage() {
             .eq("id", editing.id);
           if (error) throw new Error(error.message);
         } else {
-          const { error } = await supabase.from("funcionarios").insert(payload);
+          const codigo = await nextCodigo();
+          const { error } = await supabase.from("funcionarios").insert({
+            ...payload,
+            codigo,
+          });
           if (error) throw new Error(error.message);
         }
       });
@@ -213,7 +199,7 @@ export default function FuncionariosPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha ao gravar.";
       if (/unique|duplicate|codigo/i.test(msg)) {
-        setFormError("Já existe um funcionário com este código.");
+        setFormError("Código já utilizado. Tente salvar novamente.");
       } else {
         setFormError(msg);
       }
@@ -283,20 +269,31 @@ export default function FuncionariosPage() {
 
       <ModulePage
         title="Funcionários"
-        description="Código numérico usado na abertura de caixa e nas vendas do PDV"
+        description="Código sequencial gerado automaticamente para o PDV"
         icon={<IdCard size={22} />}
         columns={columns}
         rows={rows}
         addLabel="Novo Funcionário"
         backUrl="/cadastros"
-        onAdd={busy ? undefined : () => void openCreate()}
+        onAdd={busy ? undefined : openCreate}
       />
 
       {modalOpen ? (
         <CadastroModal
           title={editing ? "Editar Funcionário" : "Novo Funcionário"}
           titleId="funcionario-title"
-          subtitle="O código inteiro identifica o operador no caixa e nas vendas"
+          subtitle={
+            editing ? (
+              <>
+                Código:{" "}
+                <strong style={{ color: "var(--text-secondary)" }}>
+                  {editing.codigo}
+                </strong>
+              </>
+            ) : (
+              "Código gerado automaticamente ao salvar"
+            )
+          }
           onClose={closeModal}
           disabled={busy}
           width={520}
@@ -311,27 +308,13 @@ export default function FuncionariosPage() {
           }
         >
           <CadastroFormGrid>
-            <CadastroField label="Código *" htmlFor="fun-codigo">
-              <input
-                id="fun-codigo"
-                className="input-base input-compact"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={form.codigo}
-                onChange={(e) =>
-                  setField("codigo", e.target.value.replace(/\D/g, ""))
-                }
-                autoFocus
-                required
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Nome *" htmlFor="fun-nome" span={2}>
+            <CadastroField label="Nome *" htmlFor="fun-nome" span="full">
               <input
                 id="fun-nome"
                 className="input-base input-compact"
                 value={form.nome}
                 onChange={(e) => setField("nome", e.target.value)}
+                autoFocus
                 maxLength={255}
                 required
                 disabled={busy}
