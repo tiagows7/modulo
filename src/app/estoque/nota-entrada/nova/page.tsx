@@ -7,6 +7,7 @@ import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
 import { CadastroFormError } from "@/components/CadastroUi";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
+import { ensureFornecedorFromNfe } from "@/lib/nfe/ensureFornecedorFromNfe";
 import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 import { supabase } from "@/lib/supabase";
 
@@ -276,16 +277,21 @@ export default function NotaEntradaNovaPage() {
       const raw = await file.text();
       const parsed = parseNfeXml(raw);
 
-      const { data: fornecedores } = await supabase
-        .from("fornecedores")
-        .select("id, cnpj")
-        .eq("status", "ativo");
+      if (!parsed.emit_cnpj || parsed.emit_cnpj.length !== 14) {
+        throw new Error(
+          "XML sem CNPJ do emitente. Não é possível importar/cadastrar o fornecedor.",
+        );
+      }
 
-      const fornCnpj = parsed.emit_cnpj || "";
-      const fornecedorId =
-        (fornecedores ?? []).find(
-          (f) => String(f.cnpj || "").replace(/\D/g, "") === fornCnpj,
-        )?.id ?? null;
+      const forn = await ensureFornecedorFromNfe(parsed);
+      if (!forn) {
+        throw new Error("Não foi possível identificar o fornecedor do XML.");
+      }
+
+      const fornecedorId = forn.id;
+      const avisoFornecedor = forn.criado
+        ? `Fornecedor cadastrado: ${forn.codigo ? `${forn.codigo} — ` : ""}${forn.nome}`
+        : "";
 
       const payload = {
         filial: filialId,
@@ -293,8 +299,8 @@ export default function NotaEntradaNovaPage() {
         fornecedor: fornecedorId,
         fornecedor_nome: parsed.emit_nome
           ? parsed.emit_nome.slice(0, 120)
-          : null,
-        fornecedor_cnpj: fornCnpj || null,
+          : forn.nome.slice(0, 120),
+        fornecedor_cnpj: parsed.emit_cnpj,
         fornecedor_ie: parsed.emit_ie
           ? parsed.emit_ie.slice(0, 14)
           : null,
@@ -322,19 +328,25 @@ export default function NotaEntradaNovaPage() {
       const manifestoPk = data?.id ? String(data.id) : "";
       const { pendentes } = await classificarItensXml(parsed, fornecedorId);
 
-      setInfoMsg(
-        `XML importado: NF ${parsed.numero ?? "—"} — ${parsed.emit_nome || "fornecedor"} (${parsed.itens.length} item(ns)).`,
-      );
+      const baseMsg = `XML importado: NF ${parsed.numero ?? "—"} — ${parsed.emit_nome || forn.nome} (${parsed.itens.length} item(ns)).`;
+      setInfoMsg(avisoFornecedor ? `${avisoFornecedor}\n\n${baseMsg}` : baseMsg);
       await loadData();
 
       if (!manifestoPk) return;
 
+      const qs = new URLSearchParams({ manifesto: manifestoPk });
+      if (avisoFornecedor) {
+        qs.set("fornecedorNovo", "1");
+        qs.set("fornecedorNome", forn.nome);
+        if (forn.codigo) qs.set("fornecedorCodigo", forn.codigo);
+      }
+
       if (pendentes.length > 0) {
         router.push(
-          `/estoque/nota-entrada/vincular-produtos?manifesto=${manifestoPk}`,
+          `/estoque/nota-entrada/vincular-produtos?${qs.toString()}`,
         );
       } else {
-        router.push(`/estoque/nota-entrada?manifesto=${manifestoPk}`);
+        router.push(`/estoque/nota-entrada?${qs.toString()}`);
       }
     } catch (err) {
       setActionError(

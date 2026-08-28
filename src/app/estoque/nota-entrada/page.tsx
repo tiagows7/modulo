@@ -212,6 +212,9 @@ function NotaEntradaCadastroPage() {
   const searchParams = useSearchParams();
   const manifestoParam = searchParams.get("manifesto");
   const manualParam = searchParams.get("manual");
+  const fornecedorNovo = searchParams.get("fornecedorNovo") === "1";
+  const fornecedorNomeParam = searchParams.get("fornecedorNome") || "";
+  const fornecedorCodigoParam = searchParams.get("fornecedorCodigo") || "";
   const { busy, pesquisar, gravar } = useDbStatus();
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [fornecedores, setFornecedores] = useState<FornecedorOpt[]>([]);
@@ -219,6 +222,7 @@ function NotaEntradaCadastroPage() {
   const [items, setItems] = useState<NotaEntrada[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [infoMsg, setInfoMsg] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<NotaEntrada | null>(null);
   const [deleting, setDeleting] = useState<NotaEntrada | null>(null);
@@ -342,6 +346,26 @@ function NotaEntradaCadastroPage() {
     void loadLookups();
     void loadData();
   }, [loadLookups, loadData]);
+
+  useEffect(() => {
+    if (!fornecedorNovo || !fornecedorNomeParam) return;
+    const label = fornecedorCodigoParam
+      ? `${fornecedorCodigoParam} — ${fornecedorNomeParam}`
+      : fornecedorNomeParam;
+    setInfoMsg(`Fornecedor cadastrado automaticamente: ${label}`);
+    const qs = new URLSearchParams();
+    if (manifestoParam) qs.set("manifesto", manifestoParam);
+    const suffix = qs.toString();
+    router.replace(
+      suffix ? `/estoque/nota-entrada?${suffix}` : "/estoque/nota-entrada",
+    );
+  }, [
+    fornecedorNovo,
+    fornecedorNomeParam,
+    fornecedorCodigoParam,
+    manifestoParam,
+    router,
+  ]);
 
   useEffect(() => {
     if (!manifestoParam || !fornecedores.length) return;
@@ -839,6 +863,15 @@ function NotaEntradaCadastroPage() {
           title="Erro ao carregar"
           message={`Erro ao carregar notas de entrada: ${loadError}`}
           onClose={() => setLoadError("")}
+        />
+      ) : null}
+
+      {infoMsg ? (
+        <CadastroFormError
+          type="warning"
+          title="Fornecedor cadastrado"
+          message={infoMsg}
+          onClose={() => setInfoMsg("")}
         />
       ) : null}
 

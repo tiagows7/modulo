@@ -42,6 +42,9 @@ function VincularProdutosPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const manifestoId = searchParams.get("manifesto") || "";
+  const fornecedorNovo = searchParams.get("fornecedorNovo") === "1";
+  const fornecedorNomeParam = searchParams.get("fornecedorNome") || "";
+  const fornecedorCodigoParam = searchParams.get("fornecedorCodigo") || "";
   const { busy, pesquisar, gravar } = useDbStatus();
 
   const [produtos, setProdutos] = useState<ProdutoOpt[]>([]);
@@ -51,7 +54,28 @@ function VincularProdutosPageInner() {
   const [notaLabel, setNotaLabel] = useState("");
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
+  const [infoMsg, setInfoMsg] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!fornecedorNovo || !fornecedorNomeParam) return;
+    const label = fornecedorCodigoParam
+      ? `${fornecedorCodigoParam} — ${fornecedorNomeParam}`
+      : fornecedorNomeParam;
+    setInfoMsg(`Fornecedor cadastrado automaticamente: ${label}`);
+    // limpa params para não reexibir ao atualizar
+    const qs = new URLSearchParams();
+    if (manifestoId) qs.set("manifesto", manifestoId);
+    router.replace(
+      `/estoque/nota-entrada/vincular-produtos?${qs.toString()}`,
+    );
+  }, [
+    fornecedorNovo,
+    fornecedorNomeParam,
+    fornecedorCodigoParam,
+    manifestoId,
+    router,
+  ]);
 
   const load = useCallback(async () => {
     if (!manifestoId) {
@@ -220,6 +244,15 @@ function VincularProdutosPageInner() {
             setLoadError("");
             router.push("/estoque/nota-entrada/nova");
           }}
+        />
+      ) : null}
+
+      {infoMsg ? (
+        <CadastroFormError
+          type="warning"
+          title="Fornecedor cadastrado"
+          message={infoMsg}
+          onClose={() => setInfoMsg("")}
         />
       ) : null}
 

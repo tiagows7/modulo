@@ -39,6 +39,14 @@ export type NfeXmlParsed = {
   emit_nome: string | null
   emit_fantasia: string | null
   emit_ie: string | null
+  emit_endereco: string | null
+  emit_numero: string | null
+  emit_bairro: string | null
+  emit_municipio: string | null
+  emit_cmun: string | null
+  emit_uf: string | null
+  emit_cep: string | null
+  emit_fone: string | null
   dest_cnpj: string | null
   protocolo: string | null
   xml: string
@@ -187,6 +195,7 @@ export function parseNfeXml(xmlRaw: string): NfeXmlParsed {
   const ide = inf.getElementsByTagName('ide')[0]
   const emit = inf.getElementsByTagName('emit')[0]
   const dest = inf.getElementsByTagName('dest')[0]
+  const enderEmit = emit?.getElementsByTagName('enderEmit')[0]
   const total = inf.getElementsByTagName('total')[0]
   const icmsTot = total?.getElementsByTagName('ICMSTot')[0]
 
@@ -218,6 +227,14 @@ export function parseNfeXml(xmlRaw: string): NfeXmlParsed {
     emit_nome: text(emit, 'xNome') || null,
     emit_fantasia: text(emit, 'xFant') || null,
     emit_ie: text(emit, 'IE') || null,
+    emit_endereco: text(enderEmit, 'xLgr') || null,
+    emit_numero: text(enderEmit, 'nro') || null,
+    emit_bairro: text(enderEmit, 'xBairro') || null,
+    emit_municipio: text(enderEmit, 'xMun') || null,
+    emit_cmun: text(enderEmit, 'cMun') || null,
+    emit_uf: text(enderEmit, 'UF') || null,
+    emit_cep: onlyDigits(text(enderEmit, 'CEP')) || null,
+    emit_fone: text(enderEmit, 'fone') || null,
     dest_cnpj: onlyDigits(text(dest, 'CNPJ')) || null,
     protocolo: text(doc.documentElement, 'nProt') || null,
     xml,
