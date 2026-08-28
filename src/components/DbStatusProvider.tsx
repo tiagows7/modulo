@@ -4,10 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 export type DbStatus = "idle" | "pesquisando" | "gravando" | "consultando";
@@ -49,9 +51,14 @@ function statusCopy(status: DbStatus) {
 }
 
 function DbStatusOverlay({ status }: { status: DbStatus }) {
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
   const copy = statusCopy(status);
 
-  return (
+  const overlay = (
     <AnimatePresence>
       {copy ? (
         <motion.div
@@ -66,7 +73,7 @@ function DbStatusOverlay({ status }: { status: DbStatus }) {
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 200,
+            zIndex: 1400,
             background: "rgba(6, 13, 26, 0.72)",
             backdropFilter: "blur(4px)",
             display: "grid",
@@ -147,6 +154,9 @@ function DbStatusOverlay({ status }: { status: DbStatus }) {
       ) : null}
     </AnimatePresence>
   );
+
+  if (!portalTarget) return null;
+  return createPortal(overlay, portalTarget);
 }
 
 export function DbStatusProvider({ children }: { children: ReactNode }) {

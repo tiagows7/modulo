@@ -341,7 +341,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           position: isMobile ? "fixed" : "relative",
           left: 0,
           top: 0,
-          zIndex: 50,
+          // Só eleva o z-index no mobile (drawer); no desktop o menu
+          // não deve competir com modais/overlays do conteúdo.
+          zIndex: isMobile ? 50 : 1,
           flexShrink: 0,
           transition: isMobile ? "transform 0.25s ease" : "width 0.2s ease, min-width 0.2s ease",
           transform: isMobile && !mobileOpen ? "translateX(-105%)" : "translateX(0)",
@@ -488,19 +490,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             overflowY: "auto",
             padding: 24,
             position: "relative",
+            isolation: "isolate",
           }}
         >
           <div
             className="bg-grid"
             style={{
-              position: "fixed",
+              position: "absolute",
               inset: 0,
               pointerEvents: "none",
               zIndex: 0,
               opacity: 0.4,
             }}
           />
-          <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }}>
+          <div style={{ position: "relative", zIndex: 1, width: "100%", minHeight: "100%" }}>
             {children}
           </div>
         </main>

@@ -4,7 +4,10 @@ import {
   type CSSProperties,
   type FormEvent,
   type ReactNode,
+  useEffect,
+  useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CircleAlert, Pencil, Trash2, X } from "lucide-react";
 
 type CadastroRowActionsProps = {
@@ -44,6 +47,14 @@ export function CadastroRowActions({
   );
 }
 
+function usePortalTarget() {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.body);
+  }, []);
+  return target;
+}
+
 type CadastroModalProps = {
   title: string;
   titleId: string;
@@ -69,6 +80,7 @@ export function CadastroModal({
   asForm,
   onSubmit,
 }: CadastroModalProps) {
+  const portalTarget = usePortalTarget();
   const panelStyle: CSSProperties = {
     width: `min(${width}px, 100%)`,
   };
@@ -97,7 +109,7 @@ export function CadastroModal({
     </>
   );
 
-  return (
+  const dialog = (
     <div
       role="dialog"
       aria-modal="true"
@@ -125,6 +137,9 @@ export function CadastroModal({
       )}
     </div>
   );
+
+  if (!portalTarget) return null;
+  return createPortal(dialog, portalTarget);
 }
 
 export function CadastroField({
@@ -177,13 +192,14 @@ export function CadastroMessageDialog({
   onClose,
   confirmLabel = "OK",
 }: CadastroMessageDialogProps) {
+  const portalTarget = usePortalTarget();
   if (!message) return null;
 
   const isWarning = type === "warning";
   const resolvedTitle = title ?? (isWarning ? "Atenção" : "Erro");
   const Icon = isWarning ? AlertTriangle : CircleAlert;
 
-  return (
+  const dialog = (
     <div
       role="alertdialog"
       aria-modal="true"
@@ -220,6 +236,9 @@ export function CadastroMessageDialog({
       </div>
     </div>
   );
+
+  if (!portalTarget) return null;
+  return createPortal(dialog, portalTarget);
 }
 
 /** Atalho para erro/aviso com o layout padrão na frente da tela. */

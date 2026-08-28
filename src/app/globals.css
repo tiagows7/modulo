@@ -383,7 +383,7 @@ body {
 .cadastro-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 1200;
   background: rgba(6, 13, 26, 0.72);
   display: grid;
   place-items: center;
@@ -512,7 +512,7 @@ body {
 .cadastro-message-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 260;
+  z-index: 1300;
   background: rgba(6, 13, 26, 0.78);
   backdrop-filter: blur(3px);
   display: grid;
