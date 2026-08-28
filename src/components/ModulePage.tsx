@@ -20,6 +20,8 @@ interface ModulePageProps {
   addLabel?: string;
   backUrl?: string;
   onAdd?: () => void;
+  /** Conteúdo extra na barra de busca (ex.: select de filial). */
+  filters?: ReactNode;
 }
 
 const fadeUp = {
@@ -44,6 +46,7 @@ export function ModulePage({
   addLabel = "Novo",
   backUrl,
   onAdd,
+  filters,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
 
@@ -168,6 +171,7 @@ export function ModulePage({
         >
           <Filter size={14} /> Filtros
         </motion.button>
+        {filters}
       </motion.div>
 
       {/* Table */}
