@@ -14,6 +14,8 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
+import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 
 type FilialOpt = {
   id: string;
@@ -349,7 +351,7 @@ function NotaEntradaCadastroPage() {
       const { data, error } = await supabase
         .from("nota_entradamanifesto")
         .select(
-          "id, filial, fornecedor, fornecedor_cnpj, chave, numero, valor, emissao, nota_compra",
+          "id, filial, fornecedor, fornecedor_cnpj, chave, numero, valor, emissao, nota_compra, xml_conteudo",
         )
         .eq("id", manifestoParam)
         .maybeSingle();
@@ -406,6 +408,75 @@ function NotaEntradaCadastroPage() {
         )?.id ||
         "";
 
+      // XML importado: exige vínculo de produtos pendentes antes de digitar
+      if (data.xml_conteudo) {
+        try {
+          const parsed = parseNfeXml(String(data.xml_conteudo));
+          const { mapeados, pendentes } = await classificarItensXml(
+            parsed,
+            fornId || null,
+          );
+          if (cancelled) return;
+
+          if (pendentes.length > 0) {
+            router.replace(
+              `/estoque/nota-entrada/vincular-produtos?manifesto=${data.id}`,
+            );
+            return;
+          }
+
+          setManifestoId(String(data.id));
+          setEditing(null);
+          setForm({
+            ...emptyForm,
+            filial: data.filial != null ? String(data.filial) : "",
+            fornecedor: fornId,
+            numero: data.numero != null ? String(data.numero) : "",
+            serie: parsed.serie || "1",
+            modelo: parsed.modelo || "55",
+            chave: data.chave != null ? String(data.chave) : "",
+            natureza_operacao: parsed.natureza || "",
+            data_emissao: toDateInput(
+              data.emissao != null ? String(data.emissao) : null,
+            ),
+            data_entrada: toDateInput(
+              data.emissao != null ? String(data.emissao) : null,
+            ),
+            v_nf: String(Number(data.valor) || parsed.valor || 0),
+            situacao: "pendente",
+          });
+
+          const prodById = new Map(produtos.map((p) => [p.id, p]));
+          setFormItems(
+            (mapeados.length ? mapeados : parsed.itens).map((item) => {
+              const prodId =
+                "produto_sistema" in item && item.produto_sistema
+                  ? String(item.produto_sistema)
+                  : "";
+              const prod = prodId ? prodById.get(prodId) : null;
+              return {
+                key: `xml-${item.n_item}-${item.c_prod}`,
+                produto_id: prodId,
+                c_prod: item.c_prod || "",
+                c_ean: item.c_ean || "",
+                x_prod: prod?.descricao || item.x_prod || "",
+                ncm: item.ncm || "",
+                cfop: item.cfop || "",
+                u_com: item.u_com || "UN",
+                q_com: String(item.q_com || 0),
+                v_un_com: String(item.v_un_com || 0),
+                v_prod: String(item.v_prod || 0),
+              };
+            }),
+          );
+          setFormError("");
+          setModalOpen(true);
+          return;
+        } catch {
+          // segue fluxo manual sem itens
+        }
+      }
+
       setManifestoId(String(data.id));
       setEditing(null);
       setForm({
@@ -431,9 +502,8 @@ function NotaEntradaCadastroPage() {
     return () => {
       cancelled = true;
     };
-    // openEdit is stable enough via closure; avoid re-run loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifestoParam, fornecedores]);
+  }, [manifestoParam, fornecedores, produtos]);
 
   const updateForm = <K extends keyof NotaForm>(key: K, value: NotaForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));

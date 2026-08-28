@@ -7,6 +7,7 @@ import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
 import { CadastroFormError } from "@/components/CadastroUi";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
+import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 import { supabase } from "@/lib/supabase";
 
 type FilialOpt = {
@@ -187,7 +188,28 @@ export default function NotaEntradaNovaPage() {
     void loadData();
   }, [loadData]);
 
-  const abrirDigitar = (id: string) => {
+  const abrirDigitar = async (id: string) => {
+    try {
+      const { data: man, error } = await supabase
+        .from("nota_entradamanifesto")
+        .select("id, fornecedor, xml_conteudo")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (man?.xml_conteudo) {
+        const parsed = parseNfeXml(String(man.xml_conteudo));
+        const fornId = man.fornecedor != null ? String(man.fornecedor) : null;
+        const { pendentes } = await classificarItensXml(parsed, fornId);
+        if (pendentes.length > 0) {
+          router.push(
+            `/estoque/nota-entrada/vincular-produtos?manifesto=${id}`,
+          );
+          return;
+        }
+      }
+    } catch {
+      // segue para digitação
+    }
     router.push(`/estoque/nota-entrada?manifesto=${id}`);
   };
 
@@ -286,6 +308,7 @@ export default function NotaEntradaNovaPage() {
           : null,
         xml: 1,
         digitada: 0,
+        xml_conteudo: parsed.xml,
       };
 
       const { data, error } = await supabase
@@ -296,14 +319,22 @@ export default function NotaEntradaNovaPage() {
 
       if (error) throw new Error(error.message);
 
-      // Guarda XML completo na nota_entrada só depois de digitar;
-      // no manifesto ficamos com flag xml=1 + caminho.
+      const manifestoPk = data?.id ? String(data.id) : "";
+      const { pendentes } = await classificarItensXml(parsed, fornecedorId);
+
       setInfoMsg(
-        `XML importado: NF ${parsed.numero ?? "—"} — ${parsed.emit_nome || "fornecedor"}.`,
+        `XML importado: NF ${parsed.numero ?? "—"} — ${parsed.emit_nome || "fornecedor"} (${parsed.itens.length} item(ns)).`,
       );
       await loadData();
-      if (data?.id) {
-        router.push(`/estoque/nota-entrada?manifesto=${data.id}`);
+
+      if (!manifestoPk) return;
+
+      if (pendentes.length > 0) {
+        router.push(
+          `/estoque/nota-entrada/vincular-produtos?manifesto=${manifestoPk}`,
+        );
+      } else {
+        router.push(`/estoque/nota-entrada?manifesto=${manifestoPk}`);
       }
     } catch (err) {
       setActionError(
