@@ -157,7 +157,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "contabil", label: "Contábil" },
 ];
 
-const columns = [
+const columnsBase = [
   { key: "codigo", label: "Código" },
   { key: "barras", label: "Cód. barras" },
   { key: "descricao", label: "Descrição" },
@@ -221,8 +221,33 @@ async function nextCodigo() {
 }
 
 function parseMoney(raw: string) {
-  const n = Number(String(raw).trim().replace(",", "."));
+  const t = String(raw).trim().replace(/\s/g, "");
+  if (!t) return 0;
+  // Formato BR (1.234,56): pontos = milhar, vírgula = decimal
+  if (t.includes(",")) {
+    const n = Number(t.replace(/\./g, "").replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
+  const n = Number(t);
   return Number.isFinite(n) ? n : 0;
+}
+
+function formatMoney2(n: number | string | null | undefined) {
+  const v = typeof n === "number" ? n : parseMoney(String(n ?? "0"));
+  return v.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Digitação livre com dígitos e uma vírgula (2 casas). */
+function maskMoneyInput(raw: string) {
+  let v = raw.replace(/[^\d,]/g, "");
+  const parts = v.split(",");
+  const intPart = (parts[0] ?? "").replace(/\D/g, "");
+  if (parts.length === 1) return intPart;
+  const dec = (parts[1] ?? "").replace(/\D/g, "").slice(0, 2);
+  return `${intPart},${dec}`;
 }
 
 type FilialOpt = {
@@ -265,7 +290,7 @@ function emptyFilialRows(filiais: FilialOpt[]): ProdutoFilialRow[] {
     filialId: f.id,
     filialLabel: filialOptLabel(f),
     existingId: null,
-    valor_venda: "0",
+    valor_venda: "0,00",
     valor_compra: "0",
     valor_ultima_venda: "0",
     margem_venda: "0",
@@ -294,7 +319,7 @@ function mergeFilialRows(
       filialId: f.id,
       filialLabel: filialOptLabel(f),
       existingId: row.id != null ? String(row.id) : null,
-      valor_venda: String(Number(row.valor_venda) || 0),
+      valor_venda: formatMoney2(Number(row.valor_venda) || 0),
       valor_compra: String(Number(row.valor_compra) || 0),
       valor_ultima_venda: String(Number(row.valor_ultima_venda) || 0),
       margem_venda: String(Number(row.margem_venda) || 0),
@@ -313,6 +338,10 @@ export default function ProdutosPage() {
   const [items, setItems] = useState<Produto[]>([]);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [filialRows, setFilialRows] = useState<ProdutoFilialRow[]>([]);
+  /** Preço de venda por produto quando existe apenas 1 filial. */
+  const [precoPorProduto, setPrecoPorProduto] = useState<Record<string, number>>(
+    {},
+  );
   const [grupos, setGrupos] = useState<GrupoOpt[]>([]);
   const [subgrupos, setSubgrupos] = useState<SubgrupoOpt[]>([]);
   const [unidades, setUnidades] = useState<Opt[]>([]);
@@ -591,6 +620,21 @@ export default function ProdutosPage() {
           razao_social: String(f.razao_social ?? ""),
         })),
       );
+
+      const filiaisAtivas = (filialRes.data ?? []).map((f) => String(f.id));
+      if (filiaisAtivas.length === 1) {
+        const { data: pfData } = await supabase
+          .from("produto_filial")
+          .select("produto, valor_venda")
+          .eq("filial", filiaisAtivas[0]);
+        const map: Record<string, number> = {};
+        for (const r of pfData ?? []) {
+          map[String(r.produto)] = Number(r.valor_venda) || 0;
+        }
+        setPrecoPorProduto(map);
+      } else {
+        setPrecoPorProduto({});
+      }
     });
   }, [pesquisar]);
 
@@ -983,6 +1027,19 @@ export default function ProdutosPage() {
     }
   };
 
+  const columns = useMemo(() => {
+    if (filiais.length !== 1) return columnsBase;
+    return [
+      ...columnsBase.slice(0, 5),
+      {
+        key: "valor_venda",
+        label: "Valor venda",
+        align: "right" as const,
+      },
+      ...columnsBase.slice(5),
+    ];
+  }, [filiais.length]);
+
   const rows = items.map((item) => ({
     codigo: item.codigo,
     barras: item.codigo_barras || "—",
@@ -991,6 +1048,11 @@ export default function ProdutosPage() {
     grupo: item.grupo_produtos
       ? `${item.grupo_produtos.codigo} — ${item.grupo_produtos.descricao}`
       : "—",
+    ...(filiais.length === 1
+      ? {
+          valor_venda: formatMoney2(precoPorProduto[item.id] ?? 0),
+        }
+      : {}),
     status: (
       <span
         className={`badge ${item.status === "ativo" ? "badge-success" : "badge-warning"}`}
@@ -1703,12 +1765,19 @@ export default function ProdutosPage() {
                               updateFilialRow(
                                 row.filialId,
                                 "valor_venda",
-                                e.target.value,
+                                maskMoneyInput(e.target.value),
+                              )
+                            }
+                            onBlur={() =>
+                              updateFilialRow(
+                                row.filialId,
+                                "valor_venda",
+                                formatMoney2(row.valor_venda),
                               )
                             }
                             disabled={busy}
                             inputMode="decimal"
-                            style={{ width: 90, textAlign: "right" }}
+                            style={{ width: 100, textAlign: "right" }}
                           />
                         </td>
                         <td>
