@@ -17,13 +17,48 @@ export type NfeXmlItem = {
   v_un_trib: number
   v_desc: number
   c_prod_anp: string | null
+  orig: number | null
   cst_icms: string | null
+  v_bc_icms: number
   p_icms: number
+  v_icms: number
+  v_bc_st: number
+  p_icms_st: number
+  v_icms_st: number
+  cst_ipi: string | null
+  v_bc_ipi: number
+  p_ipi: number
+  v_ipi: number
   cst_pis: string | null
+  v_bc_pis: number
+  p_pis: number
+  v_pis: number
   cst_cofins: string | null
+  v_bc_cofins: number
+  p_cofins: number
+  v_cofins: number
   cbenef: string | null
   cst_ibscbs: number | null
   classtrib: string | null
+}
+
+export type NfeXmlTotais = {
+  v_bc: number
+  v_icms: number
+  v_icms_deson: number
+  v_bc_st: number
+  v_st: number
+  v_prod: number
+  v_frete: number
+  v_seg: number
+  v_desc: number
+  v_ii: number
+  v_ipi: number
+  v_pis: number
+  v_cofins: number
+  v_outro: number
+  v_nf: number
+  v_tot_trib: number
 }
 
 export type NfeXmlParsed = {
@@ -34,6 +69,7 @@ export type NfeXmlParsed = {
   natureza: string | null
   emissao: string | null
   valor: number
+  totais: NfeXmlTotais
   emit_cnpj: string | null
   emit_cpf: string | null
   emit_nome: string | null
@@ -108,20 +144,61 @@ function parseItens(inf: Element): NfeXmlItem[] {
     const imposto = firstByLocal(det, 'imposto')
     const comb = firstByLocal(prod, 'comb')
 
+    let orig: number | null = null
     let cstIcms = ''
+    let vBcIcms = 0
     let pIcms = 0
+    let vIcms = 0
+    let vBcSt = 0
+    let pIcmsSt = 0
+    let vIcmsSt = 0
+    let cstIpi = ''
+    let vBcIpi = 0
+    let pIpi = 0
+    let vIpi = 0
     let cstPis = ''
+    let vBcPis = 0
+    let pPis = 0
+    let vPis = 0
     let cstCofins = ''
+    let vBcCofins = 0
+    let pCofins = 0
+    let vCofins = 0
+
     if (imposto) {
       const icms = firstByLocal(imposto, 'ICMS')
       if (icms) {
+        const origRaw = textsByLocal(icms, 'orig')
+        if (origRaw !== '') orig = Number(origRaw)
         cstIcms = textsByLocal(icms, 'CST') || textsByLocal(icms, 'CSOSN')
+        vBcIcms = num(textsByLocal(icms, 'vBC'))
         pIcms = num(textsByLocal(icms, 'pICMS'))
+        vIcms = num(textsByLocal(icms, 'vICMS'))
+        vBcSt = num(textsByLocal(icms, 'vBCST'))
+        pIcmsSt = num(textsByLocal(icms, 'pICMSST'))
+        vIcmsSt = num(textsByLocal(icms, 'vICMSST'))
+      }
+      const ipi = firstByLocal(imposto, 'IPI')
+      if (ipi) {
+        cstIpi = textsByLocal(ipi, 'CST')
+        vBcIpi = num(textsByLocal(ipi, 'vBC'))
+        pIpi = num(textsByLocal(ipi, 'pIPI'))
+        vIpi = num(textsByLocal(ipi, 'vIPI'))
       }
       const pis = firstByLocal(imposto, 'PIS')
+      if (pis) {
+        cstPis = textsByLocal(pis, 'CST')
+        vBcPis = num(textsByLocal(pis, 'vBC'))
+        pPis = num(textsByLocal(pis, 'pPIS'))
+        vPis = num(textsByLocal(pis, 'vPIS'))
+      }
       const cofins = firstByLocal(imposto, 'COFINS')
-      if (pis) cstPis = textsByLocal(pis, 'CST')
-      if (cofins) cstCofins = textsByLocal(cofins, 'CST')
+      if (cofins) {
+        cstCofins = textsByLocal(cofins, 'CST')
+        vBcCofins = num(textsByLocal(cofins, 'vBC'))
+        pCofins = num(textsByLocal(cofins, 'pCOFINS'))
+        vCofins = num(textsByLocal(cofins, 'vCOFINS'))
+      }
     }
 
     // IBS/CBS (reforma) — tags variam; tenta CST e cClassTrib comuns
@@ -162,10 +239,26 @@ function parseItens(inf: Element): NfeXmlItem[] {
       v_un_trib: num(text(prod, 'vUnTrib')),
       v_desc: num(text(prod, 'vDesc')),
       c_prod_anp: comb ? text(comb, 'cProdANP') || null : null,
+      orig,
       cst_icms: cstIcms || null,
+      v_bc_icms: vBcIcms,
       p_icms: pIcms,
+      v_icms: vIcms,
+      v_bc_st: vBcSt,
+      p_icms_st: pIcmsSt,
+      v_icms_st: vIcmsSt,
+      cst_ipi: cstIpi || null,
+      v_bc_ipi: vBcIpi,
+      p_ipi: pIpi,
+      v_ipi: vIpi,
       cst_pis: cstPis || null,
+      v_bc_pis: vBcPis,
+      p_pis: pPis,
+      v_pis: vPis,
       cst_cofins: cstCofins || null,
+      v_bc_cofins: vBcCofins,
+      p_cofins: pCofins,
+      v_cofins: vCofins,
       cbenef: text(prod, 'cBenef') || null,
       cst_ibscbs: cstIbscbs,
       classtrib,
@@ -173,6 +266,27 @@ function parseItens(inf: Element): NfeXmlItem[] {
   }
 
   return items
+}
+
+function parseTotais(icmsTot: Element | undefined | null): NfeXmlTotais {
+  return {
+    v_bc: num(text(icmsTot, 'vBC')),
+    v_icms: num(text(icmsTot, 'vICMS')),
+    v_icms_deson: num(text(icmsTot, 'vICMSDeson')),
+    v_bc_st: num(text(icmsTot, 'vBCST')),
+    v_st: num(text(icmsTot, 'vST')),
+    v_prod: num(text(icmsTot, 'vProd')),
+    v_frete: num(text(icmsTot, 'vFrete')),
+    v_seg: num(text(icmsTot, 'vSeg')),
+    v_desc: num(text(icmsTot, 'vDesc')),
+    v_ii: num(text(icmsTot, 'vII')),
+    v_ipi: num(text(icmsTot, 'vIPI')),
+    v_pis: num(text(icmsTot, 'vPIS')),
+    v_cofins: num(text(icmsTot, 'vCOFINS')),
+    v_outro: num(text(icmsTot, 'vOutro')),
+    v_nf: num(text(icmsTot, 'vNF')),
+    v_tot_trib: num(text(icmsTot, 'vTotTrib')),
+  }
 }
 
 export function parseNfeXml(xmlRaw: string): NfeXmlParsed {
@@ -198,6 +312,7 @@ export function parseNfeXml(xmlRaw: string): NfeXmlParsed {
   const enderEmit = emit?.getElementsByTagName('enderEmit')[0]
   const total = inf.getElementsByTagName('total')[0]
   const icmsTot = total?.getElementsByTagName('ICMSTot')[0]
+  const totais = parseTotais(icmsTot)
 
   let chave = onlyDigits(inf.getAttribute('Id') || '')
   if (chave.length > 44) {
@@ -221,7 +336,8 @@ export function parseNfeXml(xmlRaw: string): NfeXmlParsed {
     modelo: text(ide, 'mod') || '55',
     natureza: text(ide, 'natOp') || null,
     emissao: toDateIso(text(ide, 'dhEmi') || text(ide, 'dEmi')),
-    valor: Number(valorRaw) || 0,
+    valor: Number(valorRaw) || totais.v_nf || 0,
+    totais,
     emit_cnpj: onlyDigits(text(emit, 'CNPJ')) || null,
     emit_cpf: onlyDigits(text(emit, 'CPF')) || null,
     emit_nome: text(emit, 'xNome') || null,
