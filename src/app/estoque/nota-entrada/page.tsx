@@ -1146,6 +1146,19 @@ function NotaEntradaCadastroPage() {
         }
 
         if (virandoLancada) {
+          if (!form.filial || !form.data_entrada) {
+            throw new Error(
+              "Informe filial e data de entrada para gerar a medição de tanques.",
+            );
+          }
+          const semTanque = formTanques.filter(
+            (t) => !t.tanqueId && parseMoney(t.qtd) > 0,
+          );
+          if (semTanque.length) {
+            throw new Error(
+              "Na aba Tanque, selecione o tanque de cada produto combustível.",
+            );
+          }
           const tankLines = formTanques
             .filter((t) => t.tanqueId && parseMoney(t.qtd) > 0)
             .map((t) => ({
@@ -1153,13 +1166,11 @@ function NotaEntradaCadastroPage() {
               produtoId: t.produtoId || null,
               litros: parseMoney(t.qtd),
             }));
-          if (tankLines.length && form.filial && form.data_entrada) {
-            await aplicarEntradasMarcacaoTanque({
-              filialId: form.filial,
-              data: form.data_entrada,
-              lines: tankLines,
-            });
-          }
+          await aplicarEntradasMarcacaoTanque({
+            filialId: form.filial,
+            data: form.data_entrada,
+            lines: tankLines,
+          });
         }
 
         const { error: delTitErr } = await supabase

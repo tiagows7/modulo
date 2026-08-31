@@ -30,7 +30,16 @@ async function lastMarcacaoFinal(tanqueId: string, beforeDate: string) {
     .maybeSingle();
 
   if (data?.marcacao_final != null) return Number(data.marcacao_final) || 0;
-  return 0;
+  return null;
+}
+
+async function volumeAtualTanque(tanqueId: string) {
+  const { data } = await supabase
+    .from("tanques")
+    .select("volume_atual")
+    .eq("id", tanqueId)
+    .maybeSingle();
+  return data?.volume_atual != null ? Number(data.volume_atual) || 0 : 0;
 }
 
 export type EntradaTanqueLine = {
@@ -39,10 +48,19 @@ export type EntradaTanqueLine = {
   litros: number;
 };
 
+type TanqueFilial = {
+  id: string;
+  produto_id: string | null;
+  volume_atual: number;
+};
+
 /**
- * Soma litros em `marcacao_tanques.entradas` na data da nota e recalcula
- * `marcacao_final = inicial - saidas_ai + entradas`.
- * Só chama ao lançar a nota (evita duplicar em regravações).
+ * Ao lançar a nota:
+ * - Se ainda não houver marcação no dia da nota para a filial,
+ *   cria movimento de TODOS os tanques operantes da filial,
+ *   com medição inicial = marcação final do dia anterior (última data < data da nota).
+ * - Soma `entradas` nos tanques informados e recalcula
+ *   `marcacao_final = inicial - saidas_ai + entradas`.
  */
 export async function aplicarEntradasMarcacaoTanque(args: {
   filialId: string;
@@ -50,7 +68,7 @@ export async function aplicarEntradasMarcacaoTanque(args: {
   lines: EntradaTanqueLine[];
 }) {
   const dataIso = String(args.data || "").slice(0, 10);
-  if (!args.filialId || !dataIso || !args.lines.length) return;
+  if (!args.filialId || !dataIso) return;
 
   const byTanque = new Map<string, EntradaTanqueLine>();
   for (const line of args.lines) {
@@ -64,18 +82,79 @@ export async function aplicarEntradasMarcacaoTanque(args: {
     }
   }
 
-  for (const line of byTanque.values()) {
-    const { data: existing, error: findErr } = await supabase
-      .from("marcacao_tanques")
-      .select(
-        "id, marcacao_inicial, entradas, saidas_ai, marcacao_final, produto",
-      )
-      .eq("filial", args.filialId)
-      .eq("tanque", line.tanqueId)
-      .eq("data", dataIso)
-      .maybeSingle();
+  // Movimentos já existentes no dia
+  const { data: existentesDia, error: existErr } = await supabase
+    .from("marcacao_tanques")
+    .select(
+      "id, tanque, produto, marcacao_inicial, entradas, saidas_ai, marcacao_final",
+    )
+    .eq("filial", args.filialId)
+    .eq("data", dataIso);
 
-    if (findErr) throw new Error(findErr.message);
+  if (existErr) throw new Error(existErr.message);
+
+  const existingByTanque = new Map(
+    (existentesDia ?? []).map((e) => [String(e.tanque), e]),
+  );
+
+  // Sem movimento no dia: cria todos os tanques operantes da filial
+  if (!existingByTanque.size) {
+    const { data: tanques, error: tanqErr } = await supabase
+      .from("tanques")
+      .select("id, produto_id, volume_atual")
+      .eq("filial", args.filialId)
+      .eq("status", "operante")
+      .order("numero");
+
+    if (tanqErr) throw new Error(tanqErr.message);
+
+    const lista = (tanques ?? []).map(
+      (t): TanqueFilial => ({
+        id: String(t.id),
+        produto_id: t.produto_id != null ? String(t.produto_id) : null,
+        volume_atual: t.volume_atual != null ? Number(t.volume_atual) || 0 : 0,
+      }),
+    );
+
+    if (!lista.length) {
+      throw new Error(
+        "Nenhum tanque operante cadastrado nesta filial para gerar a medição.",
+      );
+    }
+
+    const inserts = [];
+    for (const t of lista) {
+      const entradaLine = byTanque.get(t.id);
+      const prevFinal = await lastMarcacaoFinal(t.id, dataIso);
+      const inicial =
+        prevFinal != null ? prevFinal : t.volume_atual || 0;
+      const entradas = entradaLine ? Number(entradaLine.litros) || 0 : 0;
+      const saidas = 0;
+      const final = calcMarcacaoFinal(inicial, entradas, saidas);
+      inserts.push({
+        filial: args.filialId,
+        data: dataIso,
+        tanque: t.id,
+        produto: entradaLine?.produtoId || t.produto_id,
+        marcacao_inicial: inicial,
+        entradas,
+        saidas_ai: saidas,
+        marcacao_final: final,
+        variacao: calcVariacaoMarcacao(inicial, entradas, saidas, final),
+      });
+    }
+
+    const { error: insErr } = await supabase
+      .from("marcacao_tanques")
+      .insert(inserts);
+    if (insErr) throw new Error(insErr.message);
+    return;
+  }
+
+  // Já existe movimento no dia: só atualiza entradas dos tanques da nota
+  // (e cria o tanque da nota se faltar naquele dia)
+  for (const line of byTanque.values()) {
+    const existing = existingByTanque.get(line.tanqueId);
 
     if (existing?.id) {
       const inicial = Number(existing.marcacao_inicial) || 0;
@@ -96,7 +175,11 @@ export async function aplicarEntradasMarcacaoTanque(args: {
       continue;
     }
 
-    const inicial = await lastMarcacaoFinal(line.tanqueId, dataIso);
+    const prevFinal = await lastMarcacaoFinal(line.tanqueId, dataIso);
+    const inicial =
+      prevFinal != null
+        ? prevFinal
+        : await volumeAtualTanque(line.tanqueId);
     const entradas = Number(line.litros || 0);
     const saidas = 0;
     const final = calcMarcacaoFinal(inicial, entradas, saidas);
