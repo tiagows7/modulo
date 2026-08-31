@@ -26,30 +26,8 @@ CREATE TABLE IF NOT EXISTS public.nota_entrada (
     data_saida_entrada TIMESTAMPTZ,     -- dhSaiEnt
     data_entrada DATE,                  -- data efetiva da entrada no estoque
 
-    -- Emitente (emit)
-    emit_cnpj VARCHAR(14),
-    emit_cpf VARCHAR(11),
-    emit_razao_social VARCHAR(255),
-    emit_fantasia VARCHAR(255),
-    emit_ie VARCHAR(20),
-    emit_im VARCHAR(20),
-    emit_uf VARCHAR(2),
-    emit_municipio VARCHAR(120),
-    emit_cmun VARCHAR(7),
-    emit_endereco VARCHAR(255),
-    emit_numero VARCHAR(60),
-    emit_bairro VARCHAR(120),
-    emit_cep VARCHAR(8),
-    emit_fone VARCHAR(20),
-
-    -- Destinatário (dest) — normalmente a filial
-    dest_cnpj VARCHAR(14),
-    dest_cpf VARCHAR(11),
-    dest_razao_social VARCHAR(255),
-    dest_ie VARCHAR(20),
-    dest_uf VARCHAR(2),
-    dest_municipio VARCHAR(120),
-    dest_cmun VARCHAR(7),
+    -- Emitente: apenas FK fornecedor (dados em public.fornecedores)
+    -- Destinatário: apenas FK filial (dados em public.filial)
 
     -- Totais (ICMSTot / total)
     v_bc NUMERIC(15, 2) NOT NULL DEFAULT 0,
@@ -97,8 +75,6 @@ CREATE INDEX IF NOT EXISTS idx_nota_entrada_emissao
   ON public.nota_entrada (data_emissao);
 CREATE INDEX IF NOT EXISTS idx_nota_entrada_situacao
   ON public.nota_entrada (situacao);
-CREATE INDEX IF NOT EXISTS idx_nota_entrada_emit_cnpj
-  ON public.nota_entrada (emit_cnpj);
 
 DROP TRIGGER IF EXISTS update_nota_entrada_modtime ON public.nota_entrada;
 CREATE TRIGGER update_nota_entrada_modtime

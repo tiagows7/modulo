@@ -70,7 +70,6 @@ type NotaEntrada = {
   v_nf: number;
   situacao: string;
   observacao: string | null;
-  emit_razao_social: string | null;
 };
 
 type ItemForm = {
@@ -300,7 +299,7 @@ function NotaEntradaCadastroPage() {
           `
           id, filial, fornecedor, chave, numero, serie, modelo,
           natureza_operacao, data_emissao, data_entrada,
-          v_prod, v_nf, situacao, observacao, emit_razao_social
+          v_prod, v_nf, situacao, observacao
         `,
         )
         .order("data_emissao", { ascending: false })
@@ -333,10 +332,6 @@ function NotaEntradaCadastroPage() {
           v_nf: Number(row.v_nf) || 0,
           situacao: String(row.situacao || "pendente"),
           observacao: row.observacao != null ? String(row.observacao) : null,
-          emit_razao_social:
-            row.emit_razao_social != null
-              ? String(row.emit_razao_social)
-              : null,
         })),
       );
     });
@@ -389,7 +384,7 @@ function NotaEntradaCadastroPage() {
             `
             id, filial, fornecedor, chave, numero, serie, modelo,
             natureza_operacao, data_emissao, data_entrada,
-            v_prod, v_nf, situacao, observacao, emit_razao_social
+            v_prod, v_nf, situacao, observacao
           `,
           )
           .eq("id", data.nota_compra)
@@ -415,10 +410,6 @@ function NotaEntradaCadastroPage() {
           v_nf: Number(nota.v_nf) || 0,
           situacao: String(nota.situacao || "pendente"),
           observacao: nota.observacao != null ? String(nota.observacao) : null,
-          emit_razao_social:
-            nota.emit_razao_social != null
-              ? String(nota.emit_razao_social)
-              : null,
         });
         setManifestoId(String(data.id));
         return;
@@ -710,7 +701,6 @@ function NotaEntradaCadastroPage() {
       }
     }
 
-    const forn = fornecedorById.get(form.fornecedor);
     const totalItens = round2(
       linhas.reduce((acc, { row }) => acc + parseMoney(row.v_prod), 0),
     );
@@ -745,9 +735,6 @@ function NotaEntradaCadastroPage() {
       v_nf: vNf,
       situacao: form.situacao || "pendente",
       observacao: form.observacao.trim() || null,
-      emit_cnpj: forn?.cnpj ? forn.cnpj.replace(/\D/g, "") : null,
-      emit_razao_social: forn?.razao_social ?? null,
-      emit_fantasia: forn?.fantasia ?? null,
     };
 
     try {
@@ -828,10 +815,7 @@ function NotaEntradaCadastroPage() {
   const rows = items.map((item) => {
     const fil = item.filial ? filialById.get(item.filial) : null;
     const forn = item.fornecedor ? fornecedorById.get(item.fornecedor) : null;
-    const fornLabel =
-      forn != null
-        ? fornecedorLabel(forn)
-        : item.emit_razao_social?.trim() || "—";
+    const fornLabel = forn != null ? fornecedorLabel(forn) : "—";
 
     return {
       numero: String(item.numero),
