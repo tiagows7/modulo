@@ -1052,6 +1052,44 @@ function NotaEntradaCadastroPage() {
     const situacaoAnterior = editing?.situacao || "";
     const virandoLancada =
       situacaoNova === "lancada" && situacaoAnterior !== "lancada";
+    const jaEstavaLancada = situacaoNova === "lancada" && situacaoAnterior === "lancada";
+
+    // Sincroniza qtd dos tanques com os itens no momento do save
+    const tankLinesSync = formTanques
+      .map((t) => {
+        const item = formItems.find((i) => i.key === t.itemKey);
+        const qtd = item ? item.q_com : t.qtd;
+        return {
+          tanqueId: t.tanqueId,
+          produtoId: t.produtoId || null,
+          litros: parseMoney(qtd),
+          label: t.label,
+        };
+      })
+      .filter((t) => t.tanqueId && t.litros > 0);
+
+    if (situacaoNova === "lancada") {
+      const pendentesTanque = formTanques.filter(
+        (t) => !t.tanqueId && parseMoney(t.qtd) > 0,
+      );
+      if (pendentesTanque.length) {
+        setFormError(
+          "Na aba Tanque, selecione o tanque de cada produto antes de lançar a nota.",
+        );
+        setTab("tanque");
+        return;
+      }
+      if (!form.data_entrada) {
+        setFormError("Informe a data de entrada para gerar a medição de tanques.");
+        setTab("geral");
+        return;
+      }
+      if (!form.filial) {
+        setFormError("Selecione a filial para gerar a medição de tanques.");
+        setTab("geral");
+        return;
+      }
+    }
 
     setFormError("");
 
@@ -1145,31 +1183,16 @@ function NotaEntradaCadastroPage() {
           if (itErr) throw new Error(itErr.message);
         }
 
-        if (virandoLancada) {
-          if (!form.filial || !form.data_entrada) {
-            throw new Error(
-              "Informe filial e data de entrada para gerar a medição de tanques.",
-            );
-          }
-          const semTanque = formTanques.filter(
-            (t) => !t.tanqueId && parseMoney(t.qtd) > 0,
-          );
-          if (semTanque.length) {
-            throw new Error(
-              "Na aba Tanque, selecione o tanque de cada produto combustível.",
-            );
-          }
-          const tankLines = formTanques
-            .filter((t) => t.tanqueId && parseMoney(t.qtd) > 0)
-            .map((t) => ({
-              tanqueId: t.tanqueId,
-              produtoId: t.produtoId || null,
-              litros: parseMoney(t.qtd),
-            }));
+        if (situacaoNova === "lancada" && form.filial && form.data_entrada) {
           await aplicarEntradasMarcacaoTanque({
             filialId: form.filial,
             data: form.data_entrada,
-            lines: tankLines,
+            lines: tankLinesSync.map((t) => ({
+              tanqueId: t.tanqueId,
+              produtoId: t.produtoId,
+              litros: t.litros,
+            })),
+            modo: virandoLancada ? "somar" : "reparar",
           });
         }
 
@@ -1184,7 +1207,7 @@ function NotaEntradaCadastroPage() {
         );
 
         if (
-          virandoLancada &&
+          (virandoLancada || jaEstavaLancada) &&
           !titulosToSave.length &&
           vNf > 0
         ) {
