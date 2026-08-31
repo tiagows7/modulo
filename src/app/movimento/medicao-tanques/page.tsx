@@ -109,14 +109,14 @@ function parseLiters(raw: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** variação = inicial + entradas − saídas − final */
 function calcVariacao(
   inicial: number,
   entradas: number,
   saidas: number,
   final: number,
 ) {
-  const esperado = inicial + entradas - saidas;
-  return Number((final - esperado).toFixed(3));
+  return Number((inicial + entradas - saidas - final).toFixed(3));
 }
 
 async function lastMarcacaoFinal(tanqueId: string, beforeDate: string) {

@@ -1,22 +1,22 @@
 import { supabase } from "@/lib/supabase";
 
-/** final teórico = inicial − venda (saídas) + entradas */
+/** marcacao_final teórico = inicial + entradas − saídas */
 export function calcMarcacaoFinal(
   inicial: number,
   entradas: number,
   saidas: number,
 ) {
-  return Number((inicial - saidas + entradas).toFixed(3));
+  return Number((inicial + entradas - saidas).toFixed(3));
 }
 
+/** variação = inicial + entradas − saídas − final */
 export function calcVariacaoMarcacao(
   inicial: number,
   entradas: number,
   saidas: number,
   final: number,
 ) {
-  const esperado = inicial + entradas - saidas;
-  return Number((final - esperado).toFixed(3));
+  return Number((inicial + entradas - saidas - final).toFixed(3));
 }
 
 async function lastMarcacaoFinal(tanqueId: string, beforeDate: string) {
@@ -196,22 +196,27 @@ export async function aplicarEntradasMarcacaoTanque(args: {
     let entradas = existing.entradas;
     if (modo === "somar") {
       entradas = Number((existing.entradas + line.litros).toFixed(3));
-    } else {
-      // reparar: só aplica se ainda não há entrada neste tanque no dia
-      if (existing.entradas > 0.0001) continue;
+    } else if (existing.entradas <= 0.0001) {
+      // reparar: grava litros se ainda não havia entrada
       entradas = Number(line.litros.toFixed(3));
+    } else {
+      // já tem entrada: mantém valor e só recalcula final/variação
+      entradas = existing.entradas;
     }
 
     const inicial = existing.marcacao_inicial;
     const saidas = existing.saidas_ai;
+    // final = inicial + entradas − saídas
     const final = calcMarcacaoFinal(inicial, entradas, saidas);
+    // variação = inicial + entradas − saídas − final
+    const variacao = calcVariacaoMarcacao(inicial, entradas, saidas, final);
 
     const { error } = await supabase
       .from("marcacao_tanques")
       .update({
         entradas,
         marcacao_final: final,
-        variacao: calcVariacaoMarcacao(inicial, entradas, saidas, final),
+        variacao,
         produto: line.produtoId || existing.produto || null,
       })
       .eq("id", existing.id);
