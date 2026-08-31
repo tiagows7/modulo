@@ -13,6 +13,7 @@ import {
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
 import { ensureFornecedorFromNfe } from "@/lib/nfe/ensureFornecedorFromNfe";
 import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
+import { lancarDespesaFromManifesto } from "@/lib/financeiro/lancarDespesaFromManifesto";
 import { supabase } from "@/lib/supabase";
 
 type FilialOpt = {
@@ -372,18 +373,21 @@ export default function NotaEntradaNovaPage() {
     setActionError("");
     try {
       await gravar(async () => {
-        const { error } = await supabase
-          .from("nota_entradamanifesto")
-          .update({
-            despesa: 1,
-            digitada: 1,
-          })
-          .eq("id", despesaItem.id);
-        if (error) throw new Error(error.message);
+        await lancarDespesaFromManifesto({
+          id: despesaItem.id,
+          filial: despesaItem.filial,
+          fornecedor: despesaItem.fornecedor,
+          fornecedor_cnpj: despesaItem.fornecedor_cnpj,
+          fornecedor_nome: despesaItem.fornecedor_nome,
+          numero: despesaItem.numero,
+          emissao: despesaItem.emissao,
+          valor: despesaItem.valor,
+          chave: despesaItem.chave,
+        });
       });
       setDespesaItem(null);
       setInfoMsg(
-        `Nota ${despesaItem.numero ?? "—"} marcada como despesa do posto (sem entrada de estoque).`,
+        `Despesa lançada em Contas a Pagar (título ${despesaItem.numero ?? "—"}). Nota de entrada não foi gerada.`,
       );
       await loadData();
     } catch (err) {
@@ -630,7 +634,8 @@ export default function NotaEntradaNovaPage() {
             {despesaItem.fornecedor_nome
               ? ` — ${despesaItem.fornecedor_nome}`
               : ""}{" "}
-            é apenas <strong>despesa do posto</strong>, sem entrada de estoque?
+            é apenas <strong>despesa do posto</strong>? Será lançada em Contas a
+            Pagar, sem gerar nota de entrada/estoque.
           </p>
           {actionError ? (
             <p
