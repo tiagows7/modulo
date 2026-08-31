@@ -25,7 +25,6 @@ import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
 import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 import {
   aplicarEntradasMarcacaoTanque,
-  calcMarcacaoFinal,
 } from "@/lib/estoque/aplicarEntradaMarcacaoTanque";
 
 type TabId = "geral" | "titulos" | "tanque";
@@ -505,49 +504,80 @@ function NotaEntradaCadastroPage() {
     let cancelled = false;
 
     void (async () => {
-      const fuelItems = formItems.filter(
-        (row) =>
-          (row.x_prod.trim() || row.produto_id) &&
-          itemIsCombustivel(row, produtos) &&
-          row.produto_id,
+      // Itens com produto vinculado — tanque filtrado por produto + filial
+      const candidatos = formItems.filter(
+        (row) => row.produto_id && (row.x_prod.trim() || row.produto_id),
       );
 
-      const produtoIds = [...new Set(fuelItems.map((r) => r.produto_id))];
+      const produtoIds = [...new Set(candidatos.map((r) => r.produto_id))];
       const optionsMap: Record<string, TanqueOpt[]> = {};
 
-      await Promise.all(
-        produtoIds.map(async (produtoId) => {
-          let q = supabase
-            .from("tanques")
-            .select("id, numero, descricao, produto_id, filial")
-            .eq("produto_id", produtoId)
-            .eq("status", "ativo")
-            .order("numero");
-          if (form.filial) {
-            q = q.or(`filial.eq.${form.filial},filial.is.null`);
+      if (produtoIds.length && form.filial) {
+        const { data, error } = await supabase
+          .from("tanques")
+          .select("id, numero, descricao, produto_id, filial, status")
+          .in("produto_id", produtoIds)
+          .eq("filial", form.filial)
+          .eq("status", "operante")
+          .order("numero");
+
+        if (cancelled) return;
+
+        if (!error && data) {
+          for (const t of data) {
+            const pid = String(t.produto_id);
+            if (!optionsMap[pid]) optionsMap[pid] = [];
+            optionsMap[pid].push({
+              id: String(t.id),
+              numero: String(t.numero ?? ""),
+              descricao: String(t.descricao ?? ""),
+              produto_id: pid,
+              filial: t.filial != null ? String(t.filial) : null,
+            });
           }
-          const { data } = await q;
-          if (cancelled) return;
-          optionsMap[produtoId] = (data ?? []).map((t) => ({
-            id: String(t.id),
-            numero: String(t.numero ?? ""),
-            descricao: String(t.descricao ?? ""),
-            produto_id: String(t.produto_id),
-            filial: t.filial != null ? String(t.filial) : null,
-          }));
-        }),
-      );
+        }
+      } else if (produtoIds.length && !form.filial) {
+        // Sem filial: lista tanques do produto (operante) para não ficar vazio
+        const { data, error } = await supabase
+          .from("tanques")
+          .select("id, numero, descricao, produto_id, filial, status")
+          .in("produto_id", produtoIds)
+          .eq("status", "operante")
+          .order("numero");
+
+        if (cancelled) return;
+
+        if (!error && data) {
+          for (const t of data) {
+            const pid = String(t.produto_id);
+            if (!optionsMap[pid]) optionsMap[pid] = [];
+            optionsMap[pid].push({
+              id: String(t.id),
+              numero: String(t.numero ?? ""),
+              descricao: String(t.descricao ?? ""),
+              produto_id: pid,
+              filial: t.filial != null ? String(t.filial) : null,
+            });
+          }
+        }
+      }
 
       if (cancelled) return;
       setTanquesByProduto(optionsMap);
 
+      // Mostra itens que têm tanque cadastrado OU são combustível (para o usuário escolher)
+      const rowsVisiveis = candidatos.filter((row) => {
+        const opts = optionsMap[row.produto_id] ?? [];
+        return opts.length > 0 || itemIsCombustivel(row, produtos);
+      });
+
       setFormTanques((prev) => {
         const prevByKey = new Map(prev.map((t) => [t.itemKey, t]));
-        return fuelItems.map((row) => {
+        return rowsVisiveis.map((row) => {
           const prod = produtos.find((p) => p.id === row.produto_id);
           const label = prod
             ? `${prod.codigo} — ${prod.descricao}`
-            : row.x_prod || "Combustível";
+            : row.x_prod || "Produto";
           const opts = optionsMap[row.produto_id] ?? [];
           const prevRow = prevByKey.get(row.key);
           let tanqueId = prevRow?.tanqueId || "";
@@ -2124,12 +2154,22 @@ function NotaEntradaCadastroPage() {
                   color: "var(--text-muted)",
                 }}
               >
-                Itens combustível vinculados a tanques. Ao lançar a nota, a
-                marcação usa: final = inicial − saídas + entradas (
-                {`ex.: ${calcMarcacaoFinal(1000, 500, 200)} L`}).
+                Informe em qual tanque caiu cada produto. Lista os tanques
+                operantes do mesmo produto e filial da nota. Ao lançar: final =
+                inicial − saídas + entradas.
               </p>
 
-              {!formTanques.length ? (
+              {!form.filial ? (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 12,
+                    color: "var(--warning, #F59E0B)",
+                  }}
+                >
+                  Selecione a filial na aba Geral para carregar os tanques.
+                </p>
+              ) : !formTanques.length ? (
                 <p
                   style={{
                     margin: 0,
@@ -2137,7 +2177,8 @@ function NotaEntradaCadastroPage() {
                     color: "var(--text-muted)",
                   }}
                 >
-                  Nenhum item combustível com produto vinculado nesta nota.
+                  Nenhum item com produto vinculado, ou não há tanque operante
+                  cadastrado para o produto nesta filial.
                 </p>
               ) : (
                 <div
@@ -2180,7 +2221,7 @@ function NotaEntradaCadastroPage() {
                             />
                           </CadastroField>
                           <CadastroField
-                            label="Tanque"
+                            label="Tanque *"
                             htmlFor={`ne-tq-sel-${row.itemKey}`}
                             span={2}
                           >
@@ -2199,10 +2240,15 @@ function NotaEntradaCadastroPage() {
                               }
                               disabled={busy}
                             >
-                              <option value="">Selecione…</option>
+                              <option value="">
+                                {opts.length
+                                  ? "Selecione o tanque…"
+                                  : "Nenhum tanque para produto/filial"}
+                              </option>
                               {opts.map((t) => (
                                 <option key={t.id} value={t.id}>
-                                  {t.numero} — {t.descricao}
+                                  {t.numero}
+                                  {t.descricao ? ` — ${t.descricao}` : ""}
                                 </option>
                               ))}
                             </select>
