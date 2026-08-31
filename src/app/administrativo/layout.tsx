@@ -204,7 +204,11 @@ function SidebarContent({
               )}
 
               {items.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive =
+                  item.href === "/administrativo"
+                    ? pathname === "/administrativo"
+                    : pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (
                   <Link
@@ -292,6 +296,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobile || !mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobile, mobileOpen]);
 
   if (loadingSession) {
     return (
@@ -390,17 +403,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header
+          className="admin-header"
           style={{
-            height: 60,
+            height: 56,
             background: "var(--bg-surface)",
             borderBottom: "1px solid var(--border-subtle)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 24px",
             flexShrink: 0,
             zIndex: 10,
             gap: 12,
+            paddingTop: "env(safe-area-inset-top)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -432,7 +446,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 whiteSpace: "nowrap",
               }}
             >
-              {navItems.find((i) => i.href === pathname)?.label ?? "Sistema"}
+              {navItems.find(
+                (i) =>
+                  i.href === "/administrativo"
+                    ? pathname === "/administrativo"
+                    : pathname === i.href || pathname.startsWith(`${i.href}/`),
+              )?.label ?? "Sistema"}
             </span>
           </div>
 
@@ -485,12 +504,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         <main
+          className="admin-main"
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: 24,
+            overflowX: "hidden",
             position: "relative",
             isolation: "isolate",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <div

@@ -80,14 +80,7 @@ export default function MovimentoMenuPage() {
         </div>
       </motion.div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 16,
-          marginTop: 8,
-        }}
-      >
+      <div className="module-hub-grid">
         {submenus.map((item, i) => {
           const Icon = item.icon;
           return (

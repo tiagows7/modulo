@@ -533,7 +533,10 @@ function SalesMonthlyChart({ points }: { points: MonthPoint[] }) {
             {PROJ_MONTHS}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+        <div
+          className="admin-dash-legend"
+          style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
             <span
               style={{
@@ -562,87 +565,91 @@ function SalesMonthlyChart({ points }: { points: MonthPoint[] }) {
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${Math.max(points.length, 1)}, minmax(0, 1fr))`,
-          alignItems: "end",
-          gap: 10,
-          height: 220,
-          padding: "8px 4px 0",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        {points.map((p, i) => {
-          const h = Math.max(4, (p.valor / maxValor) * 100);
-          return (
-            <div
-              key={p.key}
-              title={`${p.label}: ${formatMoney(p.valor)}${p.projected ? " (projeção)" : ""}`}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                height: "100%",
-                gap: 6,
-                minWidth: 0,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: p.projected ? "#F5C518" : "var(--text-secondary)",
-                  fontVariantNumeric: "tabular-nums",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {p.valor > 0 ? formatMoneyShort(p.valor) : "—"}
-              </span>
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                transition={{ delay: 0.15 + i * 0.04, duration: 0.45 }}
-                style={{
-                  width: "70%",
-                  maxWidth: 42,
-                  borderRadius: "8px 8px 4px 4px",
-                  background: p.projected
-                    ? "repeating-linear-gradient(135deg, rgba(245,197,24,0.85), rgba(245,197,24,0.85) 6px, rgba(245,197,24,0.35) 6px, rgba(245,197,24,0.35) 12px)"
-                    : "linear-gradient(180deg, #4A9FE8 0%, #1A6FD8 100%)",
-                  boxShadow: p.projected
-                    ? "none"
-                    : "0 6px 16px rgba(26,111,216,0.25)",
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${Math.max(points.length, 1)}, minmax(0, 1fr))`,
-          gap: 10,
-          marginTop: 8,
-        }}
-      >
-        {points.map((p) => (
+      <div className="admin-dash-chart-scroll">
+        <div className="admin-dash-chart-track">
           <div
-            key={`${p.key}-lbl`}
             style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: p.projected ? 600 : 500,
-              color: p.projected ? "#F5C518" : "var(--text-muted)",
-              textTransform: "capitalize",
+              display: "grid",
+              gridTemplateColumns: `repeat(${Math.max(points.length, 1)}, minmax(0, 1fr))`,
+              alignItems: "end",
+              gap: 10,
+              height: 220,
+              padding: "8px 4px 0",
+              borderBottom: "1px solid var(--border-subtle)",
             }}
           >
-            {p.label}
+            {points.map((p, i) => {
+              const h = Math.max(4, (p.valor / maxValor) * 100);
+              return (
+                <div
+                  key={p.key}
+                  title={`${p.label}: ${formatMoney(p.valor)}${p.projected ? " (projeção)" : ""}`}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    height: "100%",
+                    gap: 6,
+                    minWidth: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: p.projected ? "#F5C518" : "var(--text-secondary)",
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {p.valor > 0 ? formatMoneyShort(p.valor) : "—"}
+                  </span>
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${h}%` }}
+                    transition={{ delay: 0.15 + i * 0.04, duration: 0.45 }}
+                    style={{
+                      width: "70%",
+                      maxWidth: 42,
+                      borderRadius: "8px 8px 4px 4px",
+                      background: p.projected
+                        ? "repeating-linear-gradient(135deg, rgba(245,197,24,0.85), rgba(245,197,24,0.85) 6px, rgba(245,197,24,0.35) 6px, rgba(245,197,24,0.35) 12px)"
+                        : "linear-gradient(180deg, #4A9FE8 0%, #1A6FD8 100%)",
+                      boxShadow: p.projected
+                        ? "none"
+                        : "0 6px 16px rgba(26,111,216,0.25)",
+                    }}
+                  />
+                </div>
+              );
+            })}
           </div>
-        ))}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${Math.max(points.length, 1)}, minmax(0, 1fr))`,
+              gap: 10,
+              marginTop: 8,
+            }}
+          >
+            {points.map((p) => (
+              <div
+                key={`${p.key}-lbl`}
+                style={{
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: p.projected ? 600 : 500,
+                  color: p.projected ? "#F5C518" : "var(--text-muted)",
+                  textTransform: "capitalize",
+                }}
+              >
+                {p.label}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </motion.div>
   );
@@ -672,6 +679,7 @@ function KpiCard({ card, index }: { card: KpiCardData; index: number }) {
         transition: "border-color 0.2s",
         position: "relative",
         overflow: "hidden",
+        minWidth: 0,
       }}
     >
       <div
@@ -723,11 +731,12 @@ function KpiCard({ card, index }: { card: KpiCardData; index: number }) {
       <div>
         <div
           style={{
-            fontSize: 26,
+            fontSize: "clamp(18px, 5vw, 26px)",
             fontWeight: 800,
             color: "var(--text-primary)",
             fontFamily: "var(--font-display)",
-            lineHeight: 1,
+            lineHeight: 1.1,
+            wordBreak: "break-word",
           }}
         >
           {card.value}
@@ -787,12 +796,14 @@ function FuelGauge({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
+          gap: 8,
+          flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {fuel.alert && (
-            <AlertTriangle size={12} style={{ color: "#F59E0B" }} />
+            <AlertTriangle size={12} style={{ color: "#F59E0B", flexShrink: 0 }} />
           )}
           <span
             style={{
@@ -811,6 +822,7 @@ function FuelGauge({
             fontSize: 12,
             color: "var(--text-muted)",
             fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
           }}
         >
           {fuel.current.toLocaleString("pt-BR")} /{" "}
@@ -918,6 +930,7 @@ export default function DashboardPage() {
 
   return (
     <div
+      className="admin-dash"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -929,17 +942,20 @@ export default function DashboardPage() {
         initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="admin-dash-title"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
         <div>
           <h1
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: 26,
+              fontSize: "clamp(20px, 4vw, 26px)",
               fontWeight: 800,
               color: "var(--text-primary)",
               lineHeight: 1.2,
@@ -966,6 +982,7 @@ export default function DashboardPage() {
             fontSize: 12,
             fontWeight: 600,
             cursor: "default",
+            flexShrink: 0,
           }}
         >
           <CheckCircle size={13} />
@@ -973,13 +990,7 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-        }}
-      >
+      <div className="admin-dash-kpi">
         {kpiCards.map((card, i) => (
           <KpiCard key={card.id} card={card} index={i} />
         ))}
@@ -987,13 +998,7 @@ export default function DashboardPage() {
 
       <SalesMonthlyChart points={monthPoints} />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "340px 1fr",
-          gap: 20,
-        }}
-      >
+      <div className="admin-dash-split">
         <motion.div
           custom={8}
           variants={fadeUp}
@@ -1004,6 +1009,7 @@ export default function DashboardPage() {
             border: "1px solid var(--border-subtle)",
             borderRadius: 14,
             padding: "20px 22px",
+            minWidth: 0,
           }}
         >
           <div
@@ -1012,9 +1018,10 @@ export default function DashboardPage() {
               alignItems: "center",
               justifyContent: "space-between",
               marginBottom: 20,
+              gap: 12,
             }}
           >
-            <div>
+            <div style={{ minWidth: 0 }}>
               <h3
                 style={{
                   fontSize: 14,
@@ -1038,7 +1045,7 @@ export default function DashboardPage() {
                   : "Sem medições em marcacao_tanques"}
               </p>
             </div>
-            <BarChart3 size={18} style={{ color: "var(--blue-light)" }} />
+            <BarChart3 size={18} style={{ color: "var(--blue-light)", flexShrink: 0 }} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -1072,6 +1079,7 @@ export default function DashboardPage() {
             border: "1px solid var(--border-subtle)",
             borderRadius: 14,
             padding: "20px 22px",
+            minWidth: 0,
           }}
         >
           <div
@@ -1080,9 +1088,11 @@ export default function DashboardPage() {
               alignItems: "center",
               justifyContent: "space-between",
               marginBottom: 20,
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            <div>
+            <div style={{ minWidth: 0 }}>
               <h3
                 style={{
                   fontSize: 14,
@@ -1136,36 +1146,14 @@ export default function DashboardPage() {
               Nenhuma despesa com vencimento hoje
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Fornecedor</th>
-                  <th>Descrição</th>
-                  <th style={{ textAlign: "right" }}>Valor</th>
-                  <th>Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {despesasDia.map((d, i) => (
-                  <motion.tr
-                    key={d.id}
-                    initial={false}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
-                  >
-                    <td style={{ fontWeight: 500 }}>{d.fornecedor}</td>
-                    <td>{d.descricao}</td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        fontWeight: 600,
-                        fontVariantNumeric: "tabular-nums",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {formatMoney(d.valor)}
-                    </td>
-                    <td>
+            <>
+              <div className="admin-despesas-cards">
+                {despesasDia.map((d) => (
+                  <div key={d.id} className="admin-despesa-card">
+                    <div className="admin-despesa-card-top">
+                      <span className="admin-despesa-card-fornecedor">
+                        {d.fornecedor}
+                      </span>
                       <span
                         className={`badge badge-${
                           d.situacao === "pago"
@@ -1181,11 +1169,67 @@ export default function DashboardPage() {
                             ? "Vencido"
                             : "A pagar"}
                       </span>
-                    </td>
-                  </motion.tr>
+                    </div>
+                    <p className="admin-despesa-card-desc">{d.descricao}</p>
+                    <div className="admin-despesa-card-valor">
+                      {formatMoney(d.valor)}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="admin-despesas-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Fornecedor</th>
+                      <th>Descrição</th>
+                      <th style={{ textAlign: "right" }}>Valor</th>
+                      <th>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {despesasDia.map((d, i) => (
+                      <motion.tr
+                        key={d.id}
+                        initial={false}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
+                      >
+                        <td style={{ fontWeight: 500 }}>{d.fornecedor}</td>
+                        <td>{d.descricao}</td>
+                        <td
+                          style={{
+                            textAlign: "right",
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {formatMoney(d.valor)}
+                        </td>
+                        <td>
+                          <span
+                            className={`badge badge-${
+                              d.situacao === "pago"
+                                ? "success"
+                                : d.situacao === "vencido"
+                                  ? "danger"
+                                  : "warning"
+                            }`}
+                          >
+                            {d.situacao === "pago"
+                              ? "Pago"
+                              : d.situacao === "vencido"
+                                ? "Vencido"
+                                : "A pagar"}
+                          </span>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </motion.div>
       </div>

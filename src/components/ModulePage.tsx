@@ -62,11 +62,11 @@ export function ModulePage({
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}
-        style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}
+        className="module-page-header"
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
           {backUrl && (
-            <Link href={backUrl} style={{ textDecoration: "none" }}>
+            <Link href={backUrl} style={{ textDecoration: "none", flexShrink: 0 }}>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -90,11 +90,12 @@ export function ModulePage({
               border: "1px solid rgba(74,159,232,0.25)",
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "var(--blue-light)",
+              flexShrink: 0,
             }}
           >
             {icon}
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1 }}>
               {title}
             </h1>
@@ -102,7 +103,7 @@ export function ModulePage({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="module-page-header-actions">
           <motion.button
             whileHover={{ scale: 1.03, y: -1 }}
             whileTap={{ scale: 0.97 }}

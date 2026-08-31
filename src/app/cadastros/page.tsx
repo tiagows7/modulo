@@ -161,14 +161,7 @@ export default function CadastrosMenuPage() {
         </div>
       </motion.div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 16,
-          marginTop: 8,
-        }}
-      >
+      <div className="module-hub-grid">
         {visibleMenus.map((item, i) => {
           const Icon = item.icon;
           return (

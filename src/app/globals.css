@@ -790,3 +790,164 @@ body {
   margin-top: 2px;
   accent-color: var(--blue-light);
 }
+
+/* —— Administrativo / shell responsivo —— */
+.admin-header {
+  padding: 0 24px;
+}
+
+.admin-main {
+  padding: 24px;
+}
+
+.admin-dash-kpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.admin-dash-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.admin-dash-chart-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.admin-dash-chart-track {
+  min-width: 0;
+}
+
+.admin-despesas-cards {
+  display: none;
+}
+
+.admin-despesas-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+}
+
+.admin-despesa-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-despesa-card:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.admin-despesa-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-despesa-card-fornecedor {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-despesa-card-desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.admin-despesa-card-valor {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.module-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.module-page-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.module-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .admin-dash-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-header {
+    padding: 0 12px;
+  }
+
+  .admin-main {
+    padding: 14px 12px 24px;
+  }
+
+  .admin-dash {
+    gap: 16px !important;
+  }
+
+  .admin-dash-kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .admin-dash-kpi > * {
+    padding: 14px 14px !important;
+  }
+
+  .admin-dash-chart-track {
+    min-width: 560px;
+  }
+
+  .admin-despesas-cards {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-despesas-table-wrap {
+    display: none;
+  }
+
+  .module-page-header h1 {
+    font-size: 20px !important;
+  }
+
+  .module-page-header-actions .btn-primary,
+  .module-page-header-actions button {
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-dash-kpi {
+    grid-template-columns: 1fr;
+  }
+}
+
