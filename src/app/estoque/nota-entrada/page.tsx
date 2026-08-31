@@ -14,6 +14,13 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import {
+  formatMoney2,
+  formatQty,
+  maskMoneyInput,
+  maskQtyInput,
+  parseMoney,
+} from "@/lib/moneyMask";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
 import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 
@@ -111,7 +118,7 @@ const emptyForm: NotaForm = {
   natureza_operacao: "",
   data_emissao: "",
   data_entrada: "",
-  v_nf: "0",
+  v_nf: "0,00",
   situacao: "pendente",
   observacao: "",
 };
@@ -127,8 +134,8 @@ function emptyItem(): ItemForm {
     cfop: "",
     u_com: "UN",
     q_com: "1",
-    v_un_com: "0",
-    v_prod: "0",
+    v_un_com: "0,00",
+    v_prod: "0,00",
   };
 }
 
@@ -170,23 +177,6 @@ function toDateInput(iso: string | null) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toISOString().slice(0, 10);
-}
-
-function formatMoney(n: number | null | undefined) {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  return Number(n).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
-function parseMoney(raw: string) {
-  const s = String(raw).trim();
-  if (!s) return 0;
-  if (s.includes(",")) {
-    return Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-  }
-  return Number(s) || 0;
 }
 
 function situacaoBadge(situacao: string) {
@@ -457,7 +447,7 @@ function NotaEntradaCadastroPage() {
             data_entrada: toDateInput(
               data.emissao != null ? String(data.emissao) : null,
             ),
-            v_nf: String(Number(data.valor) || parsed.valor || 0),
+            v_nf: formatMoney2(Number(data.valor) || parsed.valor || 0),
             situacao: "pendente",
           });
 
@@ -478,9 +468,9 @@ function NotaEntradaCadastroPage() {
                 ncm: item.ncm || "",
                 cfop: item.cfop || "",
                 u_com: item.u_com || "UN",
-                q_com: String(item.q_com || 0),
-                v_un_com: String(item.v_un_com || 0),
-                v_prod: String(item.v_prod || 0),
+                q_com: formatQty(item.q_com || 0),
+                v_un_com: formatMoney2(item.v_un_com || 0),
+                v_prod: formatMoney2(item.v_prod || 0),
               };
             }),
           );
@@ -506,7 +496,7 @@ function NotaEntradaCadastroPage() {
         data_entrada: toDateInput(
           data.emissao != null ? String(data.emissao) : null,
         ),
-        v_nf: String(Number(data.valor) || 0),
+        v_nf: formatMoney2(Number(data.valor) || 0),
         situacao: "pendente",
       });
       setFormItems([emptyItem()]);
@@ -532,7 +522,7 @@ function NotaEntradaCadastroPage() {
         if (patch.q_com != null || patch.v_un_com != null) {
           const q = parseMoney(patch.q_com ?? next.q_com);
           const vu = parseMoney(patch.v_un_com ?? next.v_un_com);
-          next.v_prod = String(round2(q * vu));
+          next.v_prod = formatMoney2(round2(q * vu));
         }
         return next;
       }),
@@ -587,7 +577,7 @@ function NotaEntradaCadastroPage() {
       natureza_operacao: item.natureza_operacao ?? "",
       data_emissao: toDateInput(item.data_emissao),
       data_entrada: toDateInput(item.data_entrada),
-      v_nf: String(item.v_nf ?? 0),
+      v_nf: formatMoney2(item.v_nf ?? 0),
       situacao: item.situacao || "pendente",
       observacao: item.observacao ?? "",
     });
@@ -625,9 +615,9 @@ function NotaEntradaCadastroPage() {
         ncm: r.ncm ?? "",
         cfop: r.cfop ?? "",
         u_com: r.u_com ?? "UN",
-        q_com: String(r.q_com ?? 0),
-        v_un_com: String(r.v_un_com ?? 0),
-        v_prod: String(r.v_prod ?? 0),
+        q_com: formatQty(r.q_com ?? 0),
+        v_un_com: formatMoney2(r.v_un_com ?? 0),
+        v_prod: formatMoney2(r.v_prod ?? 0),
       })),
     );
   };
@@ -824,7 +814,7 @@ function NotaEntradaCadastroPage() {
       filial: fil ? filialLabel(fil) : "—",
       emissao: formatDateBr(item.data_emissao),
       entrada: formatDateBr(item.data_entrada),
-      valor: formatMoney(item.v_nf),
+      valor: formatMoney2(item.v_nf),
       status: situacaoBadge(item.situacao),
       acoes: (
         <CadastroRowActions
@@ -1011,9 +1001,11 @@ function NotaEntradaCadastroPage() {
                 className="input-base input-compact"
                 inputMode="decimal"
                 value={form.v_nf}
-                onChange={(e) => updateForm("v_nf", e.target.value)}
+                onChange={(e) =>
+                  updateForm("v_nf", maskMoneyInput(e.target.value))
+                }
                 disabled={busy}
-                placeholder={String(totalItensPreview)}
+                placeholder={formatMoney2(totalItensPreview)}
               />
             </CadastroField>
 
@@ -1225,7 +1217,9 @@ function NotaEntradaCadastroPage() {
                       inputMode="decimal"
                       value={row.q_com}
                       onChange={(e) =>
-                        updateItem(row.key, { q_com: e.target.value })
+                        updateItem(row.key, {
+                          q_com: maskQtyInput(e.target.value),
+                        })
                       }
                       disabled={busy}
                     />
@@ -1238,7 +1232,9 @@ function NotaEntradaCadastroPage() {
                       inputMode="decimal"
                       value={row.v_un_com}
                       onChange={(e) =>
-                        updateItem(row.key, { v_un_com: e.target.value })
+                        updateItem(row.key, {
+                          v_un_com: maskMoneyInput(e.target.value),
+                        })
                       }
                       disabled={busy}
                     />
@@ -1251,7 +1247,9 @@ function NotaEntradaCadastroPage() {
                       inputMode="decimal"
                       value={row.v_prod}
                       onChange={(e) =>
-                        updateItem(row.key, { v_prod: e.target.value })
+                        updateItem(row.key, {
+                          v_prod: maskMoneyInput(e.target.value),
+                        })
                       }
                       disabled={busy}
                     />
@@ -1268,7 +1266,7 @@ function NotaEntradaCadastroPage() {
               textAlign: "right",
             }}
           >
-            Total dos itens: <strong>{formatMoney(totalItensPreview)}</strong>
+            Total dos itens: <strong>{formatMoney2(totalItensPreview)}</strong>
           </div>
 
           {formError ? (

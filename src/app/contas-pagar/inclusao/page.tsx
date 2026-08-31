@@ -13,6 +13,7 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { formatMoney2, maskMoneyInput, parseMoney } from "@/lib/moneyMask";
 
 type FilialOpt = {
   id: string;
@@ -68,8 +69,8 @@ const emptyForm: ContaForm = {
   data_emissao: "",
   data_chegada: "",
   data_vencimento: "",
-  valor: "0",
-  valor_outros: "0",
+  valor: "0,00",
+  valor_outros: "0,00",
   situacao: "0",
 };
 
@@ -109,7 +110,7 @@ function toDateInput(iso: string | null) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
 }
 
-function formatMoney(n: number | null | undefined) {
+function formatCurrency(n: number | null | undefined) {
   if (n == null || Number.isNaN(Number(n))) return "—";
   return Number(n).toLocaleString("pt-BR", {
     style: "currency",
@@ -117,21 +118,9 @@ function formatMoney(n: number | null | undefined) {
   });
 }
 
-function parseMoney(raw: string) {
-  const s = String(raw).trim();
-  if (!s) return 0;
-  if (s.includes(",")) {
-    return Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-  }
-  return Number(s) || 0;
-}
-
 function situacaoBadge(situacao: number, saldo: number) {
   if (situacao === 1 || saldo <= 0) {
     return <span className="badge badge-success">Quitado</span>;
-  }
-  if (saldo > 0 && saldo < Number.MAX_SAFE_INTEGER) {
-    // aberto — se houver diferença tipicamente parcial, mas sem valor original aqui
   }
   return <span className="badge badge-warning">Aberto</span>;
 }
@@ -292,8 +281,8 @@ export default function ContasPagarInclusaoPage() {
       data_emissao: toDateInput(item.data_emissao),
       data_chegada: toDateInput(item.data_chegada),
       data_vencimento: toDateInput(item.data_vencimento),
-      valor: String(item.valor ?? 0),
-      valor_outros: String(item.valor_outros ?? 0),
+      valor: formatMoney2(item.valor ?? 0),
+      valor_outros: formatMoney2(item.valor_outros ?? 0),
       situacao: String(item.situacao ?? 0),
     });
     setFormError("");
@@ -455,8 +444,8 @@ export default function ContasPagarInclusaoPage() {
       filial: fil ? filialLabel(fil) : "—",
       emissao: formatDateBr(item.data_emissao),
       vencimento: formatDateBr(item.data_vencimento),
-      valor: formatMoney(item.valor),
-      saldo: formatMoney(item.valor_saldo),
+      valor: formatCurrency(item.valor),
+      saldo: formatCurrency(item.valor_saldo),
       situacao: situacaoBadge(item.situacao, item.valor_saldo),
       acoes: (
         <CadastroRowActions
@@ -645,7 +634,9 @@ export default function ContasPagarInclusaoPage() {
                 className="input-base input-compact"
                 inputMode="decimal"
                 value={form.valor}
-                onChange={(e) => updateForm("valor", e.target.value)}
+                onChange={(e) =>
+                  updateForm("valor", maskMoneyInput(e.target.value))
+                }
                 disabled={busy}
               />
             </CadastroField>
@@ -656,7 +647,9 @@ export default function ContasPagarInclusaoPage() {
                 className="input-base input-compact"
                 inputMode="decimal"
                 value={form.valor_outros}
-                onChange={(e) => updateForm("valor_outros", e.target.value)}
+                onChange={(e) =>
+                  updateForm("valor_outros", maskMoneyInput(e.target.value))
+                }
                 disabled={busy}
               />
             </CadastroField>

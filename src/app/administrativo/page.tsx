@@ -418,38 +418,49 @@ type DespesaDia = {
   situacao: "aberto" | "vencido" | "pago";
 };
 
-/** Despesas com vencimento no dia (mock até existir tabela contas_pagar). */
-function despesasAPagarHoje(): DespesaDia[] {
-  return [
-    {
-      id: "CP-101",
-      fornecedor: "Petrobras Distribuidora",
-      descricao: "NF combustível — parcela do dia",
-      valor: 12800,
-      situacao: "aberto",
-    },
-    {
-      id: "CP-102",
-      fornecedor: "Energia Elétrica CPFL",
-      descricao: "Fatura vencendo hoje",
-      valor: 3200,
-      situacao: "aberto",
-    },
-    {
-      id: "CP-103",
-      fornecedor: "Limpeza Total",
-      descricao: "Serviço mensal",
-      valor: 850,
-      situacao: "aberto",
-    },
-    {
-      id: "CP-104",
-      fornecedor: "Auto Peças Veloz",
-      descricao: "NF 1102 — lubrificantes",
-      valor: 1340,
-      situacao: "vencido",
-    },
-  ];
+/** Contas a pagar com vencimento no dia (public.contas_pagar). */
+async function loadContasPagarHoje(dateIso: string): Promise<DespesaDia[]> {
+  const { data, error } = await supabase
+    .from("contas_pagar")
+    .select(
+      `
+      id, titulo, finalidade, tipo, valor, valor_saldo, situacao, data_vencimento,
+      fornecedores ( codigo, razao_social, fantasia )
+    `,
+    )
+    .eq("data_vencimento", dateIso)
+    .order("valor_saldo", { ascending: false })
+    .limit(50);
+
+  if (error || !data) return [];
+
+  return data.map((row) => {
+    const forn = asOne(
+      row.fornecedores as
+        | { codigo: string; razao_social: string; fantasia: string | null }
+        | { codigo: string; razao_social: string; fantasia: string | null }[]
+        | null,
+    );
+    const nomeForn =
+      (forn?.fantasia || forn?.razao_social || "").trim() ||
+      (forn?.codigo ? String(forn.codigo) : "—");
+    const saldo = Number(row.valor_saldo) || 0;
+    const valor = Number(row.valor) || 0;
+    const quitado = Number(row.situacao) === 1 || saldo <= 0;
+    const finalidade = String(row.finalidade || "").trim();
+    const tipo = row.tipo === "despesa" ? "Despesa" : "Nota";
+    const titulo = String(row.titulo || "").trim();
+
+    return {
+      id: String(row.id),
+      fornecedor: nomeForn,
+      descricao:
+        finalidade ||
+        `${tipo}${titulo ? ` · título ${titulo}` : ""}`,
+      valor: quitado ? valor : saldo > 0 ? saldo : valor,
+      situacao: quitado ? ("pago" as const) : ("aberto" as const),
+    };
+  });
 }
 
 const fadeUp = {
@@ -866,8 +877,10 @@ export default function DashboardPage() {
   const [fuelStock, setFuelStock] = useState<FuelStockItem[]>([]);
   const [fuelRefDate, setFuelRefDate] = useState<string | null>(null);
   const [fuelFromToday, setFuelFromToday] = useState(true);
-  const despesasDia = despesasAPagarHoje();
-  const totalDespesasDia = despesasDia.reduce((sum, d) => sum + d.valor, 0);
+  const [despesasDia, setDespesasDia] = useState<DespesaDia[]>([]);
+  const totalDespesasDia = despesasDia
+    .filter((d) => d.situacao !== "pago")
+    .reduce((sum, d) => sum + d.valor, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -879,11 +892,12 @@ export default function DashboardPage() {
       y.setDate(y.getDate() - 1);
       const yesterdayIso = isoDateLocal(y);
 
-      const [today, yesterday, months, fuel] = await Promise.all([
+      const [today, yesterday, months, fuel, despesas] = await Promise.all([
         loadDayAgg(todayIso),
         loadDayAgg(yesterdayIso),
         loadMonthlySales(),
         loadFuelStockFromMarcacao(),
+        loadContasPagarHoje(todayIso),
       ]);
       if (cancelled) return;
       setKpiCards(buildKpiCards(today, yesterday));
@@ -891,6 +905,7 @@ export default function DashboardPage() {
       setFuelStock(fuel.items);
       setFuelRefDate(fuel.refDate);
       setFuelFromToday(fuel.fromToday);
+      setDespesasDia(despesas);
     }
 
     void load();
@@ -1087,7 +1102,7 @@ export default function DashboardPage() {
                 Contas com vencimento hoje · {formatMoney(totalDespesasDia)}
               </p>
             </div>
-            <Link href="/contas-pagar" style={{ textDecoration: "none" }}>
+            <Link href="/contas-pagar/inclusao" style={{ textDecoration: "none" }}>
               <motion.div
                 whileHover={{ x: 3 }}
                 style={{
