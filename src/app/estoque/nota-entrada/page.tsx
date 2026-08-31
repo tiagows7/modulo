@@ -26,6 +26,7 @@ import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
 import {
   aplicarEntradasMarcacaoTanque,
 } from "@/lib/estoque/aplicarEntradaMarcacaoTanque";
+import { nextContasPagarTitulo } from "@/lib/financeiro/contasPagarTitulo";
 
 type TabId = "geral" | "titulos" | "tanque";
 
@@ -1052,7 +1053,6 @@ function NotaEntradaCadastroPage() {
     const situacaoAnterior = editing?.situacao || "";
     const virandoLancada =
       situacaoNova === "lancada" && situacaoAnterior !== "lancada";
-    const jaEstavaLancada = situacaoNova === "lancada" && situacaoAnterior === "lancada";
 
     // Sincroniza qtd dos tanques com os itens no momento do save
     const tankLinesSync = formTanques
@@ -1196,53 +1196,77 @@ function NotaEntradaCadastroPage() {
           });
         }
 
-        const { error: delTitErr } = await supabase
-          .from("contas_pagar")
-          .delete()
-          .eq("nota_entrada", notaId);
-        if (delTitErr) throw new Error(delTitErr.message);
-
-        let titulosToSave = formTitulos.filter(
-          (t) => t.titulo.trim() || parseMoney(t.valor) > 0 || t.data_vencimento,
-        );
-
-        if (
-          (virandoLancada || jaEstavaLancada) &&
-          !titulosToSave.length &&
-          vNf > 0
-        ) {
-          titulosToSave = [
-            {
-              key: "default",
-              titulo: String(numero),
-              data_vencimento: form.data_entrada || form.data_emissao || "",
-              valor: formatMoney2(vNf),
-            },
-          ];
-        }
-
-        const titulosPayload = titulosToSave
-          .filter((t) => t.titulo.trim() && parseMoney(t.valor) > 0)
-          .map((t) => ({
-            fornecedor: form.fornecedor,
-            titulo: t.titulo.trim().slice(0, 15),
-            nota_entrada: notaId,
-            filial: form.filial,
-            tipo: "nota" as const,
-            data_emissao: form.data_emissao || null,
-            data_chegada: form.data_entrada || null,
-            data_vencimento: t.data_vencimento || form.data_entrada || null,
-            valor: parseMoney(t.valor),
-            valor_saldo: parseMoney(t.valor),
-            valor_outros: 0,
-            situacao: 0,
-          }));
-
-        if (titulosPayload.length) {
-          const { error: titErr } = await supabase
+        // Títulos em contas_pagar só ao lançar a nota (evita lixo em rascunho)
+        if (situacaoNova === "lancada") {
+          const { error: delTitErr } = await supabase
             .from("contas_pagar")
-            .insert(titulosPayload);
-          if (titErr) throw new Error(titErr.message);
+            .delete()
+            .eq("nota_entrada", notaId);
+          if (delTitErr) throw new Error(delTitErr.message);
+
+          let titulosToSave = formTitulos.filter(
+            (t) =>
+              t.titulo.trim() ||
+              parseMoney(t.valor) > 0 ||
+              t.data_vencimento,
+          );
+
+          if (
+            !titulosToSave.some((t) => parseMoney(t.valor) > 0) &&
+            vNf > 0
+          ) {
+            titulosToSave = [
+              {
+                key: "default",
+                titulo: String(numero),
+                data_vencimento: form.data_entrada || form.data_emissao || "",
+                valor: formatMoney2(vNf),
+              },
+            ];
+          }
+
+          const reservados = new Set<string>();
+          const titulosPayload = [];
+          for (const t of titulosToSave) {
+            const valor = parseMoney(t.valor);
+            if (!(valor > 0)) continue;
+
+            const prefer =
+              t.titulo.trim() ||
+              (form.serie && form.serie !== "1"
+                ? `${numero}/${form.serie}`
+                : String(numero));
+
+            const titulo = await nextContasPagarTitulo(
+              form.filial,
+              form.fornecedor,
+              prefer.slice(0, 15),
+              reservados,
+            );
+
+            titulosPayload.push({
+              fornecedor: form.fornecedor,
+              titulo,
+              nota_entrada: notaId,
+              filial: form.filial,
+              tipo: "nota" as const,
+              data_emissao: form.data_emissao || null,
+              data_chegada: form.data_entrada || null,
+              data_vencimento: t.data_vencimento || form.data_entrada || null,
+              valor,
+              valor_saldo: valor,
+              valor_outros: 0,
+              situacao: 0,
+              finalidade: `NF ${numero}/${form.serie || "1"}`.slice(0, 50),
+            });
+          }
+
+          if (titulosPayload.length) {
+            const { error: titErr } = await supabase
+              .from("contas_pagar")
+              .insert(titulosPayload);
+            if (titErr) throw new Error(titErr.message);
+          }
         }
 
         if (manifestoId) {
