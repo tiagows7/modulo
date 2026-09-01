@@ -21,6 +21,7 @@
     "smartpos-bridge": "node server/smartpos-bridge.mjs"
   },
   "dependencies": {
+    "@modulo/nfe-distribuicao-dfe": "file:./packages/nfe-distribuicao-dfe",
     "@supabase/supabase-js": "^2.112.3",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",

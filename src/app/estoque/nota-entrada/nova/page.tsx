@@ -255,6 +255,7 @@ export default function NotaEntradaNovaPage() {
         message?: string;
         upserted?: number;
         recebidos?: number;
+        com_xml?: number;
         cnpj?: string;
         ult_nsu?: string;
       };
@@ -272,9 +273,12 @@ export default function NotaEntradaNovaPage() {
       }
 
       const nsuInfo = json.ult_nsu ? ` Última NSU: ${json.ult_nsu}.` : "";
+      const xmlInfo =
+        json.com_xml != null ? ` XML completo: ${json.com_xml}.` : "";
       setInfoMsg(
         (json.message ||
           `${json.upserted ?? 0} nota(s) sincronizada(s) para o CNPJ ${formatCnpj(json.cnpj ?? null)}.`) +
+          xmlInfo +
           nsuInfo,
       );
       await loadData();
@@ -548,7 +552,7 @@ export default function NotaEntradaNovaPage() {
 
       <ModulePage
         title="Nova Nota de Entrada"
-        description="Consulte a SEFAZ ou importe o XML da NF-e emitida contra o CNPJ da filial"
+        description="Consulta DF-e na SEFAZ com o certificado A1, CNPJ e última NSU da filial (em branco = 0), ou importe o XML manualmente"
         icon={<FileInput size={22} />}
         columns={columns}
         rows={rows}

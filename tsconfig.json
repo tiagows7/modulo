@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@modulo/nfe-distribuicao-dfe": [
+        "./packages/nfe-distribuicao-dfe/src/index.ts"
+      ]
     }
   },
   "include": [
