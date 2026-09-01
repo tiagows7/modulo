@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Building2 } from "lucide-react";
+import { Building2, Upload, FolderArchive } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
 import {
@@ -19,6 +19,8 @@ import {
   onlyDigits,
 } from "@/components/barrapdv/services/document/documentValidator";
 
+type TabId = "geral" | "fiscal";
+
 type Filial = {
   id: string;
   codigo: string;
@@ -35,6 +37,11 @@ type Filial = {
   endereco_cidade: number | null;
   telefone: string | null;
   status: string | null;
+  certificado_nome: string | null;
+  certificado_storage_path: string | null;
+  certificado_senha: string | null;
+  schemas_storage_path: string | null;
+  schemas_atualizado_em: string | null;
 };
 
 type FilialForm = {
@@ -51,10 +58,18 @@ type FilialForm = {
   endereco_cidade: string;
   telefone: string;
   status: string;
+  certificado_senha: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
 type CidadeRow = { codigo: string; descricao: string; uf: string };
+
+const FISCAL_BUCKET = "filial-fiscal";
+
+const tabs: { id: TabId; label: string }[] = [
+  { id: "geral", label: "Geral" },
+  { id: "fiscal", label: "Config NF-E / NFC-E" },
+];
 
 const emptyForm: FilialForm = {
   razao_social: "",
@@ -70,6 +85,7 @@ const emptyForm: FilialForm = {
   endereco_cidade: "",
   telefone: "",
   status: "ativo",
+  certificado_senha: "",
 };
 
 const columns = [
@@ -115,6 +131,7 @@ function toForm(item: Filial): FilialForm {
       item.endereco_cidade != null ? String(item.endereco_cidade) : "",
     telefone: item.telefone ?? "",
     status: item.status === "inativo" ? "inativo" : "ativo",
+    certificado_senha: item.certificado_senha ?? "",
   };
 }
 
@@ -140,7 +157,19 @@ function toPayload(form: FilialForm) {
     endereco_cidade: Number.isFinite(cidadeCodigo) ? cidadeCodigo : null,
     telefone: blank(form.telefone),
     status: form.status === "inativo" ? "inativo" : "ativo",
+    certificado_senha: blank(form.certificado_senha),
   };
+}
+
+function safeFileName(name: string) {
+  return name.replace(/[^\w.\-()+ ]+/g, "_").slice(0, 180);
+}
+
+function formatDateTimeBr(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("pt-BR");
 }
 
 /** Retorna mensagem se a filial tiver vínculo/movimento; null se puder excluir. */
@@ -217,6 +246,15 @@ export default function FilialPage() {
   const [deleting, setDeleting] = useState<Filial | null>(null);
   const [form, setForm] = useState<FilialForm>(emptyForm);
   const [formError, setFormError] = useState("");
+  const [tab, setTab] = useState<TabId>("geral");
+  const [certNome, setCertNome] = useState<string | null>(null);
+  const [certPath, setCertPath] = useState<string | null>(null);
+  const [schemasPath, setSchemasPath] = useState<string | null>(null);
+  const [schemasAt, setSchemasAt] = useState<string | null>(null);
+  const [uploadingCert, setUploadingCert] = useState(false);
+  const [uploadingSchemas, setUploadingSchemas] = useState(false);
+  const certInputRef = useRef<HTMLInputElement | null>(null);
+  const schemasInputRef = useRef<HTMLInputElement | null>(null);
   const lastConsultedCnpj = useRef("");
   const consultingRef = useRef(false);
 
@@ -226,7 +264,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em",
         )
         .order("created_at", { ascending: false });
 
@@ -369,11 +407,20 @@ export default function FilialPage() {
     }
   };
 
+  const syncFiscalState = (item: Filial | null) => {
+    setCertNome(item?.certificado_nome ?? null);
+    setCertPath(item?.certificado_storage_path ?? null);
+    setSchemasPath(item?.schemas_storage_path ?? null);
+    setSchemasAt(item?.schemas_atualizado_em ?? null);
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
     setFormError("");
     setActionError("");
+    setTab("geral");
+    syncFiscalState(null);
     lastConsultedCnpj.current = "";
     setModalOpen(true);
   };
@@ -383,6 +430,8 @@ export default function FilialPage() {
     setForm(toForm(item));
     setFormError("");
     setActionError("");
+    setTab("geral");
+    syncFiscalState(item);
     lastConsultedCnpj.current = onlyDigits(item.cnpj ?? "");
     setModalOpen(true);
   };
@@ -393,10 +442,11 @@ export default function FilialPage() {
   };
 
   const closeModal = () => {
-    if (busy) return;
+    if (busy || uploadingCert || uploadingSchemas) return;
     setModalOpen(false);
     setEditing(null);
     setFormError("");
+    setTab("geral");
   };
 
   const closeDelete = () => {
@@ -404,10 +454,101 @@ export default function FilialPage() {
     setDeleting(null);
   };
 
+  const uploadCertificado = async (file: File, filialId: string) => {
+    const path = `${filialId}/certificado/${Date.now()}-${safeFileName(file.name)}`;
+    const { error: upErr } = await supabase.storage
+      .from(FISCAL_BUCKET)
+      .upload(path, file, { upsert: true, contentType: file.type || "application/octet-stream" });
+    if (upErr) throw new Error(upErr.message);
+
+    const { error } = await supabase
+      .from("filial")
+      .update({
+        certificado_nome: file.name.slice(0, 255),
+        certificado_storage_path: path,
+      })
+      .eq("id", filialId);
+    if (error) throw new Error(error.message);
+
+    setCertNome(file.name);
+    setCertPath(path);
+  };
+
+  const uploadSchemas = async (file: File, filialId: string) => {
+    const path = `${filialId}/schemas/${Date.now()}-${safeFileName(file.name)}`;
+    const { error: upErr } = await supabase.storage
+      .from(FISCAL_BUCKET)
+      .upload(path, file, { upsert: true, contentType: file.type || "application/zip" });
+    if (upErr) throw new Error(upErr.message);
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("filial")
+      .update({
+        schemas_storage_path: path,
+        schemas_atualizado_em: now,
+      })
+      .eq("id", filialId);
+    if (error) throw new Error(error.message);
+
+    setSchemasPath(path);
+    setSchemasAt(now);
+  };
+
+  const onCertFile = async (file: File | null) => {
+    if (!file) return;
+    if (!editing?.id) {
+      setFormError("Salve a filial na aba Geral antes de enviar o certificado.");
+      setTab("geral");
+      return;
+    }
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".pfx") && !lower.endsWith(".p12")) {
+      setFormError("Envie um certificado A1 (.pfx ou .p12).");
+      return;
+    }
+    setFormError("");
+    setUploadingCert(true);
+    try {
+      await gravar(async () => {
+        await uploadCertificado(file, editing.id);
+        await loadData();
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Falha no upload do certificado.");
+    } finally {
+      setUploadingCert(false);
+      if (certInputRef.current) certInputRef.current.value = "";
+    }
+  };
+
+  const onSchemasFile = async (file: File | null) => {
+    if (!file) return;
+    if (!editing?.id) {
+      setFormError("Salve a filial na aba Geral antes de salvar os schemas.");
+      setTab("geral");
+      return;
+    }
+    setFormError("");
+    setUploadingSchemas(true);
+    try {
+      await gravar(async () => {
+        await uploadSchemas(file, editing.id);
+        await loadData();
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Falha ao salvar schemas.");
+    } finally {
+      setUploadingSchemas(false);
+      if (schemasInputRef.current) schemasInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!form.razao_social.trim()) {
       setFormError("Informe a razão social.");
+      setTab("geral");
       return;
     }
     setFormError("");
@@ -423,11 +564,23 @@ export default function FilialPage() {
         if (error) throw new Error(error.message);
       } else {
         const codigo = await nextCodigo();
-        const { error } = await supabase.from("filial").insert({
-          ...payload,
-          codigo,
-        });
+        const { data, error } = await supabase
+          .from("filial")
+          .insert({
+            ...payload,
+            codigo,
+          })
+          .select(
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em",
+          )
+          .single();
         if (error) throw new Error(error.message);
+        // Mantém modal aberto na aba fiscal para upload após criar
+        setEditing(data as Filial);
+        syncFiscalState(data as Filial);
+        setTab("fiscal");
+        await loadData();
+        return;
       }
       setModalOpen(false);
       setEditing(null);
@@ -575,180 +728,318 @@ export default function FilialPage() {
             ) : undefined
           }
           onClose={closeModal}
-          disabled={busy}
-          width={680}
+          disabled={busy || uploadingCert || uploadingSchemas}
+          width={720}
           asForm
           onSubmit={handleSubmit}
           footer={
-            <CadastroFormActions onCancel={closeModal} disabled={busy} busy={busy} />
+            <CadastroFormActions
+              onCancel={closeModal}
+              disabled={busy || uploadingCert || uploadingSchemas}
+              busy={busy}
+              submitLabel={editing ? "Salvar" : "Salvar e continuar"}
+            />
           }
         >
-          <CadastroFormGrid>
-            <CadastroField label="CNPJ" htmlFor="cnpj" span="full">
-              <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
-                <input
-                  id="cnpj"
-                  className="input-base input-compact"
-                  value={form.cnpj}
-                  onChange={(e) => onCnpjChange(e.target.value)}
-                  onBlur={() => {
-                    const digits = onlyDigits(form.cnpj);
-                    if (digits.length === 14) void preencherPorCnpj(digits);
+          <input
+            ref={certInputRef}
+            type="file"
+            accept=".pfx,.p12,application/x-pkcs12,application/pkcs12"
+            style={{ display: "none" }}
+            onChange={(e) => void onCertFile(e.target.files?.[0] ?? null)}
+          />
+          <input
+            ref={schemasInputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            style={{ display: "none" }}
+            onChange={(e) => void onSchemasFile(e.target.files?.[0] ?? null)}
+          />
+
+          <div className="cadastro-tabs" role="tablist">
+            {tabs.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                className={`cadastro-tab${tab === item.id ? " active" : ""}`}
+                onClick={() => setTab(item.id)}
+                disabled={busy || uploadingCert || uploadingSchemas}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "geral" ? (
+            <div className="cadastro-tab-panel" role="tabpanel">
+              <CadastroFormGrid>
+                <CadastroField label="CNPJ" htmlFor="cnpj" span="full">
+                  <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                    <input
+                      id="cnpj"
+                      className="input-base input-compact"
+                      value={form.cnpj}
+                      onChange={(e) => onCnpjChange(e.target.value)}
+                      onBlur={() => {
+                        const digits = onlyDigits(form.cnpj);
+                        if (digits.length === 14) void preencherPorCnpj(digits);
+                      }}
+                      placeholder="00.000.000/0000-00"
+                      disabled={busy}
+                      autoFocus
+                      inputMode="numeric"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="cadastro-btn-edit"
+                      style={{ padding: "0 12px", fontSize: 11 }}
+                      onClick={() => void preencherPorCnpj(form.cnpj, true)}
+                      disabled={busy}
+                      title="Consultar CNPJ"
+                    >
+                      Consultar
+                    </button>
+                  </div>
+                </CadastroField>
+
+                <CadastroField label="Razão Social *" htmlFor="razao_social" span="full">
+                  <input
+                    id="razao_social"
+                    className="input-base input-compact"
+                    value={form.razao_social}
+                    onChange={(e) => updateField("razao_social", e.target.value)}
+                    required
+                    disabled={busy}
+                  />
+                </CadastroField>
+
+                <CadastroField label="Fantasia" htmlFor="fantasia">
+                  <input
+                    id="fantasia"
+                    className="input-base input-compact"
+                    value={form.fantasia}
+                    onChange={(e) => updateField("fantasia", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Telefone" htmlFor="telefone">
+                  <input
+                    id="telefone"
+                    className="input-base input-compact"
+                    value={form.telefone}
+                    onChange={(e) => updateField("telefone", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Status" htmlFor="filial-status">
+                  <select
+                    id="filial-status"
+                    className="input-base input-compact"
+                    value={form.status}
+                    onChange={(e) => updateField("status", e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo</option>
+                  </select>
+                </CadastroField>
+                <CadastroField label="Inscrição Estadual" htmlFor="inscricao_estadual">
+                  <input
+                    id="inscricao_estadual"
+                    className="input-base input-compact"
+                    value={form.inscricao_estadual}
+                    onChange={(e) =>
+                      updateField("inscricao_estadual", e.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Inscrição Municipal" htmlFor="inscricao_municipal">
+                  <input
+                    id="inscricao_municipal"
+                    className="input-base input-compact"
+                    value={form.inscricao_municipal}
+                    onChange={(e) =>
+                      updateField("inscricao_municipal", e.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </CadastroField>
+
+                <CadastroField label="CEP" htmlFor="cep">
+                  <input
+                    id="cep"
+                    className="input-base input-compact"
+                    value={form.cep}
+                    onChange={(e) => updateField("cep", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Endereço" htmlFor="endereco" span={2}>
+                  <input
+                    id="endereco"
+                    className="input-base input-compact"
+                    value={form.endereco}
+                    onChange={(e) => updateField("endereco", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Número" htmlFor="endereco_numero">
+                  <input
+                    id="endereco_numero"
+                    className="input-base input-compact"
+                    value={form.endereco_numero}
+                    onChange={(e) => updateField("endereco_numero", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="Bairro" htmlFor="endereco_bairro">
+                  <input
+                    id="endereco_bairro"
+                    className="input-base input-compact"
+                    value={form.endereco_bairro}
+                    onChange={(e) => updateField("endereco_bairro", e.target.value)}
+                    disabled={busy}
+                  />
+                </CadastroField>
+                <CadastroField label="UF" htmlFor="endereco_uf">
+                  <select
+                    id="endereco_uf"
+                    className="input-base input-compact"
+                    value={form.endereco_uf}
+                    onChange={(e) => onUfChange(e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="">Selecione</option>
+                    {ufs.map((row) => (
+                      <option key={row.codigo} value={row.codigo}>
+                        {row.codigo} — {row.descricao}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
+                <CadastroField label="Cidade" htmlFor="endereco_cidade" span={2}>
+                  <select
+                    id="endereco_cidade"
+                    className="input-base input-compact"
+                    value={form.endereco_cidade}
+                    onChange={(e) => updateField("endereco_cidade", e.target.value)}
+                    disabled={busy || !form.endereco_uf}
+                  >
+                    <option value="">
+                      {form.endereco_uf ? "Selecione" : "Selecione a UF"}
+                    </option>
+                    {cidadesUf.map((row) => (
+                      <option key={row.codigo} value={row.codigo}>
+                        {row.descricao}
+                      </option>
+                    ))}
+                  </select>
+                </CadastroField>
+              </CadastroFormGrid>
+            </div>
+          ) : null}
+
+          {tab === "fiscal" ? (
+            <div className="cadastro-tab-panel" role="tabpanel">
+              {!editing ? (
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                    lineHeight: 1.45,
                   }}
-                  placeholder="00.000.000/0000-00"
-                  disabled={busy}
-                  autoFocus
-                  inputMode="numeric"
-                  style={{ flex: 1 }}
-                />
-                <button
-                  type="button"
-                  className="cadastro-btn-edit"
-                  style={{ padding: "0 12px", fontSize: 11 }}
-                  onClick={() => void preencherPorCnpj(form.cnpj, true)}
-                  disabled={busy}
-                  title="Consultar CNPJ"
                 >
-                  Consultar
-                </button>
-              </div>
-            </CadastroField>
+                  Salve a filial na aba <strong>Geral</strong> primeiro para liberar
+                  o upload do certificado e dos schemas.
+                </p>
+              ) : null}
 
-            <CadastroField label="Razão Social *" htmlFor="razao_social" span="full">
-              <input
-                id="razao_social"
-                className="input-base input-compact"
-                value={form.razao_social}
-                onChange={(e) => updateField("razao_social", e.target.value)}
-                required
-                disabled={busy}
-              />
-            </CadastroField>
+              <CadastroFormGrid>
+                <CadastroField label="Certificado A1" htmlFor="certificado" span="full">
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <input
+                      id="certificado"
+                      className="input-base input-compact"
+                      value={certNome || ""}
+                      readOnly
+                      placeholder="Nenhum certificado enviado"
+                      disabled={busy || uploadingCert}
+                      style={{ flex: "1 1 220px" }}
+                    />
+                    <button
+                      type="button"
+                      className="cadastro-btn-edit"
+                      disabled={busy || uploadingCert || !editing}
+                      onClick={() => certInputRef.current?.click()}
+                      title="Upload do certificado .pfx / .p12"
+                    >
+                      <Upload size={12} />
+                      {uploadingCert ? "Enviando…" : "Upload certificado"}
+                    </button>
+                  </div>
+                  {certPath ? (
+                    <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                      Arquivo no storage: <code>{certPath}</code>
+                    </p>
+                  ) : null}
+                </CadastroField>
 
-            <CadastroField label="Fantasia" htmlFor="fantasia">
-              <input
-                id="fantasia"
-                className="input-base input-compact"
-                value={form.fantasia}
-                onChange={(e) => updateField("fantasia", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Telefone" htmlFor="telefone">
-              <input
-                id="telefone"
-                className="input-base input-compact"
-                value={form.telefone}
-                onChange={(e) => updateField("telefone", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Status" htmlFor="filial-status">
-              <select
-                id="filial-status"
-                className="input-base input-compact"
-                value={form.status}
-                onChange={(e) => updateField("status", e.target.value)}
-                disabled={busy}
-              >
-                <option value="ativo">Ativo</option>
-                <option value="inativo">Inativo</option>
-              </select>
-            </CadastroField>
-            <CadastroField label="Inscrição Estadual" htmlFor="inscricao_estadual">
-              <input
-                id="inscricao_estadual"
-                className="input-base input-compact"
-                value={form.inscricao_estadual}
-                onChange={(e) =>
-                  updateField("inscricao_estadual", e.target.value)
-                }
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Inscrição Municipal" htmlFor="inscricao_municipal">
-              <input
-                id="inscricao_municipal"
-                className="input-base input-compact"
-                value={form.inscricao_municipal}
-                onChange={(e) =>
-                  updateField("inscricao_municipal", e.target.value)
-                }
-                disabled={busy}
-              />
-            </CadastroField>
+                <CadastroField label="Senha do certificado" htmlFor="certificado_senha" span="full">
+                  <input
+                    id="certificado_senha"
+                    type="password"
+                    className="input-base input-compact"
+                    value={form.certificado_senha}
+                    onChange={(e) => updateField("certificado_senha", e.target.value)}
+                    disabled={busy}
+                    autoComplete="new-password"
+                    placeholder="Senha do arquivo .pfx"
+                  />
+                </CadastroField>
 
-            <CadastroField label="CEP" htmlFor="cep">
-              <input
-                id="cep"
-                className="input-base input-compact"
-                value={form.cep}
-                onChange={(e) => updateField("cep", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Endereço" htmlFor="endereco" span={2}>
-              <input
-                id="endereco"
-                className="input-base input-compact"
-                value={form.endereco}
-                onChange={(e) => updateField("endereco", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Número" htmlFor="endereco_numero">
-              <input
-                id="endereco_numero"
-                className="input-base input-compact"
-                value={form.endereco_numero}
-                onChange={(e) => updateField("endereco_numero", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="Bairro" htmlFor="endereco_bairro">
-              <input
-                id="endereco_bairro"
-                className="input-base input-compact"
-                value={form.endereco_bairro}
-                onChange={(e) => updateField("endereco_bairro", e.target.value)}
-                disabled={busy}
-              />
-            </CadastroField>
-            <CadastroField label="UF" htmlFor="endereco_uf">
-              <select
-                id="endereco_uf"
-                className="input-base input-compact"
-                value={form.endereco_uf}
-                onChange={(e) => onUfChange(e.target.value)}
-                disabled={busy}
-              >
-                <option value="">Selecione</option>
-                {ufs.map((row) => (
-                  <option key={row.codigo} value={row.codigo}>
-                    {row.codigo} — {row.descricao}
-                  </option>
-                ))}
-              </select>
-            </CadastroField>
-            <CadastroField label="Cidade" htmlFor="endereco_cidade" span={2}>
-              <select
-                id="endereco_cidade"
-                className="input-base input-compact"
-                value={form.endereco_cidade}
-                onChange={(e) => updateField("endereco_cidade", e.target.value)}
-                disabled={busy || !form.endereco_uf}
-              >
-                <option value="">
-                  {form.endereco_uf ? "Selecione" : "Selecione a UF"}
-                </option>
-                {cidadesUf.map((row) => (
-                  <option key={row.codigo} value={row.codigo}>
-                    {row.descricao}
-                  </option>
-                ))}
-              </select>
-            </CadastroField>
-          </CadastroFormGrid>
+                <CadastroField label="Schemas NF-e / NFC-e" htmlFor="schemas" span="full">
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <input
+                      id="schemas"
+                      className="input-base input-compact"
+                      value={
+                        schemasPath
+                          ? schemasPath.split("/").pop() || schemasPath
+                          : ""
+                      }
+                      readOnly
+                      placeholder="Nenhum pacote de schemas salvo"
+                      disabled={busy || uploadingSchemas}
+                      style={{ flex: "1 1 220px" }}
+                    />
+                    <button
+                      type="button"
+                      className="cadastro-btn-edit"
+                      disabled={busy || uploadingSchemas || !editing}
+                      onClick={() => schemasInputRef.current?.click()}
+                      title="Salvar schemas (ZIP com XSDs) para emissão"
+                    >
+                      <FolderArchive size={12} />
+                      {uploadingSchemas ? "Salvando…" : "Salvar schemas"}
+                    </button>
+                  </div>
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Envie um arquivo <strong>.zip</strong> com os XSDs oficiais usados na
+                    validação/emissão de NF-e e NFC-e.
+                    {schemasAt
+                      ? ` Última atualização: ${formatDateTimeBr(schemasAt)}.`
+                      : ""}
+                  </p>
+                </CadastroField>
+              </CadastroFormGrid>
+            </div>
+          ) : null}
+
           <CadastroFormError message={formError} onClose={() => setFormError("")} />
         </CadastroModal>
       ) : null}

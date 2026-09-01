@@ -57,3 +57,4 @@
 51_contas_pagar.sql
 
 52_fix_rls_authenticated_with_check.sql
+53_filial_fiscal_nfe.sql
