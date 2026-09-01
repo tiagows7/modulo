@@ -7,11 +7,15 @@ export type XmlProdutoVinculo = {
   fornecedor: string | null
   produto_xml: string
   produto_sistema: string
+  volume: number
+  volume2: number
 }
 
 export type ItemComVinculo = NfeXmlItem & {
   produto_sistema: string | null
   vinculado: boolean
+  volume: number
+  volume2: number
 }
 
 /** Busca vínculos por fornecedor + produto_xml (cProd). */
@@ -25,7 +29,7 @@ export async function listarVinculosXml(
 
   let q = supabase
     .from('nota_xmlproduto')
-    .select('id, fornecedor, produto_xml, produto_sistema')
+    .select('id, fornecedor, produto_xml, produto_sistema, volume, volume2')
     .in('produto_xml', codes)
 
   if (fornecedorId) {
@@ -43,6 +47,8 @@ export async function listarVinculosXml(
       fornecedor: row.fornecedor != null ? String(row.fornecedor) : null,
       produto_xml: key,
       produto_sistema: String(row.produto_sistema),
+      volume: Number(row.volume) || 0,
+      volume2: Number(row.volume2) || 0,
     })
   }
 
@@ -52,7 +58,7 @@ export async function listarVinculosXml(
     if (missing.length) {
       const { data: extra } = await supabase
         .from('nota_xmlproduto')
-        .select('id, fornecedor, produto_xml, produto_sistema')
+        .select('id, fornecedor, produto_xml, produto_sistema, volume, volume2')
         .in('produto_xml', missing)
         .is('fornecedor', null)
       for (const row of extra ?? []) {
@@ -63,6 +69,8 @@ export async function listarVinculosXml(
           fornecedor: null,
           produto_xml: key,
           produto_sistema: String(row.produto_sistema),
+          volume: Number(row.volume) || 0,
+          volume2: Number(row.volume2) || 0,
         })
       }
     }
@@ -81,6 +89,8 @@ export function aplicarVinculos(
       ...item,
       produto_sistema: v?.produto_sistema ?? null,
       vinculado: Boolean(v?.produto_sistema),
+      volume: v?.volume ?? 0,
+      volume2: v?.volume2 ?? 0,
     }
   })
 }
@@ -126,18 +136,34 @@ export type VinculoSaveRow = {
   classtrib_xml: string | null
 }
 
+/**
+ * Fator de conversão do vínculo XML → estoque.
+ * volume/volume2 zerados = 1 (não multiplica).
+ * Ex.: qtd 1 caixa × volume 24 = 24 un; cigarro pode usar volume × volume2.
+ */
+export function fatorVolumeVinculo(
+  volume: number | null | undefined,
+  volume2: number | null | undefined,
+): number {
+  const v1 = Number(volume) > 0 ? Number(volume) : 1
+  const v2 = Number(volume2) > 0 ? Number(volume2) : 1
+  return v1 * v2
+}
+
 export function itemToVinculoPayload(
   item: NfeXmlItem,
   produtoSistemaId: string,
   fornecedorId: string | null,
+  volumes?: { volume?: number; volume2?: number },
 ): VinculoSaveRow {
   return {
     fornecedor: fornecedorId,
     fornecedor_xml: item.c_prod.slice(0, 30) || null,
     produto_xml: item.c_prod.slice(0, 100),
     produto_sistema: produtoSistemaId,
-    volume: item.q_com || 0,
-    volume2: item.q_trib || 0,
+    // Usuário informa na tela de vínculo (padrão 0). Não usar q_com/q_trib.
+    volume: Number(volumes?.volume) > 0 ? Number(volumes?.volume) : 0,
+    volume2: Number(volumes?.volume2) > 0 ? Number(volumes?.volume2) : 0,
     codigobarras_xml: item.c_ean ? item.c_ean.slice(0, 20) : null,
     ncm_xml: item.ncm ? item.ncm.slice(0, 20) : null,
     cest_xml: item.cest ? item.cest.slice(0, 20) : null,

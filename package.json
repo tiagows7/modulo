@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:backup": "node scripts/backup/export-backup.mjs",
+    "db:schema": "node scripts/rebuild/concat-schema.mjs",
     "gateway": "node server/pdv-gateway.mjs",
     "posto": "node scripts/posto.mjs",
     "posto:autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-posto-autostart.ps1",

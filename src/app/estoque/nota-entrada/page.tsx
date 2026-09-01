@@ -22,7 +22,7 @@ import {
   parseMoney,
 } from "@/lib/moneyMask";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
-import { classificarItensXml } from "@/lib/nfe/xmlProdutoVinculo";
+import { classificarItensXml, fatorVolumeVinculo } from "@/lib/nfe/xmlProdutoVinculo";
 import {
   aplicarEntradasMarcacaoTanque,
 } from "@/lib/estoque/aplicarEntradaMarcacaoTanque";
@@ -700,6 +700,20 @@ function NotaEntradaCadastroPage() {
                   ? String(item.produto_sistema)
                   : "";
               const prod = prodId ? prodById.get(prodId) : null;
+              const vol =
+                "volume" in item ? Number((item as { volume?: number }).volume) || 0 : 0;
+              const vol2 =
+                "volume2" in item
+                  ? Number((item as { volume2?: number }).volume2) || 0
+                  : 0;
+              const fator = fatorVolumeVinculo(vol, vol2);
+              const qXml = Number(item.q_com) || 0;
+              const qConv = Number((qXml * fator).toFixed(4));
+              const vProd = Number(item.v_prod) || 0;
+              const vUn =
+                qConv > 0
+                  ? Number((vProd / qConv).toFixed(6))
+                  : Number(item.v_un_com) || 0;
               return {
                 key: `xml-${item.n_item}-${item.c_prod}`,
                 produto_id: prodId,
@@ -709,9 +723,9 @@ function NotaEntradaCadastroPage() {
                 ncm: item.ncm || "",
                 cfop: item.cfop || "",
                 u_com: item.u_com || "UN",
-                q_com: formatQty(item.q_com || 0),
-                v_un_com: formatMoney2(item.v_un_com || 0),
-                v_prod: formatMoney2(item.v_prod || 0),
+                q_com: formatQty(qConv),
+                v_un_com: formatMoney2(vUn),
+                v_prod: formatMoney2(vProd),
                 c_prod_anp: item.c_prod_anp || "",
                 cst_icms: item.cst_icms || "",
                 v_bc_icms: formatMoney2(item.v_bc_icms || 0),

@@ -48,3 +48,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database backups (dados sensíveis)
+/backups/
+
+# schema concatenado (gerado por npm run db:schema)
+/scripts/rebuild/ALL_SCHEMA.sql

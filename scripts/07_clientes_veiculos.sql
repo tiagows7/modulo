@@ -26,15 +26,28 @@ WHERE (fone1 IS NULL OR btrim(fone1) = '')
   AND btrim(telefone) <> '';
 
 -- cidade passa a ser código IBGE (inteiro)
-ALTER TABLE public.clientes
-  ALTER COLUMN cidade TYPE INTEGER
-  USING (
-    CASE
-      WHEN cidade IS NULL OR btrim(cidade::text) = '' THEN NULL
-      WHEN cidade::text ~ '^[0-9]+$' THEN cidade::integer
-      ELSE NULL
-    END
-  );
+-- Idempotente: no schema atual já nasce INTEGER; só converte se ainda for texto.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'clientes'
+      AND column_name = 'cidade'
+      AND data_type IN ('character varying', 'text', 'character')
+  ) THEN
+    ALTER TABLE public.clientes
+      ALTER COLUMN cidade TYPE INTEGER
+      USING (
+        CASE
+          WHEN cidade IS NULL OR btrim(cidade::text) = '' THEN NULL
+          WHEN cidade::text ~ '^[0-9]+$' THEN cidade::integer
+          ELSE NULL
+        END
+      );
+  END IF;
+END $$;
 
 COMMENT ON COLUMN public.clientes.cidade IS 'Código IBGE do município (public.cidades.codigo)';
 

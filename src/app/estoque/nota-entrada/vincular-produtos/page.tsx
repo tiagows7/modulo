@@ -11,6 +11,7 @@ import {
   CadastroFormError,
   CadastroModal,
 } from "@/components/CadastroUi";
+import { maskQtyInput, parseMoney } from "@/lib/moneyMask";
 import { parseNfeXml, type NfeXmlItem } from "@/lib/nfe/parseNfeXml";
 import {
   classificarItensXml,
@@ -26,6 +27,8 @@ type ProdutoOpt = {
 
 type PendenteRow = NfeXmlItem & {
   produto_sistema: string;
+  volume: string;
+  volume2: string;
 };
 
 function uniqueByCProd(items: NfeXmlItem[]): NfeXmlItem[] {
@@ -149,6 +152,8 @@ function VincularProdutosPageInner() {
         uniq.map((item) => ({
           ...item,
           produto_sistema: "",
+          volume: "0",
+          volume2: "0",
         })),
       );
     });
@@ -158,10 +163,13 @@ function VincularProdutosPageInner() {
     void load();
   }, [load]);
 
-  const setProduto = (cProd: string, produtoId: string) => {
+  const patchPendente = (
+    cProd: string,
+    patch: Partial<Pick<PendenteRow, "produto_sistema" | "volume" | "volume2">>,
+  ) => {
     setPendentes((prev) =>
       prev.map((row) =>
-        row.c_prod === cProd ? { ...row, produto_sistema: produtoId } : row,
+        row.c_prod === cProd ? { ...row, ...patch } : row,
       ),
     );
   };
@@ -193,7 +201,10 @@ function VincularProdutosPageInner() {
       }
       await gravar(async () => {
         const payload = pendentes.map((item) =>
-          itemToVinculoPayload(item, item.produto_sistema, fornecedorId),
+          itemToVinculoPayload(item, item.produto_sistema, fornecedorId, {
+            volume: parseMoney(item.volume),
+            volume2: parseMoney(item.volume2),
+          }),
         );
         const { error } = await supabase
           .from("nota_xmlproduto")
@@ -212,17 +223,43 @@ function VincularProdutosPageInner() {
     c_prod: item.c_prod || "—",
     descricao: item.x_prod || "—",
     ean: item.c_ean || "—",
-    ncm: item.ncm || "—",
-    cfop: item.cfop || "—",
     un: item.u_com || "—",
     qtd: String(item.q_com || 0),
+    volume: (
+      <input
+        className="input-base input-compact"
+        style={{ width: 88, textAlign: "right" }}
+        inputMode="decimal"
+        value={item.volume}
+        disabled={busy}
+        title="Fator 1 (ex.: 24 un por caixa). 0 = não multiplica."
+        onChange={(e) =>
+          patchPendente(item.c_prod, { volume: maskQtyInput(e.target.value) })
+        }
+      />
+    ),
+    volume2: (
+      <input
+        className="input-base input-compact"
+        style={{ width: 88, textAlign: "right" }}
+        inputMode="decimal"
+        value={item.volume2}
+        disabled={busy}
+        title="Fator 2 (ex.: cigarro em milhar). 0 = não multiplica."
+        onChange={(e) =>
+          patchPendente(item.c_prod, { volume2: maskQtyInput(e.target.value) })
+        }
+      />
+    ),
     produto: (
       <select
         className="input-base input-compact"
         style={{ minWidth: 220 }}
         value={item.produto_sistema}
         disabled={busy}
-        onChange={(e) => setProduto(item.c_prod, e.target.value)}
+        onChange={(e) =>
+          patchPendente(item.c_prod, { produto_sistema: e.target.value })
+        }
       >
         <option value="">Selecione o produto…</option>
         {produtos.map((p) => (
@@ -265,16 +302,16 @@ function VincularProdutosPageInner() {
 
       <ModulePage
         title="Vincular produtos do XML"
-        description={`${notaLabel} — ${fornecedorNome}. Associe cada código do XML a um produto do sistema.`}
+        description={`${notaLabel} — ${fornecedorNome}. Associe cada código do XML a um produto. Volume/Volume2 iniciam em 0 (ex.: caixa 24; cigarro usa os dois).`}
         icon={<Link2 size={22} />}
         columns={[
           { key: "c_prod", label: "Cód. XML" },
           { key: "descricao", label: "Descrição XML" },
           { key: "ean", label: "EAN" },
-          { key: "ncm", label: "NCM" },
-          { key: "cfop", label: "CFOP" },
           { key: "un", label: "Un." },
           { key: "qtd", label: "Qtd", align: "right" as const },
+          { key: "volume", label: "Volume" },
+          { key: "volume2", label: "Volume 2" },
           { key: "produto", label: "Produto sistema" },
         ]}
         rows={
@@ -285,10 +322,10 @@ function VincularProdutosPageInner() {
                   c_prod: "—",
                   descricao: "Nenhum produto pendente de vínculo.",
                   ean: "",
-                  ncm: "",
-                  cfop: "",
                   un: "",
                   qtd: "",
+                  volume: "",
+                  volume2: "",
                   produto: "",
                 },
               ]
@@ -349,8 +386,8 @@ function VincularProdutosPageInner() {
         >
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
             Serão gravados <strong>{pendentes.length}</strong> vínculo(s) em{" "}
-            <code>nota_xmlproduto</code>. Nas próximas notas desse fornecedor, os
-            itens serão preenchidos automaticamente.
+            <code>nota_xmlproduto</code> (produto + volume/volume2). Nas próximas
+            notas desse fornecedor, os itens serão preenchidos automaticamente.
           </p>
         </CadastroModal>
       ) : null}
