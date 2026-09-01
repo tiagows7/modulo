@@ -30,6 +30,10 @@ interface ModulePageProps {
   actionsPlacement?: "header" | "search";
   /** Desabilita Exportar / botão principal (ex.: durante consulta). */
   actionsDisabled?: boolean;
+  /** Exibe o botão Exportar (padrão true). */
+  showExport?: boolean;
+  /** Ações extras ao lado do botão principal (ex.: Importar XML). */
+  secondaryActions?: ReactNode;
 }
 
 const fadeUp = {
@@ -57,6 +61,8 @@ export function ModulePage({
   filters,
   actionsPlacement = "header",
   actionsDisabled = false,
+  showExport = true,
+  secondaryActions,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
   const interactive = useSuppressGhostClick(450);
@@ -70,31 +76,34 @@ export function ModulePage({
 
   const actionButtons = (
     <>
-      <motion.button
-        type="button"
-        whileHover={actionsDisabled ? undefined : { scale: 1.03, y: -1 }}
-        whileTap={actionsDisabled ? undefined : { scale: 0.97 }}
-        disabled={actionsDisabled}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          padding: "9px 16px",
-          height: 40,
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: 8,
-          color: "var(--text-secondary)",
-          fontSize: 13,
-          fontWeight: 500,
-          cursor: actionsDisabled ? "not-allowed" : "pointer",
-          opacity: actionsDisabled ? 0.6 : 1,
-          flexShrink: 0,
-        }}
-      >
-        <Download size={14} /> Exportar
-      </motion.button>
+      {secondaryActions}
+      {showExport ? (
+        <motion.button
+          type="button"
+          whileHover={actionsDisabled ? undefined : { scale: 1.03, y: -1 }}
+          whileTap={actionsDisabled ? undefined : { scale: 0.97 }}
+          disabled={actionsDisabled}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "9px 16px",
+            height: 40,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: 8,
+            color: "var(--text-secondary)",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: actionsDisabled ? "not-allowed" : "pointer",
+            opacity: actionsDisabled ? 0.6 : 1,
+            flexShrink: 0,
+          }}
+        >
+          <Download size={14} /> Exportar
+        </motion.button>
+      ) : null}
       <motion.button
         type="button"
         id={`btn-add-${title.toLowerCase().replace(/\s/g, "-")}`}

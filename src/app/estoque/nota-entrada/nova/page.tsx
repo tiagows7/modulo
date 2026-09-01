@@ -558,7 +558,43 @@ export default function NotaEntradaNovaPage() {
         backUrl="/estoque/nota-entrada"
         actionsPlacement="search"
         actionsDisabled={bloqueado}
+        showExport={false}
         onAdd={bloqueado ? undefined : () => void consultarSefaz()}
+        secondaryActions={
+          <button
+            type="button"
+            disabled={bloqueado}
+            onClick={() => {
+              if (!filialId) {
+                setActionError(
+                  "Selecione a filial antes de importar o XML.",
+                );
+                return;
+              }
+              fileRef.current?.click();
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              height: 40,
+              padding: "9px 16px",
+              flexShrink: 0,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 8,
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: bloqueado ? "not-allowed" : "pointer",
+              opacity: bloqueado ? 0.65 : 1,
+            }}
+          >
+            <FileUp size={14} />
+            {importando ? "Importando…" : "Importar XML"}
+          </button>
+        }
         filters={
           <>
             <select
@@ -602,23 +638,6 @@ export default function NotaEntradaNovaPage() {
             >
               <RefreshCw size={12} />
               Atualizar
-            </button>
-            <button
-              type="button"
-              className="cadastro-btn-edit"
-              disabled={bloqueado}
-              onClick={() => {
-                if (!filialId) {
-                  setActionError(
-                    "Selecione a filial antes de importar o XML.",
-                  );
-                  return;
-                }
-                fileRef.current?.click();
-              }}
-            >
-              <FileUp size={12} />
-              {importando ? "Importando…" : "Importar XML"}
             </button>
             <button
               type="button"
