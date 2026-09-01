@@ -989,6 +989,30 @@ function NotaEntradaCadastroPage() {
     setActionError("");
     try {
       await gravar(async () => {
+        // Libera o manifesto para digitar de novo (FK zera nota_compra, mas digitada fica 1)
+        const { error: manErr } = await supabase
+          .from("nota_entradamanifesto")
+          .update({ digitada: 0, nota_compra: null })
+          .eq("nota_compra", deleting.id);
+        if (manErr) throw new Error(manErr.message);
+
+        // Fallback por chave (caso o vínculo já tenha sido limpo)
+        if (deleting.chave) {
+          const { error: manChaveErr } = await supabase
+            .from("nota_entradamanifesto")
+            .update({ digitada: 0, nota_compra: null })
+            .eq("chave", deleting.chave)
+            .eq("digitada", 1)
+            .is("nota_compra", null);
+          if (manChaveErr) throw new Error(manChaveErr.message);
+        }
+
+        const { error: titErr } = await supabase
+          .from("contas_pagar")
+          .delete()
+          .eq("nota_entrada", deleting.id);
+        if (titErr) throw new Error(titErr.message);
+
         const { error } = await supabase
           .from("nota_entrada")
           .delete()
