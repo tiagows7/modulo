@@ -22,11 +22,15 @@ export function CadastroRowActions({
   onDelete,
 }: CadastroRowActionsProps) {
   return (
-    <div className="cadastro-row-actions">
+    <div className="cadastro-row-actions" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className="cadastro-btn-edit"
-        onClick={onEdit}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onEdit();
+        }}
         disabled={disabled}
         title="Editar"
       >
@@ -36,7 +40,11 @@ export function CadastroRowActions({
       <button
         type="button"
         className="cadastro-btn-delete"
-        onClick={onDelete}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDelete();
+        }}
         disabled={disabled}
         title="Excluir"
       >

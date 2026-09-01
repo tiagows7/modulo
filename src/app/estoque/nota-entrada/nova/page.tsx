@@ -455,7 +455,11 @@ export default function NotaEntradaNovaPage() {
             type="button"
             className="cadastro-btn-edit"
             disabled={busy || consultando || importando}
-            onClick={() => void abrirDigitar(item.id)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void abrirDigitar(item.id);
+            }}
           >
             {item.digitada ? "Abrir" : "Digitar"}
           </button>

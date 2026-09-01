@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ReactNode, useState } from "react";
 import { Search, Plus, Filter, Download, ArrowLeft } from "lucide-react";
+import { useSuppressGhostClick } from "@/lib/useSuppressGhostClick";
 
 interface Column {
   key: string;
@@ -49,6 +50,7 @@ export function ModulePage({
   filters,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
+  const interactive = useSuppressGhostClick(450);
 
   const filtered = rows.filter((row) =>
     Object.values(row).some((v) =>
@@ -57,7 +59,14 @@ export function ModulePage({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 24,
+        pointerEvents: interactive ? "auto" : "none",
+      }}
+    >
       {/* Header */}
       <motion.div
         initial={false}

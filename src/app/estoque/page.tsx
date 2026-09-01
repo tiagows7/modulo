@@ -6,10 +6,16 @@ import { FileInput, Package } from "lucide-react";
 
 const submenus = [
   {
-    href: "/estoque/nota-entrada",
-    label: "Nota de Entrada",
+    href: "/estoque/nota-entrada/nova",
+    label: "Digitação de Notas",
     icon: FileInput,
-    description: "Notas digitadas, consulta SEFAZ e importação de XML",
+    description: "Consultar SEFAZ, importar XML e digitar nota de entrada",
+  },
+  {
+    href: "/estoque/nota-entrada",
+    label: "Notas Digitadas",
+    icon: Package,
+    description: "Consultar e editar notas de entrada já lançadas",
   },
 ];
 
