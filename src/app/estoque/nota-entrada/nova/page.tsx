@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileInput, FileUp, RefreshCw } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
@@ -108,11 +108,6 @@ export default function NotaEntradaNovaPage() {
   const [importando, setImportando] = useState(false);
   const [deleting, setDeleting] = useState<ManifestoRow | null>(null);
   const [despesaItem, setDespesaItem] = useState<ManifestoRow | null>(null);
-
-  const filialSel = useMemo(
-    () => filiais.find((f) => f.id === filialId) ?? null,
-    [filiais, filialId],
-  );
 
   const loadFiliais = useCallback(async () => {
     const { data } = await supabase
@@ -612,23 +607,6 @@ export default function NotaEntradaNovaPage() {
                 </option>
               ))}
             </select>
-            <span
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              CNPJ:{" "}
-              <strong style={{ color: "var(--text-secondary)" }}>
-                {filialSel ? formatCnpj(filialSel.cnpj) : "—"}
-              </strong>
-              {" · "}
-              Última NSU:{" "}
-              <strong style={{ color: "var(--text-secondary)" }}>
-                {filialSel?.ult_nsu || "0"}
-              </strong>
-            </span>
             <button
               type="button"
               className="cadastro-btn-edit"
