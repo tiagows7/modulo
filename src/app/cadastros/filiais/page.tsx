@@ -42,6 +42,7 @@ type Filial = {
   certificado_senha: string | null;
   schemas_storage_path: string | null;
   schemas_atualizado_em: string | null;
+  ult_nsu: string | null;
 };
 
 type FilialForm = {
@@ -59,6 +60,7 @@ type FilialForm = {
   telefone: string;
   status: string;
   certificado_senha: string;
+  ult_nsu: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -86,6 +88,7 @@ const emptyForm: FilialForm = {
   telefone: "",
   status: "ativo",
   certificado_senha: "",
+  ult_nsu: "",
 };
 
 const columns = [
@@ -132,6 +135,7 @@ function toForm(item: Filial): FilialForm {
     telefone: item.telefone ?? "",
     status: item.status === "inativo" ? "inativo" : "ativo",
     certificado_senha: item.certificado_senha ?? "",
+    ult_nsu: item.ult_nsu ?? "",
   };
 }
 
@@ -158,6 +162,7 @@ function toPayload(form: FilialForm) {
     telefone: blank(form.telefone),
     status: form.status === "inativo" ? "inativo" : "ativo",
     certificado_senha: blank(form.certificado_senha),
+    ult_nsu: blank(form.ult_nsu)?.replace(/\D/g, "") ?? null,
   };
 }
 
@@ -264,7 +269,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu",
         )
         .order("created_at", { ascending: false });
 
@@ -571,7 +576,7 @@ export default function FilialPage() {
             codigo,
           })
           .select(
-            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em",
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu",
           )
           .single();
         if (error) throw new Error(error.message);
@@ -1000,6 +1005,24 @@ export default function FilialPage() {
                     autoComplete="new-password"
                     placeholder="Senha do arquivo .pfx"
                   />
+                </CadastroField>
+
+                <CadastroField label="Última NSU (SEFAZ)" htmlFor="ult_nsu" span="full">
+                  <input
+                    id="ult_nsu"
+                    className="input-base input-compact"
+                    value={form.ult_nsu}
+                    onChange={(e) =>
+                      updateField("ult_nsu", e.target.value.replace(/\D/g, "").slice(0, 30))
+                    }
+                    disabled={busy}
+                    inputMode="numeric"
+                    placeholder="0"
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Cursor da distribuição DF-e. Atualizado automaticamente ao consultar a
+                    SEFAZ na digitação de notas.
+                  </p>
                 </CadastroField>
 
                 <CadastroField label="Schemas NF-e / NFC-e" htmlFor="schemas" span="full">

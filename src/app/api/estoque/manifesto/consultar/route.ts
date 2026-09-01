@@ -19,6 +19,17 @@ function onlyDigits(v: string) {
   return String(v || "").replace(/\D/g, "");
 }
 
+/** Compara NSUs numéricos e devolve o maior (como string de dígitos). */
+function maxNsu(...values: Array<string | number | null | undefined>) {
+  let best: string | null = null;
+  for (const v of values) {
+    const s = onlyDigits(String(v ?? ""));
+    if (!s) continue;
+    if (!best || BigInt(s) > BigInt(best)) best = s;
+  }
+  return best;
+}
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -63,7 +74,7 @@ async function consultarSefaz(params: {
   cnpj: string;
   uf?: string | null;
   ultimoNsu?: string | null;
-}): Promise<{ docs: ManifestoSefazDoc[]; message: string }> {
+}): Promise<{ docs: ManifestoSefazDoc[]; message: string; maxNsu: string | null }> {
   const url = bridgeUrl();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45_000);
@@ -93,15 +104,30 @@ async function consultarSefaz(params: {
       message?: string;
       documentos?: ManifestoSefazDoc[];
       docs?: ManifestoSefazDoc[];
+      maxNsu?: string | number | null;
+      maxNSU?: string | number | null;
+      ultimoNsu?: string | number | null;
+      ultNSU?: string | number | null;
+      ultNsu?: string | number | null;
     };
 
     const docs = json.documentos ?? json.docs ?? [];
+    const list = Array.isArray(docs) ? docs : [];
+    const maxFromDocs = maxNsu(...list.map((d) => d.nsu));
+    const maxFromResp = maxNsu(
+      json.maxNsu,
+      json.maxNSU,
+      json.ultimoNsu,
+      json.ultNSU,
+      json.ultNsu,
+    );
     return {
-      docs: Array.isArray(docs) ? docs : [],
+      docs: list,
+      maxNsu: maxNsu(maxFromDocs, maxFromResp),
       message:
         json.message ||
-        (docs.length
-          ? `${docs.length} documento(s) retornado(s) da SEFAZ.`
+        (list.length
+          ? `${list.length} documento(s) retornado(s) da SEFAZ.`
           : "Consulta SEFAZ concluída sem novos documentos."),
     };
   } catch (err) {
@@ -153,7 +179,7 @@ export async function POST(req: Request) {
 
   const { data: filial, error: filErr } = await supabase
     .from("filial")
-    .select("id, codigo, cnpj, razao_social, fantasia, endereco_uf")
+    .select("id, codigo, cnpj, razao_social, fantasia, endereco_uf, ult_nsu")
     .eq("id", filialId)
     .maybeSingle();
 
@@ -175,21 +201,29 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: lastNsuRow } = await supabase
-    .from("nota_entradamanifesto")
-    .select("nsu")
-    .eq("filial", filialId)
-    .not("nsu", "is", null)
-    .order("manifesto_registro", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Preferência: cursor persistido na filial; fallback: maior NSU do manifesto
+  let ultimoNsu =
+    filial.ult_nsu != null && String(filial.ult_nsu).trim()
+      ? onlyDigits(String(filial.ult_nsu))
+      : "";
+
+  if (!ultimoNsu) {
+    const { data: manifestoRows } = await supabase
+      .from("nota_entradamanifesto")
+      .select("nsu")
+      .eq("filial", filialId)
+      .not("nsu", "is", null)
+      .limit(500);
+    ultimoNsu =
+      maxNsu(...(manifestoRows ?? []).map((r) => r.nsu as string | null)) || "";
+  }
 
   let sefaz;
   try {
     sefaz = await consultarSefaz({
       cnpj,
       uf: filial.endereco_uf != null ? String(filial.endereco_uf) : null,
-      ultimoNsu: lastNsuRow?.nsu != null ? String(lastNsuRow.nsu) : "0",
+      ultimoNsu: ultimoNsu || "0",
     });
   } catch (err) {
     return NextResponse.json(
@@ -197,6 +231,7 @@ export async function POST(req: Request) {
         error: err instanceof Error ? err.message : "Falha na consulta SEFAZ.",
         cnpj,
         upserted: 0,
+        ult_nsu: ultimoNsu || "0",
       },
       { status: 502 },
     );
@@ -215,12 +250,16 @@ export async function POST(req: Request) {
 
   let upserted = 0;
   const now = new Date().toISOString();
+  let maxDocNsu: string | null = null;
 
   for (const doc of sefaz.docs) {
     const chave = onlyDigits(String(doc.chave || ""));
     if (chave.length !== 44) continue;
 
     const fornCnpj = onlyDigits(String(doc.fornecedor_cnpj || ""));
+    const nsuDoc = doc.nsu != null ? onlyDigits(String(doc.nsu)).slice(0, 30) : null;
+    maxDocNsu = maxNsu(maxDocNsu, nsuDoc);
+
     const payload = {
       filial: filialId,
       chave,
@@ -240,7 +279,7 @@ export async function POST(req: Request) {
       manifesto_protocolo: doc.protocolo
         ? String(doc.protocolo).slice(0, 40)
         : null,
-      nsu: doc.nsu != null ? String(doc.nsu).slice(0, 30) : null,
+      nsu: nsuDoc || null,
       xml: doc.xml != null ? Number(doc.xml) || 0 : 1,
     };
 
@@ -251,11 +290,32 @@ export async function POST(req: Request) {
     if (!error) upserted += 1;
   }
 
+  const novoUltNsu = maxNsu(ultimoNsu, sefaz.maxNsu, maxDocNsu);
+  if (novoUltNsu && novoUltNsu !== onlyDigits(String(filial.ult_nsu || ""))) {
+    const { error: nsuErr } = await supabase
+      .from("filial")
+      .update({ ult_nsu: novoUltNsu.slice(0, 30) })
+      .eq("id", filialId);
+    if (nsuErr) {
+      return NextResponse.json(
+        {
+          error: `Notas importadas, mas falhou ao gravar ult_nsu: ${nsuErr.message}`,
+          cnpj,
+          recebidos: sefaz.docs.length,
+          upserted,
+          ult_nsu: novoUltNsu,
+        },
+        { status: 500 },
+      );
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     cnpj,
     recebidos: sefaz.docs.length,
     upserted,
+    ult_nsu: novoUltNsu || ultimoNsu || "0",
     message: sefaz.message,
   });
 }

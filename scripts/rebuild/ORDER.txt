@@ -58,3 +58,4 @@
 
 52_fix_rls_authenticated_with_check.sql
 53_filial_fiscal_nfe.sql
+54_filial_ult_nsu.sql

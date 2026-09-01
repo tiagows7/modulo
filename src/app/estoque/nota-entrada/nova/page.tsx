@@ -22,6 +22,7 @@ type FilialOpt = {
   fantasia: string | null;
   razao_social: string;
   cnpj: string | null;
+  ult_nsu: string | null;
 };
 
 type ManifestoRow = {
@@ -117,7 +118,7 @@ export default function NotaEntradaNovaPage() {
   const loadFiliais = useCallback(async () => {
     const { data } = await supabase
       .from("filial")
-      .select("id, codigo, fantasia, razao_social, cnpj")
+      .select("id, codigo, fantasia, razao_social, cnpj, ult_nsu")
       .eq("status", "ativo")
       .order("codigo");
 
@@ -127,6 +128,7 @@ export default function NotaEntradaNovaPage() {
       fantasia: f.fantasia != null ? String(f.fantasia) : null,
       razao_social: String(f.razao_social ?? ""),
       cnpj: f.cnpj != null ? String(f.cnpj) : null,
+      ult_nsu: f.ult_nsu != null ? String(f.ult_nsu) : null,
     }));
     setFiliais(rows);
     setFilialId((prev) => prev || (rows.length === 1 ? rows[0].id : ""));
@@ -254,17 +256,29 @@ export default function NotaEntradaNovaPage() {
         upserted?: number;
         recebidos?: number;
         cnpj?: string;
+        ult_nsu?: string;
       };
 
       if (!res.ok) {
         throw new Error(json.error || "Falha ao consultar a SEFAZ.");
       }
 
+      if (json.ult_nsu) {
+        setFiliais((prev) =>
+          prev.map((f) =>
+            f.id === filialId ? { ...f, ult_nsu: String(json.ult_nsu) } : f,
+          ),
+        );
+      }
+
+      const nsuInfo = json.ult_nsu ? ` Última NSU: ${json.ult_nsu}.` : "";
       setInfoMsg(
-        json.message ||
-          `${json.upserted ?? 0} nota(s) sincronizada(s) para o CNPJ ${formatCnpj(json.cnpj ?? null)}.`,
+        (json.message ||
+          `${json.upserted ?? 0} nota(s) sincronizada(s) para o CNPJ ${formatCnpj(json.cnpj ?? null)}.`) +
+          nsuInfo,
       );
       await loadData();
+      await loadFiliais();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Falha ao consultar a SEFAZ.",
@@ -568,6 +582,11 @@ export default function NotaEntradaNovaPage() {
               CNPJ:{" "}
               <strong style={{ color: "var(--text-secondary)" }}>
                 {filialSel ? formatCnpj(filialSel.cnpj) : "—"}
+              </strong>
+              {" · "}
+              Última NSU:{" "}
+              <strong style={{ color: "var(--text-secondary)" }}>
+                {filialSel?.ult_nsu || "0"}
               </strong>
             </span>
             <button
