@@ -1017,6 +1017,22 @@ function NotaEntradaCadastroPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      setFormError(
+        "Sessão expirada ou não autenticada. Faça login novamente e tente salvar.",
+      );
+      setTab("geral");
+      return;
+    }
+    // Garante JWT fresco nas próximas requests REST
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
     const numero = Number(String(form.numero).trim());
     if (!Number.isFinite(numero) || numero <= 0) {
       setFormError("Informe o número da nota.");
@@ -1037,6 +1053,12 @@ function NotaEntradaCadastroPage() {
     const linhas = formItems
       .map((row, idx) => ({ row, idx }))
       .filter(({ row }) => row.x_prod.trim() || row.produto_id);
+
+    if (!linhas.length) {
+      setFormError("Inclua pelo menos um item na nota.");
+      setTab("geral");
+      return;
+    }
 
     for (const { row, idx } of linhas) {
       if (!row.x_prod.trim()) {
@@ -1306,7 +1328,24 @@ function NotaEntradaCadastroPage() {
       setFormTanques([]);
       await loadData();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Falha ao gravar.");
+      const raw = err instanceof Error ? err.message : "Falha ao gravar.";
+      let msg = raw;
+      if (/row-level security|RLS/i.test(raw)) {
+        msg =
+          "Sem permissão para gravar (sessão/RLS). Faça login novamente e tente outra vez.";
+      } else if (/duplicate key|unique constraint/i.test(raw)) {
+        if (/chave/i.test(raw)) {
+          msg =
+            "Já existe uma nota com esta chave de acesso. Abra a nota existente para editar.";
+        } else if (/filial_numero_serie|numero/i.test(raw)) {
+          msg =
+            "Já existe uma nota com este número/série/modelo nesta filial.";
+        } else {
+          msg = `Registro duplicado: ${raw}`;
+        }
+      }
+      setFormError(msg);
+      setTab("geral");
     }
   };
 
@@ -1401,6 +1440,14 @@ function NotaEntradaCadastroPage() {
             />
           }
         >
+          {formError ? (
+            <CadastroFormError
+              title="Não foi possível salvar"
+              message={formError}
+              onClose={() => setFormError("")}
+            />
+          ) : null}
+
           <div className="cadastro-tabs" role="tablist">
             {tabs.map((item) => (
               <button
@@ -2332,18 +2379,6 @@ function NotaEntradaCadastroPage() {
                 </div>
               )}
             </div>
-          ) : null}
-
-          {formError ? (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: "var(--danger, #e35d6a)",
-              }}
-            >
-              {formError}
-            </p>
           ) : null}
         </CadastroModal>
       ) : null}

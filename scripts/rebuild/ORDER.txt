@@ -55,3 +55,5 @@
 49_nota_entrada_drop_emit.sql
 50_nota_entrada_drop_dest.sql
 51_contas_pagar.sql
+
+52_fix_rls_authenticated_with_check.sql
