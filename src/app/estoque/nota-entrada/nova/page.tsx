@@ -97,7 +97,7 @@ function shortChave(chave: string | null) {
 
 export default function NotaEntradaNovaPage() {
   const router = useRouter();
-  const { busy, pesquisar, gravar } = useDbStatus();
+  const { busy, pesquisar, gravar, consultar } = useDbStatus();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [filialId, setFilialId] = useState("");
@@ -105,7 +105,6 @@ export default function NotaEntradaNovaPage() {
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
-  const [consultando, setConsultando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [deleting, setDeleting] = useState<ManifestoRow | null>(null);
   const [despesaItem, setDespesaItem] = useState<ManifestoRow | null>(null);
@@ -233,62 +232,61 @@ export default function NotaEntradaNovaPage() {
       );
       return;
     }
-    setConsultando(true);
     setActionError("");
     setInfoMsg("");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+      await consultar(async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
-      const res = await fetch("/api/estoque/manifesto/consultar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ filialId }),
-      });
+        const res = await fetch("/api/estoque/manifesto/consultar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ filialId }),
+        });
 
-      const json = (await res.json()) as {
-        error?: string;
-        message?: string;
-        upserted?: number;
-        recebidos?: number;
-        com_xml?: number;
-        cnpj?: string;
-        ult_nsu?: string;
-      };
+        const json = (await res.json()) as {
+          error?: string;
+          message?: string;
+          upserted?: number;
+          recebidos?: number;
+          com_xml?: number;
+          cnpj?: string;
+          ult_nsu?: string;
+        };
 
-      if (!res.ok) {
-        throw new Error(json.error || "Falha ao consultar a SEFAZ.");
-      }
+        if (!res.ok) {
+          throw new Error(json.error || "Falha ao consultar a SEFAZ.");
+        }
 
-      if (json.ult_nsu) {
-        setFiliais((prev) =>
-          prev.map((f) =>
-            f.id === filialId ? { ...f, ult_nsu: String(json.ult_nsu) } : f,
-          ),
+        if (json.ult_nsu) {
+          setFiliais((prev) =>
+            prev.map((f) =>
+              f.id === filialId ? { ...f, ult_nsu: String(json.ult_nsu) } : f,
+            ),
+          );
+        }
+
+        const nsuInfo = json.ult_nsu ? ` Última NSU: ${json.ult_nsu}.` : "";
+        const xmlInfo =
+          json.com_xml != null ? ` XML completo: ${json.com_xml}.` : "";
+        setInfoMsg(
+          (json.message ||
+            `${json.upserted ?? 0} nota(s) sincronizada(s) para o CNPJ ${formatCnpj(json.cnpj ?? null)}.`) +
+            xmlInfo +
+            nsuInfo,
         );
-      }
-
-      const nsuInfo = json.ult_nsu ? ` Última NSU: ${json.ult_nsu}.` : "";
-      const xmlInfo =
-        json.com_xml != null ? ` XML completo: ${json.com_xml}.` : "";
-      setInfoMsg(
-        (json.message ||
-          `${json.upserted ?? 0} nota(s) sincronizada(s) para o CNPJ ${formatCnpj(json.cnpj ?? null)}.`) +
-          xmlInfo +
-          nsuInfo,
-      );
-      await loadData();
-      await loadFiliais();
+        await loadData();
+        await loadFiliais();
+      });
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Falha ao consultar a SEFAZ.",
       );
-    } finally {
-      setConsultando(false);
     }
   };
 
@@ -472,7 +470,7 @@ export default function NotaEntradaNovaPage() {
           <button
             type="button"
             className="cadastro-btn-edit"
-            disabled={busy || consultando || importando}
+            disabled={busy || importando}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -486,7 +484,7 @@ export default function NotaEntradaNovaPage() {
           <button
             type="button"
             className="cadastro-btn-edit"
-            disabled={busy || consultando || importando}
+            disabled={busy || importando}
             onClick={() => {
               setActionError("");
               setDespesaItem(item);
@@ -499,7 +497,7 @@ export default function NotaEntradaNovaPage() {
         <button
           type="button"
           className="cadastro-btn-delete"
-          disabled={busy || consultando || importando}
+          disabled={busy || importando}
           onClick={() => {
             setActionError("");
             setDeleting(item);
@@ -511,7 +509,7 @@ export default function NotaEntradaNovaPage() {
     ),
   }));
 
-  const bloqueado = busy || consultando || importando;
+  const bloqueado = busy || importando;
 
   return (
     <>
@@ -556,14 +554,16 @@ export default function NotaEntradaNovaPage() {
         icon={<FileInput size={22} />}
         columns={columns}
         rows={rows}
-        addLabel={consultando ? "Consultando…" : "Consultar SEFAZ"}
+        addLabel="Consultar SEFAZ"
         backUrl="/estoque/nota-entrada"
+        actionsPlacement="search"
+        actionsDisabled={bloqueado}
         onAdd={bloqueado ? undefined : () => void consultarSefaz()}
         filters={
           <>
             <select
               className="input-base input-compact"
-              style={{ minWidth: 240, width: "auto", flex: "0 1 280px" }}
+              style={{ minWidth: 220, width: "auto", flex: "0 1 260px", height: 40 }}
               value={filialId}
               onChange={(e) => setFilialId(e.target.value)}
               disabled={bloqueado}

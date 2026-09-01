@@ -43,8 +43,8 @@ function statusCopy(status: DbStatus) {
   }
   if (status === "consultando") {
     return {
-      title: "Consultando",
-      message: "Consultando CNPJ…",
+      title: "Aguarde",
+      message: "Consultando… Por favor, aguarde.",
     };
   }
   return null;

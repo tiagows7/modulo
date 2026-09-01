@@ -23,6 +23,13 @@ interface ModulePageProps {
   onAdd?: () => void;
   /** Conteúdo extra na barra de busca (ex.: select de filial). */
   filters?: ReactNode;
+  /**
+   * Onde ficam Exportar + botão principal.
+   * `search` = mesma linha do campo Buscar (ex.: digitação de notas).
+   */
+  actionsPlacement?: "header" | "search";
+  /** Desabilita Exportar / botão principal (ex.: durante consulta). */
+  actionsDisabled?: boolean;
 }
 
 const fadeUp = {
@@ -48,14 +55,68 @@ export function ModulePage({
   backUrl,
   onAdd,
   filters,
+  actionsPlacement = "header",
+  actionsDisabled = false,
 }: ModulePageProps) {
   const [search, setSearch] = useState("");
   const interactive = useSuppressGhostClick(450);
+  const actionsInSearch = actionsPlacement === "search";
 
   const filtered = rows.filter((row) =>
     Object.values(row).some((v) =>
       String(v).toLowerCase().includes(search.toLowerCase())
     )
+  );
+
+  const actionButtons = (
+    <>
+      <motion.button
+        type="button"
+        whileHover={actionsDisabled ? undefined : { scale: 1.03, y: -1 }}
+        whileTap={actionsDisabled ? undefined : { scale: 0.97 }}
+        disabled={actionsDisabled}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          padding: "9px 16px",
+          height: 40,
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: 8,
+          color: "var(--text-secondary)",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: actionsDisabled ? "not-allowed" : "pointer",
+          opacity: actionsDisabled ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        <Download size={14} /> Exportar
+      </motion.button>
+      <motion.button
+        type="button"
+        id={`btn-add-${title.toLowerCase().replace(/\s/g, "-")}`}
+        whileHover={actionsDisabled || !onAdd ? undefined : { scale: 1.03, y: -1 }}
+        whileTap={actionsDisabled || !onAdd ? undefined : { scale: 0.97 }}
+        className="btn-primary"
+        disabled={actionsDisabled || !onAdd}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          height: 40,
+          flexShrink: 0,
+          opacity: actionsDisabled || !onAdd ? 0.65 : 1,
+          cursor: actionsDisabled || !onAdd ? "not-allowed" : "pointer",
+        }}
+        onClick={onAdd}
+      >
+        <Plus size={15} /> {addLabel}
+      </motion.button>
+    </>
   );
 
   return (
@@ -112,55 +173,35 @@ export function ModulePage({
           </div>
         </div>
 
-        <div className="module-page-header-actions">
-          <motion.button
-            whileHover={{ scale: 1.03, y: -1 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "9px 16px",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: 8,
-              color: "var(--text-secondary)",
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-            }}
-          >
-            <Download size={14} /> Exportar
-          </motion.button>
-          <motion.button
-            type="button"
-            id={`btn-add-${title.toLowerCase().replace(/\s/g, "-")}`}
-            whileHover={{ scale: 1.03, y: -1 }}
-            whileTap={{ scale: 0.97 }}
-            className="btn-primary"
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-            onClick={onAdd}
-          >
-            <Plus size={15} /> {addLabel}
-          </motion.button>
-        </div>
+        {!actionsInSearch ? (
+          <div className="module-page-header-actions">{actionButtons}</div>
+        ) : null}
       </motion.div>
 
-      {/* Search & Filters */}
+      {/* Search & Filters (+ ações opcionais na mesma linha) */}
       <motion.div
         custom={1}
         variants={fadeUp}
         initial="hidden"
         animate="visible"
+        className={
+          actionsInSearch
+            ? "module-page-toolbar module-page-toolbar--with-actions"
+            : "module-page-toolbar"
+        }
         style={{
           display: "flex",
           gap: 10,
           alignItems: "center",
-          flexWrap: "wrap",
+          flexWrap: "nowrap",
         }}
       >
         <div
           style={{
             position: "relative",
-            flex: "1 1 220px",
-            maxWidth: 380,
-            minWidth: 180,
+            flex: "1 1 200px",
+            maxWidth: actionsInSearch ? 320 : 380,
+            minWidth: 160,
             display: "flex",
             alignItems: "center",
           }}
@@ -184,7 +225,7 @@ export function ModulePage({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-base"
-            style={{ paddingLeft: 38, width: "100%" }}
+            style={{ paddingLeft: 38, width: "100%", height: 40 }}
           />
         </div>
         {!filters ? (
@@ -214,16 +255,32 @@ export function ModulePage({
         ) : null}
         {filters ? (
           <div
+            className="module-page-toolbar-filters"
             style={{
               display: "flex",
               gap: 10,
               alignItems: "center",
-              flexWrap: "wrap",
+              flexWrap: "nowrap",
               flex: "1 1 auto",
               minWidth: 0,
+              overflowX: "auto",
             }}
           >
             {filters}
+          </div>
+        ) : null}
+        {actionsInSearch ? (
+          <div
+            className="module-page-toolbar-actions"
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexShrink: 0,
+              marginLeft: "auto",
+            }}
+          >
+            {actionButtons}
           </div>
         ) : null}
       </motion.div>
