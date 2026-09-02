@@ -1,23 +1,11 @@
 import { supabase } from "@/lib/supabase";
+import {
+  calcMarcacaoFinal,
+  calcVariacaoMarcacao,
+} from "@/lib/estoque/marcacaoTanqueMath";
+import { recalcularMarcacaoTanquesAFrente } from "@/lib/estoque/recalcularMarcacaoTanquesAFrente";
 
-/** marcacao_final teórico = inicial + entradas − saídas */
-export function calcMarcacaoFinal(
-  inicial: number,
-  entradas: number,
-  saidas: number,
-) {
-  return Number((inicial + entradas - saidas).toFixed(3));
-}
-
-/** variação = inicial + entradas − saídas − final */
-export function calcVariacaoMarcacao(
-  inicial: number,
-  entradas: number,
-  saidas: number,
-  final: number,
-) {
-  return Number((inicial + entradas - saidas - final).toFixed(3));
-}
+export { calcMarcacaoFinal, calcVariacaoMarcacao } from "@/lib/estoque/marcacaoTanqueMath";
 
 async function lastMarcacaoFinal(tanqueId: string, beforeDate: string) {
   const { data } = await supabase
@@ -223,4 +211,11 @@ export async function aplicarEntradasMarcacaoTanque(args: {
 
     if (error) throw new Error(error.message);
   }
+
+  // Propaga final do dia → inicial dos dias seguintes (e volume_atual do tanque)
+  await recalcularMarcacaoTanquesAFrente({
+    filialId: args.filialId,
+    afterDate: dataIso,
+    tanqueIds: lista.map((t) => t.id),
+  });
 }

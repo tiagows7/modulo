@@ -13,6 +13,7 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { recalcularMarcacaoTanquesAFrente } from "@/lib/estoque/recalcularMarcacaoTanquesAFrente";
 
 type FilialOpt = {
   id: string;
@@ -453,6 +454,12 @@ export default function MedicaoTanquesPage() {
             if (error) throw new Error(error.message);
           }
         }
+
+        await recalcularMarcacaoTanquesAFrente({
+          filialId: formFilial,
+          afterDate: formData,
+          tanqueIds: lines.map((l) => l.tanqueId),
+        });
       });
 
       setModalOpen(false);
@@ -472,6 +479,14 @@ export default function MedicaoTanquesPage() {
           .delete()
           .eq("id", deleting.id);
         if (error) throw new Error(error.message);
+
+        if (deleting.filial) {
+          await recalcularMarcacaoTanquesAFrente({
+            filialId: deleting.filial,
+            afterDate: deleting.data,
+            tanqueIds: [deleting.tanque],
+          });
+        }
       });
       setDeleting(null);
       await loadData();
