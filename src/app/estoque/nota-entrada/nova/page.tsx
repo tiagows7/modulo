@@ -50,7 +50,6 @@ const columns = [
   { key: "numero", label: "Número" },
   { key: "emissao", label: "Emissão" },
   { key: "fornecedor", label: "Fornecedor" },
-  { key: "cnpj", label: "CNPJ" },
   { key: "valor", label: "Valor", align: "right" as const },
   { key: "nsu", label: "NSU" },
   { key: "xml", label: "XML", align: "center" as const },
@@ -432,7 +431,6 @@ export default function NotaEntradaNovaPage() {
     numero: item.numero != null ? String(item.numero) : "—",
     emissao: formatDateBr(item.emissao),
     fornecedor: item.fornecedor_nome?.trim() || "—",
-    cnpj: formatCnpj(item.fornecedor_cnpj),
     valor: formatMoney(item.valor),
     nsu: item.nsu || "—",
     xml: (

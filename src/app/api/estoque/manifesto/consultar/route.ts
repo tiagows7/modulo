@@ -19,9 +19,7 @@ function onlyDigits(v: string) {
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -169,7 +167,10 @@ export async function POST(req: Request) {
   const supabase = adminClient();
   if (!supabase) {
     return NextResponse.json(
-      { error: "Supabase não configurado." },
+      {
+        error:
+          "Supabase não configurado (defina SUPABASE_SERVICE_ROLE_KEY para gravar ult_nsu e baixar o certificado).",
+      },
       { status: 500 },
     );
   }
@@ -372,27 +373,49 @@ export async function POST(req: Request) {
     if (!error) upserted += 1;
   }
 
-  const novoUltNsu = padNsu(
-    maxNsu(ultimoNsu, sefaz.maxNsu, sefaz.ultNsu, maxDocNsu) || "0",
-  );
-  if (novoUltNsu !== padNsu(filial.ult_nsu || "0")) {
-    const { error: nsuErr } = await supabase
-      .from("filial")
-      .update({ ult_nsu: novoUltNsu.slice(0, 30) })
-      .eq("id", filialId);
-    if (nsuErr) {
-      return NextResponse.json(
-        {
-          error: `Notas importadas, mas falhou ao gravar ult_nsu: ${nsuErr.message}`,
-          cnpj,
-          recebidos: sefaz.docs.length,
-          upserted,
-          com_xml: comXml,
-          ult_nsu: novoUltNsu,
-        },
-        { status: 500 },
-      );
-    }
+  // Cursor a persistir: último NSU efetivamente processado (docs + ultNSU da SEFAZ).
+  // Não avança para maxNSU se ainda não consumimos até lá (evita pular documentos).
+  const ultProcessado = padNsu(maxNsu(sefaz.ultNsu, maxDocNsu) || "0");
+  const maxDisponivel = padNsu(sefaz.maxNsu || "0");
+  const novoUltNsu =
+    BigInt(ultProcessado) >= BigInt(maxDisponivel)
+      ? maxNsu(ultProcessado, maxDisponivel)
+      : ultProcessado;
+
+  const { data: filialUpdated, error: nsuErr } = await supabase
+    .from("filial")
+    .update({ ult_nsu: novoUltNsu.slice(0, 30) })
+    .eq("id", filialId)
+    .select("id, ult_nsu")
+    .maybeSingle();
+
+  if (nsuErr) {
+    return NextResponse.json(
+      {
+        error: `Notas importadas, mas falhou ao gravar ult_nsu na filial: ${nsuErr.message}`,
+        cnpj,
+        recebidos: sefaz.docs.length,
+        upserted,
+        com_xml: comXml,
+        ult_nsu: novoUltNsu,
+      },
+      { status: 500 },
+    );
+  }
+
+  if (!filialUpdated) {
+    return NextResponse.json(
+      {
+        error:
+          "Notas importadas, mas a filial não foi atualizada (ult_nsu). Verifique permissões/RLS.",
+        cnpj,
+        recebidos: sefaz.docs.length,
+        upserted,
+        com_xml: comXml,
+        ult_nsu: novoUltNsu,
+      },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({
@@ -401,7 +424,7 @@ export async function POST(req: Request) {
     recebidos: sefaz.docs.length,
     upserted,
     com_xml: comXml,
-    ult_nsu: novoUltNsu,
+    ult_nsu: onlyDigits(String(filialUpdated.ult_nsu || novoUltNsu)) || novoUltNsu,
     cStat: sefaz.cStat ?? null,
     consultas: sefaz.consultas ?? null,
     message: sefaz.message,
