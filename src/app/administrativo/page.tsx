@@ -29,6 +29,7 @@ type KpiCardData = {
   icon: LucideIcon;
   color: string;
   glow: string;
+  postoOnly?: boolean;
 };
 
 type DayAgg = { qtd: number; litros: number; valor: number };
@@ -213,8 +214,13 @@ async function loadMonthlySales(): Promise<MonthPoint[]> {
   return points;
 }
 
-function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
-  return [
+function buildKpiCards(
+  today: DayAgg,
+  yesterday: DayAgg,
+  opts?: { temPosto?: boolean },
+): KpiCardData[] {
+  const temPosto = opts?.temPosto !== false;
+  const cards: KpiCardData[] = [
     {
       id: "vendas",
       title: "Vendas do Dia",
@@ -224,6 +230,7 @@ function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
       icon: DollarSign,
       color: "#1A6FD8",
       glow: "rgba(26,111,216,0.25)",
+      postoOnly: true,
     },
     {
       id: "abastecimentos",
@@ -234,6 +241,7 @@ function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
       icon: Fuel,
       color: "#4A9FE8",
       glow: "rgba(74,159,232,0.25)",
+      postoOnly: true,
     },
     {
       id: "litros",
@@ -244,6 +252,7 @@ function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
       icon: Droplets,
       color: "#22C55E",
       glow: "rgba(34,197,94,0.25)",
+      postoOnly: true,
     },
     {
       id: "caixa",
@@ -256,6 +265,8 @@ function buildKpiCards(today: DayAgg, yesterday: DayAgg): KpiCardData[] {
       glow: "rgba(245,197,24,0.25)",
     },
   ];
+
+  return cards.filter((c) => !c.postoOnly || temPosto);
 }
 
 const FUEL_COLORS = ["#1A6FD8", "#4A9FE8", "#22C55E", "#F5C518", "#A78BFA", "#F97316"];
@@ -907,10 +918,10 @@ export default function DashboardPage() {
       const yesterdayIso = isoDateLocal(y);
 
       const [today, yesterday, months, fuel, despesas] = await Promise.all([
-        loadDayAgg(todayIso),
-        loadDayAgg(yesterdayIso),
-        loadMonthlySales(),
-        postoReady && temPosto
+        temPosto ? loadDayAgg(todayIso) : Promise.resolve(emptyAgg),
+        temPosto ? loadDayAgg(yesterdayIso) : Promise.resolve(emptyAgg),
+        temPosto ? loadMonthlySales() : Promise.resolve([] as MonthPoint[]),
+        temPosto
           ? loadFuelStockFromMarcacao()
           : Promise.resolve({
               items: [] as FuelStockItem[],
@@ -920,7 +931,7 @@ export default function DashboardPage() {
         loadContasPagarHoje(todayIso),
       ]);
       if (cancelled) return;
-      setKpiCards(buildKpiCards(today, yesterday));
+      setKpiCards(buildKpiCards(today, yesterday, { temPosto }));
       setMonthPoints(months);
       setFuelStock(fuel.items);
       setFuelRefDate(fuel.refDate);
@@ -1006,7 +1017,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <SalesMonthlyChart points={monthPoints} />
+      {temPosto ? <SalesMonthlyChart points={monthPoints} /> : null}
 
       <div className="admin-dash-split">
         {temPosto ? (
