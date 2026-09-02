@@ -107,6 +107,10 @@ export default function NotaEntradaNovaPage() {
   const [importando, setImportando] = useState(false);
   const [deleting, setDeleting] = useState<ManifestoRow | null>(null);
   const [despesaItem, setDespesaItem] = useState<ManifestoRow | null>(null);
+  /** pendentes = não digitadas e não despesa (padrão); processadas = digitadas ou despesa */
+  const [listaFiltro, setListaFiltro] = useState<
+    "pendentes" | "processadas" | "todas"
+  >("pendentes");
 
   const loadFiliais = useCallback(async () => {
     const { data } = await supabase
@@ -143,6 +147,12 @@ export default function NotaEntradaNovaPage() {
         .order("numero", { ascending: false });
 
       if (filialId) q = q.eq("filial", filialId);
+
+      if (listaFiltro === "pendentes") {
+        q = q.eq("digitada", 0).eq("despesa", 0);
+      } else if (listaFiltro === "processadas") {
+        q = q.or("digitada.eq.1,despesa.eq.1");
+      }
 
       const { data, error } = await q;
       if (error) {
@@ -184,7 +194,7 @@ export default function NotaEntradaNovaPage() {
         })),
       );
     });
-  }, [pesquisar, filialId]);
+  }, [pesquisar, filialId, listaFiltro]);
 
   useEffect(() => {
     void loadFiliais();
@@ -604,6 +614,22 @@ export default function NotaEntradaNovaPage() {
                   {filialLabel(f)}
                 </option>
               ))}
+            </select>
+            <select
+              className="input-base input-compact"
+              style={{ minWidth: 200, width: "auto", flex: "0 0 auto", height: 40 }}
+              value={listaFiltro}
+              onChange={(e) =>
+                setListaFiltro(
+                  e.target.value as "pendentes" | "processadas" | "todas",
+                )
+              }
+              disabled={bloqueado}
+              aria-label="Filtro do manifesto"
+            >
+              <option value="pendentes">Pendentes</option>
+              <option value="processadas">Digitadas / Despesas</option>
+              <option value="todas">Todas</option>
             </select>
             <button
               type="button"
