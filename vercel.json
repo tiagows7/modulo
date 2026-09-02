@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/estoque/manifesto/consultar/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/nfe/distribuicao/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

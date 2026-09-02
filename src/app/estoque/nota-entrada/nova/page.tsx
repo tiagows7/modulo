@@ -298,7 +298,8 @@ export default function NotaEntradaNovaPage() {
           body: JSON.stringify({ filialId }),
         });
 
-        const json = (await res.json()) as {
+        const raw = await res.text();
+        let json: {
           error?: string;
           message?: string;
           upserted?: number;
@@ -306,7 +307,18 @@ export default function NotaEntradaNovaPage() {
           com_xml?: number;
           cnpj?: string;
           ult_nsu?: string;
+          incompleto?: boolean;
         };
+        try {
+          json = raw ? (JSON.parse(raw) as typeof json) : {};
+        } catch {
+          const hint = /an error occurred|FUNCTION_INVOCATION|timeout|504|502/i.test(
+            raw,
+          )
+            ? "O servidor interrompeu a consulta SEFAZ (timeout/certificado). Confira o .pfx/senha e tente de novo."
+            : raw.slice(0, 180) || "Resposta inválida da API.";
+          throw new Error(hint);
+        }
 
         if (!res.ok) {
           throw new Error(json.error || "Falha ao consultar a SEFAZ.");

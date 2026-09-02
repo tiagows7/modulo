@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@modulo/nfe-distribuicao-dfe"],
 };
 
 export default nextConfig;

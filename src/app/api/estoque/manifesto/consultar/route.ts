@@ -7,6 +7,7 @@ import {
   padNsu,
   type DistDfeDoc,
 } from "@modulo/nfe-distribuicao-dfe";
+import { assertValidPfx } from "@/lib/nfe/assertValidPfx";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,6 +16,14 @@ const FISCAL_BUCKET = "filial-fiscal";
 
 function onlyDigits(v: string) {
   return onlyDigitsNfe(v);
+}
+
+function jsonError(
+  error: string,
+  status: number,
+  extra?: Record<string, unknown>,
+) {
+  return NextResponse.json({ error, ...extra }, { status });
 }
 
 function adminClient() {
@@ -159,19 +168,27 @@ async function consultarBridge(params: {
 }
 
 export async function POST(req: Request) {
+  try {
+    return await postConsultar(req);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Falha interna na consulta SEFAZ.";
+    console.error("[manifesto/consultar]", err);
+    return jsonError(message, 500);
+  }
+}
+
+async function postConsultar(req: Request) {
   const auth = await verifyUser(req);
   if ("error" in auth && auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return jsonError(auth.error, 401);
   }
 
   const supabase = adminClient();
   if (!supabase) {
-    return NextResponse.json(
-      {
-        error:
-          "Supabase não configurado (defina SUPABASE_SERVICE_ROLE_KEY para gravar ult_nsu e baixar o certificado).",
-      },
-      { status: 500 },
+    return jsonError(
+      "Supabase não configurado (defina SUPABASE_SERVICE_ROLE_KEY para gravar ult_nsu e baixar o certificado).",
+      500,
     );
   }
 
@@ -179,15 +196,12 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as { filialId?: string };
   } catch {
-    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+    return jsonError("JSON inválido.", 400);
   }
 
   const filialId = String(body.filialId || "").trim();
   if (!filialId) {
-    return NextResponse.json(
-      { error: "Informe a filial para consultar a SEFAZ." },
-      { status: 400 },
-    );
+    return jsonError("Informe a filial para consultar a SEFAZ.", 400);
   }
 
   const { data: filial, error: filErr } = await supabase
@@ -199,20 +213,18 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (filErr) {
-    return NextResponse.json({ error: filErr.message }, { status: 500 });
+    return jsonError(filErr.message, 500);
   }
   if (!filial) {
-    return NextResponse.json({ error: "Filial não encontrada." }, { status: 404 });
+    return jsonError("Filial não encontrada.", 404);
   }
 
   const cnpj = onlyDigits(String(filial.cnpj || ""));
   if (cnpj.length !== 14) {
-    return NextResponse.json(
-      {
-        error:
-          "CNPJ da filial inválido ou não cadastrado. Atualize o cadastro da filial antes de consultar a SEFAZ.",
-      },
-      { status: 400 },
+    return jsonError(
+      "CNPJ da filial inválido ou não cadastrado. Atualize o cadastro da filial antes de consultar a SEFAZ.",
+      400,
+      { cnpj, upserted: 0, ult_nsu: "0" },
     );
   }
 
@@ -248,37 +260,32 @@ export async function POST(req: Request) {
       });
     } else {
       if (!certPath) {
-        return NextResponse.json(
-          {
-            error:
-              "Certificado A1 não cadastrado nesta filial. Em Cadastros → Filiais → Config NF-E / NFC-E, envie o arquivo .pfx e a senha.",
-            cnpj,
-            upserted: 0,
-            ult_nsu: padNsu(ultimoNsu),
-          },
-          { status: 400 },
+        return jsonError(
+          "Certificado A1 não cadastrado nesta filial. Em Cadastros → Filiais → Config NF-E / NFC-E, envie o arquivo .pfx e a senha.",
+          400,
+          { cnpj, upserted: 0, ult_nsu: padNsu(ultimoNsu) },
         );
       }
       if (!certSenha) {
-        return NextResponse.json(
-          {
-            error:
-              "Senha do certificado não cadastrada. Informe a senha do .pfx na aba Config NF-E / NFC-E da filial.",
-            cnpj,
-            upserted: 0,
-            ult_nsu: padNsu(ultimoNsu),
-          },
-          { status: 400 },
+        return jsonError(
+          "Senha do certificado não cadastrada. Informe a senha do .pfx na aba Config NF-E / NFC-E da filial.",
+          400,
+          { cnpj, upserted: 0, ult_nsu: padNsu(ultimoNsu) },
         );
       }
 
       const pfx = await downloadCertificado(supabase, certPath);
+      assertValidPfx(pfx, certSenha);
+
+      // Lotes menores evitam timeout/OOM na Vercel; clique de novo para continuar do ult_nsu
       const result = await distribuirDfePorNsu({
         cnpj,
         uf: filial.endereco_uf != null ? String(filial.endereco_uf) : null,
         ultimoNsu,
         pfx,
         passphrase: certSenha,
+        maxConsultas: 8,
+        timeoutMs: 25_000,
       });
       sefaz = {
         docs: result.docs,
@@ -290,14 +297,10 @@ export async function POST(req: Request) {
       };
     }
   } catch (err) {
-    return NextResponse.json(
-      {
-        error: err instanceof Error ? err.message : "Falha na consulta SEFAZ.",
-        cnpj,
-        upserted: 0,
-        ult_nsu: padNsu(ultimoNsu),
-      },
-      { status: 502 },
+    return jsonError(
+      err instanceof Error ? err.message : "Falha na consulta SEFAZ.",
+      502,
+      { cnpj, upserted: 0, ult_nsu: padNsu(ultimoNsu) },
     );
   }
 
@@ -390,33 +393,38 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (nsuErr) {
-    return NextResponse.json(
+    return jsonError(
+      `Notas importadas, mas falhou ao gravar ult_nsu na filial: ${nsuErr.message}`,
+      500,
       {
-        error: `Notas importadas, mas falhou ao gravar ult_nsu na filial: ${nsuErr.message}`,
         cnpj,
         recebidos: sefaz.docs.length,
         upserted,
         com_xml: comXml,
         ult_nsu: novoUltNsu,
       },
-      { status: 500 },
     );
   }
 
   if (!filialUpdated) {
-    return NextResponse.json(
+    return jsonError(
+      "Notas importadas, mas a filial não foi atualizada (ult_nsu). Verifique permissões/RLS.",
+      500,
       {
-        error:
-          "Notas importadas, mas a filial não foi atualizada (ult_nsu). Verifique permissões/RLS.",
         cnpj,
         recebidos: sefaz.docs.length,
         upserted,
         com_xml: comXml,
         ult_nsu: novoUltNsu,
       },
-      { status: 500 },
     );
   }
+
+  const incompleto =
+    BigInt(padNsu(sefaz.ultNsu)) < BigInt(padNsu(sefaz.maxNsu || sefaz.ultNsu));
+  const message = incompleto
+    ? `${sefaz.message} Ainda há documentos na SEFAZ — clique em Consultar SEFAZ novamente para continuar.`
+    : sefaz.message;
 
   return NextResponse.json({
     ok: true,
@@ -427,6 +435,7 @@ export async function POST(req: Request) {
     ult_nsu: onlyDigits(String(filialUpdated.ult_nsu || novoUltNsu)) || novoUltNsu,
     cStat: sefaz.cStat ?? null,
     consultas: sefaz.consultas ?? null,
-    message: sefaz.message,
+    incompleto,
+    message,
   });
 }

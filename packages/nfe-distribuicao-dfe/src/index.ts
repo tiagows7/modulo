@@ -200,6 +200,7 @@ function httpsPostPfx(args: {
           chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)),
         );
         res.on("end", () => {
+          agent.destroy();
           const text = Buffer.concat(chunks).toString("utf8");
           if ((res.statusCode ?? 500) >= 400) {
             reject(
@@ -217,7 +218,10 @@ function httpsPostPfx(args: {
     req.on("timeout", () => {
       req.destroy(new Error("Tempo esgotado na comunicação com a SEFAZ."));
     });
-    req.on("error", (err) => reject(err));
+    req.on("error", (err) => {
+      agent.destroy();
+      reject(err);
+    });
     req.write(args.body, "utf8");
     req.end();
   });
