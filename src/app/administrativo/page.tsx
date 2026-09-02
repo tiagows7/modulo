@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
 
 type KpiCardData = {
   id: string;
@@ -882,6 +883,7 @@ function FuelGauge({
 }
 
 export default function DashboardPage() {
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
   const [kpiCards, setKpiCards] = useState<KpiCardData[]>(() =>
     buildKpiCards(emptyAgg, emptyAgg),
   );
@@ -908,7 +910,13 @@ export default function DashboardPage() {
         loadDayAgg(todayIso),
         loadDayAgg(yesterdayIso),
         loadMonthlySales(),
-        loadFuelStockFromMarcacao(),
+        postoReady && temPosto
+          ? loadFuelStockFromMarcacao()
+          : Promise.resolve({
+              items: [] as FuelStockItem[],
+              refDate: null as string | null,
+              fromToday: true,
+            }),
         loadContasPagarHoje(todayIso),
       ]);
       if (cancelled) return;
@@ -920,13 +928,15 @@ export default function DashboardPage() {
       setDespesasDia(despesas);
     }
 
+    if (!postoReady) return;
+
     void load();
     const t = window.setInterval(() => void load(), 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(t);
     };
-  }, []);
+  }, [postoReady, temPosto]);
 
   return (
     <div
@@ -999,6 +1009,7 @@ export default function DashboardPage() {
       <SalesMonthlyChart points={monthPoints} />
 
       <div className="admin-dash-split">
+        {temPosto ? (
         <motion.div
           custom={8}
           variants={fadeUp}
@@ -1068,6 +1079,7 @@ export default function DashboardPage() {
             )}
           </div>
         </motion.div>
+        ) : null}
 
         <motion.div
           custom={9}

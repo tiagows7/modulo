@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Fuel } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
@@ -13,6 +14,7 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
 
 type FilialOpt = {
   id: string;
@@ -95,6 +97,8 @@ function statusBadge(status: string | null) {
 }
 
 export default function BicosPage() {
+  const router = useRouter();
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
   const { busy, pesquisar, gravar } = useDbStatus();
   const [items, setItems] = useState<Bico[]>([]);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
@@ -108,11 +112,16 @@ export default function BicosPage() {
   const [form, setForm] = useState<BicoForm>(emptyForm);
   const [formError, setFormError] = useState("");
 
+  useEffect(() => {
+    if (postoReady && !temPosto) router.replace("/cadastros");
+  }, [postoReady, temPosto, router]);
+
   const loadLookups = useCallback(async () => {
     const [filRes, tanRes, prodRes] = await Promise.all([
       supabase
         .from("filial")
         .select("id, codigo, fantasia, razao_social")
+        .eq("tipo_filial", "posto")
         .order("codigo", { ascending: true }),
       supabase
         .from("tanques")

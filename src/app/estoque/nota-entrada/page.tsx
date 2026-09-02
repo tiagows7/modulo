@@ -14,6 +14,7 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { isFilialPosto } from "@/lib/filialTipo";
 import {
   formatMoney2,
   formatQty,
@@ -36,6 +37,7 @@ type FilialOpt = {
   codigo: string;
   fantasia: string | null;
   razao_social: string;
+  tipo_filial?: string | null;
 };
 
 type FornecedorOpt = {
@@ -370,6 +372,20 @@ function NotaEntradaCadastroPage() {
     return map;
   }, [filiais]);
 
+  const filialEhPosto = useMemo(
+    () => isFilialPosto(filialById.get(form.filial)?.tipo_filial),
+    [filialById, form.filial],
+  );
+
+  const tabsVisiveis = useMemo(
+    () => tabs.filter((t) => t.id !== "tanque" || filialEhPosto),
+    [filialEhPosto],
+  );
+
+  useEffect(() => {
+    if (!filialEhPosto && tab === "tanque") setTab("geral");
+  }, [filialEhPosto, tab]);
+
   const fornecedorById = useMemo(() => {
     const map = new Map<string, FornecedorOpt>();
     for (const f of fornecedores) map.set(f.id, f);
@@ -380,7 +396,7 @@ function NotaEntradaCadastroPage() {
     const [filRes, fornRes, prodRes] = await Promise.all([
       supabase
         .from("filial")
-        .select("id, codigo, fantasia, razao_social")
+        .select("id, codigo, fantasia, razao_social, tipo_filial")
         .eq("status", "ativo")
         .order("codigo"),
       supabase
@@ -404,6 +420,7 @@ function NotaEntradaCadastroPage() {
         codigo: String(f.codigo),
         fantasia: f.fantasia != null ? String(f.fantasia) : null,
         razao_social: String(f.razao_social ?? ""),
+        tipo_filial: f.tipo_filial != null ? String(f.tipo_filial) : "posto",
       })),
     );
     setFornecedores(
@@ -1163,7 +1180,7 @@ function NotaEntradaCadastroPage() {
       })
       .filter((t) => t.tanqueId && t.litros > 0);
 
-    if (situacaoNova === "lancada") {
+    if (situacaoNova === "lancada" && filialEhPosto) {
       const pendentesTanque = formTanques.filter(
         (t) => !t.tanqueId && parseMoney(t.qtd) > 0,
       );
@@ -1278,7 +1295,12 @@ function NotaEntradaCadastroPage() {
           if (itErr) throw new Error(itErr.message);
         }
 
-        if (situacaoNova === "lancada" && form.filial && form.data_entrada) {
+        if (
+          situacaoNova === "lancada" &&
+          filialEhPosto &&
+          form.filial &&
+          form.data_entrada
+        ) {
           await aplicarEntradasMarcacaoTanque({
             filialId: form.filial,
             data: form.data_entrada,
@@ -1508,7 +1530,7 @@ function NotaEntradaCadastroPage() {
           ) : null}
 
           <div className="cadastro-tabs" role="tablist">
-            {tabs.map((item) => (
+            {tabsVisiveis.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -2323,7 +2345,7 @@ function NotaEntradaCadastroPage() {
             </div>
           ) : null}
 
-          {tab === "tanque" ? (
+          {tab === "tanque" && filialEhPosto ? (
             <div className="cadastro-tab-panel" role="tabpanel">
               <p
                 style={{

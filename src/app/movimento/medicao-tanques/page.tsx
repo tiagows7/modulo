@@ -14,6 +14,8 @@ import {
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
 import { recalcularMarcacaoTanquesAFrente } from "@/lib/estoque/recalcularMarcacaoTanquesAFrente";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
+import { useRouter } from "next/navigation";
 
 type FilialOpt = {
   id: string;
@@ -135,6 +137,8 @@ async function lastMarcacaoFinal(tanqueId: string, beforeDate: string) {
 }
 
 export default function MedicaoTanquesPage() {
+  const router = useRouter();
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
   const { busy, pesquisar, gravar } = useDbStatus();
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
@@ -150,11 +154,16 @@ export default function MedicaoTanquesPage() {
   const [formError, setFormError] = useState("");
   const [deleting, setDeleting] = useState<MarcacaoItem | null>(null);
 
+  useEffect(() => {
+    if (postoReady && !temPosto) router.replace("/movimento");
+  }, [postoReady, temPosto, router]);
+
   const loadLookups = useCallback(async () => {
     const { data } = await supabase
       .from("filial")
       .select("id, codigo, fantasia, razao_social")
       .eq("status", "ativo")
+      .eq("tipo_filial", "posto")
       .order("codigo");
     const list = (data ?? []).map((f) => ({
       id: String(f.id),

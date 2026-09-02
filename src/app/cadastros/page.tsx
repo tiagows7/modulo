@@ -17,6 +17,7 @@ import {
   Percent,
 } from "lucide-react";
 import { useAuthProfile } from "@/lib/authRole";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
 
 const submenus = [
   {
@@ -85,12 +86,14 @@ const submenus = [
     label: "Tanques",
     icon: Database,
     description: "Gestão de tanques de combustível",
+    postoOnly: true,
   },
   {
     href: "/cadastros/bicos",
     label: "Bicos",
     icon: Fuel,
     description: "Configuração de bicos de bombas",
+    postoOnly: true,
   },
 ];
 
@@ -109,9 +112,12 @@ const fadeUp = {
 
 export default function CadastrosMenuPage() {
   const { ready, isSuperAdmin } = useAuthProfile();
-  const visibleMenus = submenus.filter(
-    (item) => !item.superAdminOnly || (ready && isSuperAdmin),
-  );
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
+  const visibleMenus = submenus.filter((item) => {
+    if (item.superAdminOnly && !(ready && isSuperAdmin)) return false;
+    if (item.postoOnly && !(postoReady && temPosto)) return false;
+    return true;
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

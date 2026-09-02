@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowLeftRight, Gauge, Landmark } from "lucide-react";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
 
 const submenus = [
   {
@@ -10,6 +11,7 @@ const submenus = [
     label: "Medição de Tanques",
     icon: Gauge,
     description: "Registro e conferência do volume dos tanques",
+    postoOnly: true,
   },
   {
     href: "/movimento/fechamento-caixa",
@@ -33,6 +35,11 @@ const fadeUp = {
 };
 
 export default function MovimentoMenuPage() {
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
+  const visibleMenus = submenus.filter(
+    (item) => !item.postoOnly || (postoReady && temPosto),
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <motion.div
@@ -75,13 +82,13 @@ export default function MovimentoMenuPage() {
               marginTop: 2,
             }}
           >
-            Selecione uma das opções abaixo para lançar movimentos do posto
+            Selecione uma das opções abaixo para lançar movimentos
           </p>
         </div>
       </motion.div>
 
       <div className="module-hub-grid">
-        {submenus.map((item, i) => {
+        {visibleMenus.map((item, i) => {
           const Icon = item.icon;
           return (
             <motion.div

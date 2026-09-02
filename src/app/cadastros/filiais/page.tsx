@@ -12,6 +12,11 @@ import {
   CadastroModal,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import {
+  labelTipoFilial,
+  normalizeTipoFilial,
+  type TipoFilial,
+} from "@/lib/filialTipo";
 import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
 import {
   formatCpfCnpj,
@@ -43,6 +48,7 @@ type Filial = {
   schemas_storage_path: string | null;
   schemas_atualizado_em: string | null;
   ult_nsu: string | null;
+  tipo_filial: TipoFilial | null;
 };
 
 type FilialForm = {
@@ -61,6 +67,7 @@ type FilialForm = {
   status: string;
   certificado_senha: string;
   ult_nsu: string;
+  tipo_filial: TipoFilial;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -89,6 +96,7 @@ const emptyForm: FilialForm = {
   status: "ativo",
   certificado_senha: "",
   ult_nsu: "",
+  tipo_filial: "posto",
 };
 
 const columns = [
@@ -96,6 +104,7 @@ const columns = [
   { key: "razao", label: "Razão Social" },
   { key: "fantasia", label: "Fantasia" },
   { key: "cnpj", label: "CNPJ" },
+  { key: "tipo", label: "Tipo" },
   { key: "cidade", label: "Cidade" },
   { key: "uf", label: "UF", align: "center" as const },
   { key: "telefone", label: "Telefone" },
@@ -136,6 +145,7 @@ function toForm(item: Filial): FilialForm {
     status: item.status === "inativo" ? "inativo" : "ativo",
     certificado_senha: item.certificado_senha ?? "",
     ult_nsu: item.ult_nsu ?? "",
+    tipo_filial: normalizeTipoFilial(item.tipo_filial),
   };
 }
 
@@ -163,6 +173,7 @@ function toPayload(form: FilialForm) {
     status: form.status === "inativo" ? "inativo" : "ativo",
     certificado_senha: blank(form.certificado_senha),
     ult_nsu: blank(form.ult_nsu)?.replace(/\D/g, "") ?? null,
+    tipo_filial: normalizeTipoFilial(form.tipo_filial),
   };
 }
 
@@ -269,7 +280,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial",
         )
         .order("created_at", { ascending: false });
 
@@ -576,7 +587,7 @@ export default function FilialPage() {
             codigo,
           })
           .select(
-            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu",
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial",
           )
           .single();
         if (error) throw new Error(error.message);
@@ -643,6 +654,7 @@ export default function FilialPage() {
     razao: item.razao_social,
     fantasia: item.fantasia || "—",
     cnpj: item.cnpj || "—",
+    tipo: labelTipoFilial(item.tipo_filial),
     cidade:
       item.endereco_cidade != null
         ? cidadeNomes[String(item.endereco_cidade)] ||
@@ -849,6 +861,23 @@ export default function FilialPage() {
                   >
                     <option value="ativo">Ativo</option>
                     <option value="inativo">Inativo</option>
+                  </select>
+                </CadastroField>
+                <CadastroField label="Tipo da filial" htmlFor="tipo_filial">
+                  <select
+                    id="tipo_filial"
+                    className="input-base input-compact"
+                    value={form.tipo_filial}
+                    onChange={(e) =>
+                      updateField(
+                        "tipo_filial",
+                        normalizeTipoFilial(e.target.value),
+                      )
+                    }
+                    disabled={busy}
+                  >
+                    <option value="posto">Posto de combustível</option>
+                    <option value="empresa">Outra empresa</option>
                   </select>
                 </CadastroField>
                 <CadastroField label="Inscrição Estadual" htmlFor="inscricao_estadual">

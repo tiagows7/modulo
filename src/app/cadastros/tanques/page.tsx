@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Database } from "lucide-react";
 import { ModulePage } from "@/components/ModulePage";
 import { useDbStatus } from "@/components/DbStatusProvider";
@@ -13,6 +14,7 @@ import {
   CadastroRowActions,
 } from "@/components/CadastroUi";
 import { supabase } from "@/lib/supabase";
+import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
 
 type FilialOpt = {
   id: string;
@@ -88,6 +90,8 @@ function formatLiters(value: number | null | undefined) {
 }
 
 export default function TanquesPage() {
+  const router = useRouter();
+  const { ready: postoReady, temPosto } = useTemFilialPosto();
   const { busy, pesquisar, gravar } = useDbStatus();
   const [items, setItems] = useState<Tanque[]>([]);
   const [filiais, setFiliais] = useState<FilialOpt[]>([]);
@@ -100,11 +104,16 @@ export default function TanquesPage() {
   const [form, setForm] = useState<TanqueForm>(emptyForm);
   const [formError, setFormError] = useState("");
 
+  useEffect(() => {
+    if (postoReady && !temPosto) router.replace("/cadastros");
+  }, [postoReady, temPosto, router]);
+
   const loadLookups = useCallback(async () => {
     const [filRes, prodRes] = await Promise.all([
       supabase
         .from("filial")
         .select("id, codigo, fantasia, razao_social")
+        .eq("tipo_filial", "posto")
         .order("codigo", { ascending: true }),
       supabase
         .from("produtos")
