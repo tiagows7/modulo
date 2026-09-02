@@ -205,28 +205,73 @@ export default function NotaEntradaNovaPage() {
   }, [loadData]);
 
   const abrirDigitar = async (id: string) => {
+    setActionError("");
     try {
-      const { data: man, error } = await supabase
-        .from("nota_entradamanifesto")
-        .select("id, fornecedor, xml_conteudo")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      if (man?.xml_conteudo) {
+      await gravar(async () => {
+        const { data: man, error } = await supabase
+          .from("nota_entradamanifesto")
+          .select("id, fornecedor, xml_conteudo")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!man) throw new Error("Manifesto não encontrado.");
+
+        if (!man.xml_conteudo) {
+          router.push(`/estoque/nota-entrada?manifesto=${id}`);
+          return;
+        }
+
         const parsed = parseNfeXml(String(man.xml_conteudo));
-        const fornId = man.fornecedor != null ? String(man.fornecedor) : null;
+
+        // Garante cadastro do fornecedor (CNPJ do XML) antes de vincular produtos
+        const forn = await ensureFornecedorFromNfe(parsed);
+        if (!forn) {
+          throw new Error(
+            "XML sem CNPJ do emitente. Cadastre o fornecedor manualmente antes de digitar.",
+          );
+        }
+
+        const fornId = forn.id;
+        if (man.fornecedor !== fornId) {
+          const { error: updErr } = await supabase
+            .from("nota_entradamanifesto")
+            .update({
+              fornecedor: fornId,
+              fornecedor_nome: parsed.emit_nome
+                ? String(parsed.emit_nome).slice(0, 120)
+                : forn.nome.slice(0, 120),
+              fornecedor_cnpj: parsed.emit_cnpj,
+              fornecedor_ie: parsed.emit_ie
+                ? String(parsed.emit_ie).slice(0, 14)
+                : null,
+            })
+            .eq("id", id);
+          if (updErr) throw new Error(updErr.message);
+        }
+
         const { pendentes } = await classificarItensXml(parsed, fornId);
         if (pendentes.length > 0) {
+          const qs = new URLSearchParams({ manifesto: id });
+          if (forn.criado) {
+            qs.set("fornecedorNovo", "1");
+            qs.set("fornecedorNome", forn.nome);
+            if (forn.codigo) qs.set("fornecedorCodigo", forn.codigo);
+          }
           router.push(
-            `/estoque/nota-entrada/vincular-produtos?manifesto=${id}`,
+            `/estoque/nota-entrada/vincular-produtos?${qs.toString()}`,
           );
           return;
         }
-      }
-    } catch {
-      // segue para digitação
+
+        router.push(`/estoque/nota-entrada?manifesto=${id}`);
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao preparar a digitação da nota.",
+      );
     }
-    router.push(`/estoque/nota-entrada?manifesto=${id}`);
   };
 
   const consultarSefaz = async () => {

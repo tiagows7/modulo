@@ -22,6 +22,7 @@ import {
   parseMoney,
 } from "@/lib/moneyMask";
 import { parseNfeXml } from "@/lib/nfe/parseNfeXml";
+import { ensureFornecedorFromNfe } from "@/lib/nfe/ensureFornecedorFromNfe";
 import { classificarItensXml, fatorVolumeVinculo } from "@/lib/nfe/xmlProdutoVinculo";
 import {
   aplicarEntradasMarcacaoTanque,
@@ -635,7 +636,7 @@ function NotaEntradaCadastroPage() {
       }
 
       const cnpj = String(data.fornecedor_cnpj || "").replace(/\D/g, "");
-      const fornId =
+      let fornId =
         (data.fornecedor != null ? String(data.fornecedor) : "") ||
         fornecedores.find(
           (f) => (f.cnpj || "").replace(/\D/g, "") === cnpj,
@@ -646,6 +647,40 @@ function NotaEntradaCadastroPage() {
       if (data.xml_conteudo) {
         try {
           const parsed = parseNfeXml(String(data.xml_conteudo));
+
+          if (!fornId) {
+            const forn = await ensureFornecedorFromNfe(parsed);
+            if (forn) {
+              fornId = forn.id;
+              await supabase
+                .from("nota_entradamanifesto")
+                .update({
+                  fornecedor: forn.id,
+                  fornecedor_nome: parsed.emit_nome
+                    ? String(parsed.emit_nome).slice(0, 120)
+                    : forn.nome.slice(0, 120),
+                  fornecedor_cnpj: parsed.emit_cnpj,
+                  fornecedor_ie: parsed.emit_ie
+                    ? String(parsed.emit_ie).slice(0, 14)
+                    : null,
+                })
+                .eq("id", data.id);
+              setFornecedores((prev) => {
+                if (prev.some((p) => p.id === forn.id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: forn.id,
+                    codigo: forn.codigo || "",
+                    razao_social: forn.nome,
+                    fantasia: null,
+                    cnpj: parsed.emit_cnpj,
+                  },
+                ];
+              });
+            }
+          }
+
           const { mapeados, pendentes } = await classificarItensXml(
             parsed,
             fornId || null,

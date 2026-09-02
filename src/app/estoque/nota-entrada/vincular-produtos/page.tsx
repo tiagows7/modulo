@@ -13,6 +13,7 @@ import {
 } from "@/components/CadastroUi";
 import { maskQtyInput, parseMoney } from "@/lib/moneyMask";
 import { parseNfeXml, type NfeXmlItem } from "@/lib/nfe/parseNfeXml";
+import { ensureFornecedorFromNfe } from "@/lib/nfe/ensureFornecedorFromNfe";
 import {
   classificarItensXml,
   itemToVinculoPayload,
@@ -145,7 +146,51 @@ function VincularProdutosPageInner() {
         return;
       }
 
-      const fornId = man.fornecedor != null ? String(man.fornecedor) : null;
+      let fornId = man.fornecedor != null ? String(man.fornecedor) : null;
+      try {
+        const forn = await ensureFornecedorFromNfe(parsed);
+        if (forn) {
+          fornId = forn.id;
+          setFornecedorId(forn.id);
+          setFornecedorNome(forn.nome);
+          if (man.fornecedor !== forn.id) {
+            await supabase
+              .from("nota_entradamanifesto")
+              .update({
+                fornecedor: forn.id,
+                fornecedor_nome: parsed.emit_nome
+                  ? String(parsed.emit_nome).slice(0, 120)
+                  : forn.nome.slice(0, 120),
+                fornecedor_cnpj: parsed.emit_cnpj,
+                fornecedor_ie: parsed.emit_ie
+                  ? String(parsed.emit_ie).slice(0, 14)
+                  : null,
+              })
+              .eq("id", manifestoId);
+          }
+          if (forn.criado) {
+            const label = forn.codigo
+              ? `${forn.codigo} — ${forn.nome}`
+              : forn.nome;
+            setInfoMsg(`Fornecedor cadastrado automaticamente: ${label}`);
+          }
+        }
+      } catch (err) {
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : "Falha ao cadastrar o fornecedor do XML.",
+        );
+        return;
+      }
+
+      if (!fornId) {
+        setLoadError(
+          "Fornecedor não identificado no XML (CNPJ do emitente). Cadastre o fornecedor antes de vincular.",
+        );
+        return;
+      }
+
       const { pendentes: pend } = await classificarItensXml(parsed, fornId);
       const uniq = uniqueByCProd(pend);
       setPendentes(
