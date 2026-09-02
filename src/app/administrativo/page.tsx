@@ -230,7 +230,6 @@ function buildKpiCards(
       icon: DollarSign,
       color: "#1A6FD8",
       glow: "rgba(26,111,216,0.25)",
-      postoOnly: true,
     },
     {
       id: "abastecimentos",
@@ -918,8 +917,8 @@ export default function DashboardPage() {
       const yesterdayIso = isoDateLocal(y);
 
       const [today, yesterday, months, fuel, despesas] = await Promise.all([
-        temPosto ? loadDayAgg(todayIso) : Promise.resolve(emptyAgg),
-        temPosto ? loadDayAgg(yesterdayIso) : Promise.resolve(emptyAgg),
+        loadDayAgg(todayIso),
+        loadDayAgg(yesterdayIso),
         temPosto ? loadMonthlySales() : Promise.resolve([] as MonthPoint[]),
         temPosto
           ? loadFuelStockFromMarcacao()
