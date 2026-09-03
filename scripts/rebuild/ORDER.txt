@@ -60,3 +60,6 @@
 53_filial_fiscal_nfe.sql
 54_filial_ult_nsu.sql
 55_filial_tipo.sql
+56_pdvs.sql
+57_venda_nfce.sql
+58_venda_nfe.sql
