@@ -38,6 +38,23 @@ export type FiscalPaymentLine = {
   nsu?: string
   authorizationCode?: string
   brand?: string
+  /** Pagamento originado de TEF / cartão */
+  isTef?: boolean
+  /** Dados CliSiTef para receitas_nfce / receitas_nfe */
+  tef?: {
+    campo_131?: string | null
+    campo_132?: string | null
+    recebimento_cartao?: number | null
+    data_prevista?: string | null
+    modalidade?: string | null
+    bin_rede?: string | null
+    data_cartao?: string | null
+    hora_cartao?: string | null
+    autorizacao?: string | null
+    taxa_cartao?: number | null
+    bandeira?: string | null
+    nsu?: string | null
+  }
 }
 
 export type FiscalEmitRequest = {
@@ -153,4 +170,17 @@ export type FiscalFinalizeResult = {
   document: FiscalDocument
   send?: FiscalSendResult
   print?: FiscalPrintResult
+}
+
+export type FiscalCancelRequest = {
+  documentId: string
+  motivo: string
+  /** Protocolo SEFAZ do evento (opcional até integração live). */
+  protocoloCancelamento?: string
+}
+
+export type FiscalCancelResult = {
+  ok: boolean
+  document: FiscalDocument
+  message: string
 }

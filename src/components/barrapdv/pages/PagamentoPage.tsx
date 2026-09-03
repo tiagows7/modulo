@@ -544,14 +544,45 @@ export function PagamentoPage() {
           driver: customer.driver,
           notes: customer.notes,
         },
-        payments: payLinesRef.current.map((line) => ({
-          methodId: line.methodId,
-          label: methodLabel(line.methodId, line.detail),
-          amount: line.amount,
-          nsu: line.tefState?.nsu || undefined,
-          authorizationCode: line.tefState?.authorizationCode || undefined,
-          brand: line.detail || line.tefState?.brand || undefined,
-        })),
+        payments: payLinesRef.current.map((line) => {
+          const tef = line.tefState
+          const isTef =
+            !!tef ||
+            line.methodId === 'tef' ||
+            line.methodId === 'pix' ||
+            line.methodId === 'pos'
+          return {
+            methodId: line.methodId,
+            label: methodLabel(line.methodId, line.detail),
+            amount: line.amount,
+            isTef,
+            nsu: tef?.nsu || undefined,
+            authorizationCode: tef?.authorizationCode || undefined,
+            brand: line.detail || tef?.brand || undefined,
+            tef: isTef
+              ? {
+                  campo_131: tef?.redeDestino || null,
+                  campo_132: tef?.tipoCartao || null,
+                  recebimento_cartao: line.amount,
+                  data_prevista: null,
+                  modalidade:
+                    tef?.modalidade ||
+                    (line.methodId === 'pix'
+                      ? 'pix'
+                      : line.methodId === 'tef'
+                        ? 'tef'
+                        : line.methodId),
+                  bin_rede: tef?.binRede || null,
+                  data_cartao: tef?.dataCartao || null,
+                  hora_cartao: tef?.horaCartao || null,
+                  autorizacao: tef?.authorizationCode || null,
+                  taxa_cartao: tef?.taxaCartao ?? 0,
+                  bandeira: line.detail || tef?.brand || null,
+                  nsu: tef?.nsu || null,
+                }
+              : undefined,
+          }
+        }),
         saleRef,
         total,
       },

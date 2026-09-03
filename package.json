@@ -20,8 +20,9 @@
     "fiscal-bridge": "node server/fiscal-bridge.mjs",
     "smartpos-bridge": "node server/smartpos-bridge.mjs"
   },
-  "dependencies": {
+    "dependencies": {
     "@modulo/nfe-distribuicao-dfe": "file:./packages/nfe-distribuicao-dfe",
+    "@modulo/nfe-transmissao": "file:./packages/nfe-transmissao",
     "@supabase/supabase-js": "^2.112.3",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",

@@ -145,6 +145,7 @@ export function ReimpressaoPage() {
                   <th>Emissão</th>
                   <th>Cliente</th>
                   <th>Valor</th>
+                  <th>Situação</th>
                   <th>Chave</th>
                   <th></th>
                 </tr>
@@ -152,6 +153,14 @@ export function ReimpressaoPage() {
               <tbody>
                 {filtrados.map((doc) => {
                   const selected = selectedId === doc.id
+                  const situacao =
+                    doc.status === 'authorized'
+                      ? 'Autorizada'
+                      : doc.status === 'cancelled'
+                        ? 'Cancelada'
+                        : doc.status === 'contingency'
+                          ? 'Contingência'
+                          : doc.status
                   return (
                     <tr
                       key={doc.id}
@@ -174,6 +183,7 @@ export function ReimpressaoPage() {
                       </td>
                       <td>{doc.cliente}</td>
                       <td style={{ fontWeight: 700 }}>{formatCurrency(doc.valor)}</td>
+                      <td>{situacao}</td>
                       <td>
                         <code className="abastecidas-cbc-id">{doc.chave}</code>
                       </td>

@@ -49,6 +49,17 @@ export type TefTransactionState = {
   nsu?: string | null
   authorizationCode?: string | null
   brand?: string | null
+  /** CliSiTef campo 131 — rede destino */
+  redeDestino?: string | null
+  /** CliSiTef campo 132 — tipo cartão */
+  tipoCartao?: string | null
+  /** AAAAMMDD da transação TEF */
+  dataCartao?: string | null
+  /** HHMMSS da transação TEF */
+  horaCartao?: string | null
+  modalidade?: string | null
+  binRede?: string | null
+  taxaCartao?: number | null
   receiptCustomer?: string | null
   receiptMerchant?: string | null
   error?: string | null

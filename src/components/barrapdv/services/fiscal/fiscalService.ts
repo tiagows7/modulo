@@ -12,6 +12,8 @@ import {
 } from './printSimplified'
 import type {
   FiscalBuyer,
+  FiscalCancelRequest,
+  FiscalCancelResult,
   FiscalDocTipo,
   FiscalDocument,
   FiscalEmitRequest,
@@ -25,6 +27,20 @@ import type {
   FiscalSendRequest,
   FiscalSendResult,
 } from './types'
+import {
+  cancelVendaFiscalDocument,
+  getVendaFiscalDocument,
+  listVendaFiscalDocuments,
+  saveVendaFiscalDocument,
+} from './vendaFiscalDb'
+import {
+  decidirTipoDocumento,
+  transmitirDocumentoFiscal,
+  type ReceitaFiscalLinha,
+} from '@/lib/nfe/transmissao'
+import { normalizeAmbienteFiscal } from '@/lib/filialAmbienteFiscal'
+import { getOperadorFilialId } from '../produtos/buscarProduto'
+import { supabase } from '@/lib/supabase'
 
 function resolvePrintModel(
   doc: FiscalDocument,
@@ -78,7 +94,7 @@ class FiscalService {
 
   /** Sugere NFC-e (consumidor) ou NF-e (CNPJ / IE). */
   suggestTipo(buyer?: FiscalBuyer): FiscalDocTipo {
-    return mockFiscalEngine.suggestTipo(buyer)
+    return decidirTipoDocumento(buyer?.document) as FiscalDocTipo
   }
 
   async health(): Promise<{ ok: boolean; mode: string; message: string }> {
@@ -106,28 +122,125 @@ class FiscalService {
   }
 
   /**
-   * Emite e autoriza NFC-e ou NF-e.
-   * Em mock: gera chave/protocolo e grava no repositório compartilhado.
+   * Emite e autoriza NFC-e ou NF-e via `@modulo/nfe-transmissao`.
+   * CPF / documento em branco → NFC-e; CNPJ → NF-e.
+   * Grava venda_* + receitas_*.
    */
   async emit(request: FiscalEmitRequest): Promise<FiscalEmitResult> {
+    const tipo = request.tipo || decidirTipoDocumento(request.buyer?.document)
+
+    let ambiente: 1 | 2 = 2
+    try {
+      const filialId = await getOperadorFilialId()
+      if (filialId) {
+        const col = tipo === 'NFC-e' ? 'ambiente_nfce' : 'ambiente_nfe'
+        const { data } = await supabase
+          .from('filial')
+          .select(col)
+          .eq('id', filialId)
+          .maybeSingle()
+        const raw = data ? (data as Record<string, unknown>)[col] : null
+        ambiente = normalizeAmbienteFiscal(raw)
+      }
+    } catch {
+      /* mantém homologação */
+    }
+
+    let document: FiscalDocument
+    let message: string
+    let receitas: ReceitaFiscalLinha[] | undefined
+
     if (FISCAL_CONFIG.mode === 'live') {
       const res = await fetch(`${this.bridgeUrl}/fiscal/emit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+        body: JSON.stringify({ ...request, tipo, ambiente }),
       })
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error || `Falha ao emitir (${res.status})`)
       }
-      return (await res.json()) as FiscalEmitResult
+      const result = (await res.json()) as FiscalEmitResult
+      document = result.document
+      message = result.message
+    } else {
+      const tx = await transmitirDocumentoFiscal({
+        tipo,
+        items: request.items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          qty: i.qty,
+          price: i.price,
+          unit: i.unit,
+          kind: i.kind,
+          productCode: i.productCode,
+          discount: i.discount,
+          pumpId: i.pumpId,
+        })),
+        payments: request.payments.map((p) => ({
+          methodId: p.methodId,
+          label: p.label,
+          amount: p.amount,
+          isTef: p.isTef,
+          nsu: p.nsu,
+          authorizationCode: p.authorizationCode,
+          brand: p.brand,
+          tef: p.tef,
+        })),
+        buyer: request.buyer,
+        saleRef: request.saleRef,
+        operator: request.operator,
+        total: request.total,
+        ambiente,
+        serie: FISCAL_CONFIG.series[tipo],
+        emitente: {
+          cnpj: FISCAL_CONFIG.emitter.cnpj,
+          ie: FISCAL_CONFIG.emitter.ie,
+          razaoSocial: FISCAL_CONFIG.emitter.razaoSocial,
+          fantasia: FISCAL_CONFIG.emitter.nomeFantasia,
+          uf: FISCAL_CONFIG.emitter.uf,
+        },
+      })
+
+      receitas = tx.receitas
+      const d = tx.document
+      document = {
+        id: d.id,
+        tipo: d.tipo,
+        numero: String(d.numero).padStart(6, '0'),
+        serie: d.serie,
+        chave: d.chave,
+        emissao: d.emissao,
+        hora: d.hora,
+        valor: d.valor,
+        cliente: d.cliente,
+        status: d.status,
+        saleRef: d.saleRef,
+        issuedAt: d.issuedAt,
+        protocol: d.protocolo,
+        buyerDocument: d.buyerDocument,
+        buyerEmail: d.buyerEmail,
+        items: request.items.map((i) => ({ ...i })),
+        payments: request.payments.map((p) => ({ ...p })),
+        xml: d.xml,
+        error: d.error ?? null,
+      }
+      message = tx.message
     }
 
-    const document = mockFiscalEngine.emit(request)
-    return {
-      document,
-      message: `${document.tipo} ${document.numero} autorizada (mock).`,
+    try {
+      document = await saveVendaFiscalDocument(document, {
+        receitas,
+        ambiente,
+      })
+      message = `${document.tipo} ${document.numero} autorizada e gravada (venda + receitas).`
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'falha ao gravar'
+      console.warn('[fiscal] persistência venda/receitas:', detail)
+      message = `${message} (aviso: não gravou no banco — ${detail})`
     }
+
+    return { document, message }
   }
 
   /**
@@ -148,7 +261,7 @@ class FiscalService {
       return (await res.json()) as FiscalSendResult
     }
 
-    const doc = mockFiscalEngine.get(request.documentId)
+    const doc = mockFiscalEngine.get(request.documentId) || (await getVendaFiscalDocument(request.documentId))
     if (!doc) throw new Error('Documento não encontrado para envio.')
     if (doc.tipo !== 'NF-e') {
       throw new Error('Envio ao destinatário aplica-se apenas à NF-e.')
@@ -181,10 +294,7 @@ class FiscalService {
       request.direct === true ||
       (request.direct !== false && FISCAL_CONFIG.directPrint)
 
-    const doc =
-      FISCAL_CONFIG.mode === 'live'
-        ? await this.get(request.documentId)
-        : mockFiscalEngine.get(request.documentId)
+    const doc = await this.get(request.documentId)
 
     if (!doc) throw new Error('Documento não encontrado para impressão.')
 
@@ -284,24 +394,29 @@ class FiscalService {
     return this.print(request)
   }
 
+  /**
+   * Lista NFC-e / NF-e a partir de `venda_nfce` e `venda_nfe`.
+   * Se o banco estiver vazio/indisponível em mock, cai no motor local.
+   */
   async list(filter: FiscalListFilter = {}): Promise<FiscalDocument[]> {
-    if (FISCAL_CONFIG.mode === 'live') {
-      const params = new URLSearchParams()
-      if (filter.tipo) params.set('tipo', filter.tipo)
-      if (filter.q) params.set('q', filter.q)
-      if (filter.status) params.set('status', filter.status)
-      const qs = params.toString()
-      const res = await fetch(`${this.bridgeUrl}/fiscal/documents${qs ? `?${qs}` : ''}`)
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || `Falha ao listar documentos (${res.status})`)
-      }
-      return (await res.json()) as FiscalDocument[]
+    try {
+      return await listVendaFiscalDocuments(filter)
+    } catch (err) {
+      if (FISCAL_CONFIG.mode === 'live') throw err
+      console.warn('[fiscal] list banco falhou, usando mock:', err)
+      return mockFiscalEngine.list(filter)
     }
-    return mockFiscalEngine.list(filter)
   }
 
   async get(idOrChave: string): Promise<FiscalDocument | null> {
+    try {
+      const fromDb = await getVendaFiscalDocument(idOrChave)
+      if (fromDb) return fromDb
+    } catch (err) {
+      if (FISCAL_CONFIG.mode === 'live') throw err
+      console.warn('[fiscal] get banco falhou, tentando mock:', err)
+    }
+
     if (FISCAL_CONFIG.mode === 'live') {
       const res = await fetch(
         `${this.bridgeUrl}/fiscal/documents/${encodeURIComponent(idOrChave)}`,
@@ -313,7 +428,21 @@ class FiscalService {
       }
       return (await res.json()) as FiscalDocument
     }
+
     return mockFiscalEngine.get(idOrChave)
+  }
+
+  /**
+   * Cancela NFC-e / NF-e no banco (`situacao=cancelada` + protocolo/motivo).
+   * Evento SEFAZ real fica para a ponte live.
+   */
+  async cancel(request: FiscalCancelRequest): Promise<FiscalCancelResult> {
+    const document = await cancelVendaFiscalDocument(request)
+    return {
+      ok: true,
+      document,
+      message: `${document.tipo} ${document.numero} cancelada no banco.`,
+    }
   }
 
   /**

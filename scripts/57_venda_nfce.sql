@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS public.venda_nfce (
   protocolo_cancelamento VARCHAR(40),
   data_cancelamento TIMESTAMPTZ,
   motivo_cancelamento TEXT,
+  -- Pendente: opção de gravar XML só na máquina local (ver .cursor/rules/xml-fiscal-local-pendente.mdc)
   xml_nfce TEXT,
   qr_code TEXT,
   url_consulta TEXT,

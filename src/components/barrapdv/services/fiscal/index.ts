@@ -15,6 +15,8 @@ export {
 export { printHtmlDocument } from './printHtml'
 export type {
   FiscalBuyer,
+  FiscalCancelRequest,
+  FiscalCancelResult,
   FiscalDocStatus,
   FiscalDocTipo,
   FiscalDocument,

@@ -22,6 +22,9 @@
       "@/*": ["./src/*"],
       "@modulo/nfe-distribuicao-dfe": [
         "./packages/nfe-distribuicao-dfe/src/index.ts"
+      ],
+      "@modulo/nfe-transmissao": [
+        "./packages/nfe-transmissao/src/index.ts"
       ]
     }
   },

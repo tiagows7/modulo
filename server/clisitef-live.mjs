@@ -506,10 +506,14 @@ function applyResultField(tx, campo, text) {
       tx.authorizationCode = value
       break
     case CAMPO.BANDEIRA:
-    case CAMPO.TIPO_CARTAO:
       tx.brand = value
       break
+    case CAMPO.TIPO_CARTAO:
+      tx.tipoCartao = value
+      if (!tx.brand) tx.brand = value
+      break
     case CAMPO.REDE_DESTINO:
+      tx.redeDestino = value
       tx.message = value ? `Rede: ${value}` : tx.message
       break
     case CAMPO.FINALIZACAO:
@@ -850,6 +854,11 @@ export async function runCliSiTefTransaction(tx, cfg) {
         finalized: false,
       })
       tx.status = 'approved'
+      {
+        const now = fiscalNow()
+        if (!tx.dataCartao) tx.dataCartao = now.date
+        if (!tx.horaCartao) tx.horaCartao = now.time
+      }
       tx.message = 'Transação aprovada — aguardando confirmação'
       tx.receiptCustomer = (tx.receiptCustomer || '').trim() || null
       tx.receiptMerchant = (tx.receiptMerchant || '').trim() || null

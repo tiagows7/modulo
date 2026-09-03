@@ -63,3 +63,5 @@
 56_pdvs.sql
 57_venda_nfce.sql
 58_venda_nfe.sql
+59_filial_ambiente_fiscal.sql
+60_receitas_nfce_nfe.sql

@@ -1,0 +1,28 @@
+{
+  "name": "@modulo/nfe-transmissao",
+  "version": "1.0.0",
+  "description": "Rotina portátil de transmissão NFC-e / NF-e (decisão CPF×CNPJ, contrato TEF/receitas, mock e pluggable SEFAZ) — reutilizável em qualquer projeto",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "keywords": [
+    "nfe",
+    "nfce",
+    "sefaz",
+    "transmissao",
+    "tef",
+    "receitas"
+  ]
+}

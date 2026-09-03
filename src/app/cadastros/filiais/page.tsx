@@ -17,6 +17,10 @@ import {
   normalizeTipoFilial,
   type TipoFilial,
 } from "@/lib/filialTipo";
+import {
+  normalizeAmbienteFiscal,
+  type AmbienteFiscal,
+} from "@/lib/filialAmbienteFiscal";
 import { consultarCnpj } from "@/components/barrapdv/services/document/cnpjPublic";
 import {
   formatCpfCnpj,
@@ -49,6 +53,8 @@ type Filial = {
   schemas_atualizado_em: string | null;
   ult_nsu: string | null;
   tipo_filial: TipoFilial | null;
+  ambiente_nfe: AmbienteFiscal | null;
+  ambiente_nfce: AmbienteFiscal | null;
 };
 
 type FilialForm = {
@@ -68,6 +74,8 @@ type FilialForm = {
   certificado_senha: string;
   ult_nsu: string;
   tipo_filial: TipoFilial;
+  ambiente_nfe: AmbienteFiscal;
+  ambiente_nfce: AmbienteFiscal;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -97,6 +105,8 @@ const emptyForm: FilialForm = {
   certificado_senha: "",
   ult_nsu: "",
   tipo_filial: "posto",
+  ambiente_nfe: 2,
+  ambiente_nfce: 2,
 };
 
 const columns = [
@@ -146,6 +156,8 @@ function toForm(item: Filial): FilialForm {
     certificado_senha: item.certificado_senha ?? "",
     ult_nsu: item.ult_nsu ?? "",
     tipo_filial: normalizeTipoFilial(item.tipo_filial),
+    ambiente_nfe: normalizeAmbienteFiscal(item.ambiente_nfe),
+    ambiente_nfce: normalizeAmbienteFiscal(item.ambiente_nfce),
   };
 }
 
@@ -174,6 +186,8 @@ function toPayload(form: FilialForm) {
     certificado_senha: blank(form.certificado_senha),
     ult_nsu: blank(form.ult_nsu)?.replace(/\D/g, "") ?? null,
     tipo_filial: normalizeTipoFilial(form.tipo_filial),
+    ambiente_nfe: normalizeAmbienteFiscal(form.ambiente_nfe),
+    ambiente_nfce: normalizeAmbienteFiscal(form.ambiente_nfce),
   };
 }
 
@@ -280,7 +294,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce",
         )
         .order("created_at", { ascending: false });
 
@@ -587,7 +601,7 @@ export default function FilialPage() {
             codigo,
           })
           .select(
-            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial",
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce",
           )
           .single();
         if (error) throw new Error(error.message);
@@ -994,6 +1008,45 @@ export default function FilialPage() {
               ) : null}
 
               <CadastroFormGrid>
+                <CadastroField label="Ambiente NF-e" htmlFor="ambiente_nfe">
+                  <select
+                    id="ambiente_nfe"
+                    className="input-base input-compact"
+                    value={String(form.ambiente_nfe)}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        ambiente_nfe: normalizeAmbienteFiscal(e.target.value),
+                      }))
+                    }
+                    disabled={busy}
+                  >
+                    <option value="2">Homologação</option>
+                    <option value="1">Produção</option>
+                  </select>
+                </CadastroField>
+
+                <CadastroField label="Ambiente NFC-e" htmlFor="ambiente_nfce">
+                  <select
+                    id="ambiente_nfce"
+                    className="input-base input-compact"
+                    value={String(form.ambiente_nfce)}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        ambiente_nfce: normalizeAmbienteFiscal(e.target.value),
+                      }))
+                    }
+                    disabled={busy}
+                  >
+                    <option value="2">Homologação</option>
+                    <option value="1">Produção</option>
+                  </select>
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Ambiente SEFAZ (tpAmb). Homologação = testes; Produção = notas válidas.
+                  </p>
+                </CadastroField>
+
                 <CadastroField label="Certificado A1" htmlFor="certificado" span="full">
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <input

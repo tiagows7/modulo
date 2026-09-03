@@ -1,0 +1,24 @@
+---
+description: Opção futura — salvar XML NF-e/NFC-e na máquina local em vez do servidor
+globs: scripts/57_venda_nfce.sql,scripts/58_venda_nfe.sql,**/fiscal/**/*,**/venda_nfce*,**/venda_nfe*
+alwaysApply: false
+---
+
+# XML fiscal em disco local (pendente)
+
+Decisão do produto (ainda **não implementar**): o XML da NF-e e da NFC-e pode ficar na **máquina local** em vez de persistir no servidor (`venda_nfe.xml_nfe` / `venda_nfce.xml_nfce`).
+
+## Contexto
+
+- Hoje as colunas `xml_nfe` / `xml_nfce` existem no banco para eventual persistência.
+- PDV é web: browser não grava sozinho em pasta fixa do Windows.
+- Opções previstas quando for desenvolver:
+  1. Download / `showSaveFilePicker` após autorização
+  2. Pasta fixa via app desktop / serviço local (Electron, Tauri, agente Windows)
+  3. Híbrido: banco só com chave, protocolo, totais e situação; XML só no disco local
+
+## Ao implementar depois
+
+- Não assumir que o XML estará sempre no Supabase.
+- Cancelamento, DANFE e consulta remota precisam de estratégia se o arquivo só existir no caixa.
+- Manter colunas `xml_*` opcionais ou removê-las só após o fluxo local estar definido.
