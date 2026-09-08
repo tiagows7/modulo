@@ -83,12 +83,28 @@ export async function POST(req: Request) {
   }
 
   const role = String(data.user.user_metadata?.role || "").toLowerCase();
-  const dest =
-    role === "pdv" || userKey === "pdv" || userKey.startsWith("pdv@")
+  const isPdvUser =
+    role === "pdv" || userKey === "pdv" || userKey.startsWith("pdv@");
+
+  const hostHeader = (req.headers.get("host") || "").toLowerCase();
+  const onLocalPostoProxy =
+    hostHeader.startsWith("127.0.0.1:39199") ||
+    hostHeader.startsWith("localhost:39199");
+
+  // PDV: login na Vercel → /pdv-launch (acorda :39200, espera :39199) → handoff local.
+  const dest = isPdvUser
+    ? onLocalPostoProxy
       ? "/pdv#/venda"
-      : "/administrativo";
+      : "/pdv-launch"
+    : "/administrativo";
   const storageKey = `sb-${projectRefFromUrl(url)}-auth-token`;
   const sessionJson = JSON.stringify(data.session);
+
+  const handoffScript =
+    isPdvUser && !onLocalPostoProxy
+      ? `location.replace(${JSON.stringify("/pdv-launch")} + "#" + encodeURIComponent(${JSON.stringify(sessionJson)}));`
+      : `try { sessionStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(sessionJson)}); } catch (e) {}
+      location.replace(${JSON.stringify(dest)});`;
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -104,10 +120,7 @@ export async function POST(req: Request) {
   <p>Entrando no sistema…</p>
   <script>
     (function () {
-      try {
-        sessionStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(sessionJson)});
-      } catch (e) {}
-      location.replace(${JSON.stringify(dest)});
+      ${handoffScript}
     })();
   </script>
   <noscript>

@@ -90,6 +90,10 @@ export type FiscalDocument = {
   payments: FiscalPaymentLine[]
   /** XML autorizado (mock / caminho futuro). */
   xml?: string
+  /** idCSC / Token ID da filial (NFC-e). */
+  tokenId?: string
+  /** CSC / Token NFC-e da filial. */
+  tokenNfce?: string
   /** Último envio da NF-e ao destinatário. */
   sentAt?: string
   sentTo?: string

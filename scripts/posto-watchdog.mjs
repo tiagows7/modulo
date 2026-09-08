@@ -1,5 +1,6 @@
 /**
- * Watchdog: mantem pontes + proxy web do posto sempre no ar (sem operador).
+ * Watchdog: mantém pontes + proxy web do posto sempre no ar.
+ * Também escuta :39200 para a nuvem (Vercel) pedir “wake” / subir servidores.
  */
 import { spawn } from 'node:child_process'
 import http from 'node:http'
@@ -9,14 +10,40 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CHECK_MS = 12000
 const WEB_PORT = 39199
+const WAKE_PORT = Number(process.env.POSTO_WAKE_PORT || 39200)
 const PDV_URL = `http://127.0.0.1:${WEB_PORT}/pdv`
+const ALLOWED_ORIGINS = [
+  'https://modulo-e9xc.vercel.app',
+  'http://127.0.0.1:39199',
+  'http://localhost:39199',
+  'http://127.0.0.1:3000',
+  'http://localhost:3000',
+]
 
 let postoChild = null
 let starting = false
 let openedBrowser = false
+let lastWakeAt = 0
 
 function log(msg) {
   console.log(`[posto-watchdog] ${new Date().toISOString()} ${msg}`)
+}
+
+function corsHeaders(req) {
+  const origin = String(req.headers.origin || '')
+  const allow =
+    ALLOWED_ORIGINS.includes(origin) ||
+    origin.endsWith('.vercel.app') ||
+    !origin
+      ? origin || '*'
+      : ALLOWED_ORIGINS[0]
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Private-Network': 'true',
+    'Cache-Control': 'no-store',
+  }
 }
 
 function checkWebHealth() {
@@ -99,7 +126,77 @@ async function tick() {
   startPosto()
 }
 
+function sendJson(req, res, status, body) {
+  const headers = {
+    ...corsHeaders(req),
+    'Content-Type': 'application/json; charset=utf-8',
+  }
+  res.writeHead(status, headers)
+  res.end(JSON.stringify(body))
+}
+
+/** Agente local: a Vercel chama /wake para subir as pontes se estiverem paradas. */
+function startWakeServer() {
+  const server = http.createServer(async (req, res) => {
+    const url = req.url || '/'
+    const method = req.method || 'GET'
+
+    if (method === 'OPTIONS') {
+      res.writeHead(204, corsHeaders(req))
+      res.end()
+      return
+    }
+
+    if (url === '/health' || url.startsWith('/health?')) {
+      const webOk = await checkWebHealth()
+      sendJson(req, res, 200, {
+        ok: true,
+        agent: 'posto-watchdog',
+        wakePort: WAKE_PORT,
+        webPort: WEB_PORT,
+        webOnline: webOk,
+        starting,
+        lastWakeAt: lastWakeAt || null,
+        pdv: PDV_URL,
+      })
+      return
+    }
+
+    if (url === '/wake' || url.startsWith('/wake?')) {
+      lastWakeAt = Date.now()
+      const webOk = await checkWebHealth()
+      if (!webOk) {
+        log('Wake recebido da nuvem — subindo posto…')
+        startPosto()
+      } else {
+        log('Wake recebido — proxy já online')
+      }
+      sendJson(req, res, 200, {
+        ok: true,
+        started: !webOk,
+        webOnline: webOk,
+        pdv: PDV_URL,
+        message: webOk
+          ? 'Proxy já estava online'
+          : 'Solicitado start das pontes locais',
+      })
+      return
+    }
+
+    sendJson(req, res, 404, { ok: false, error: 'not_found' })
+  })
+
+  server.listen(WAKE_PORT, '127.0.0.1', () => {
+    log(`Agente wake em http://127.0.0.1:${WAKE_PORT}/wake`)
+  })
+
+  server.on('error', (err) => {
+    log(`Falha ao abrir wake :${WAKE_PORT} — ${err.message}`)
+  })
+}
+
 log(`Iniciado — monitora ${PDV_URL}`)
+startWakeServer()
 startPosto()
 setInterval(() => {
   void tick()

@@ -42,14 +42,16 @@ function lineNet(item: { qty: number; price: number; discount?: number }) {
 
 /**
  * Conteúdo do QR Code NFC-e (consulta pública).
- * Formato aproximado NT 2015.002 — sem CSC/hash real até integração SEFAZ.
+ * Formato aproximado NT 2015.002 — hash CSC real fica para integração SEFAZ.
  */
 export function buildNfceQrPayload(doc: FiscalDocument): string {
   const chave = onlyDigits(doc.chave)
   const uf = (FISCAL_CONFIG.emitter.uf || 'SP').toUpperCase()
   const ambiente = FISCAL_CONFIG.ambiente === 'Produção' ? '1' : '2'
-  // p = chave|versao|ambiente|cIdToken|hashCSC  (hash vazio no mock)
-  const p = `${chave}|2|${ambiente}|1|`
+  const idToken = onlyDigits(doc.tokenId || '1') || '1'
+  // p = chave|versao|ambiente|cIdToken|hashCSC  (hash vazio no mock;
+  // tokenNfce será usado no hash quando houver transmissão live)
+  const p = `${chave}|2|${ambiente}|${idToken}|`
 
   const byUf: Record<string, string> = {
     SP: `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(p)}`,

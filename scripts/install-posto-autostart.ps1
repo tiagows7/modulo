@@ -60,10 +60,10 @@ Start-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 
 Write-Host ''
 Write-Host 'OK: posto automatico instalado.'
-Write-Host "- No login: sobe pontes + proxy e abre o PDV sozinho"
-Write-Host "- URL do caixa: $pdvUrl"
-Write-Host '- Atalho na area de trabalho: PDV Posto'
+Write-Host "- No login do Windows: sobe pontes + proxy (:39199) + agente wake (:39200)"
+Write-Host "- Fluxo do caixa: login na Vercel → acorda o PC → abre PDV local"
+Write-Host "- URL do PDV local: $pdvUrl"
+Write-Host "- Atalho na area de trabalho: PDV Posto"
 Write-Host ''
-Write-Host "NAO use o Vercel direto no caixa - use $pdvUrl"
 Write-Host 'Remover: npm run posto:autostart:off'
 Write-Host ''

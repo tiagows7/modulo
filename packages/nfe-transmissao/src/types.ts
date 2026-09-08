@@ -71,6 +71,10 @@ export type TransmitEmitente = {
   fantasia?: string | null;
   uf?: string | null;
   municipioIbge?: string | null;
+  /** idCSC (Token ID) da NFC-e — SEFAZ */
+  tokenId?: string | null;
+  /** CSC (Token NFC-e) — SEFAZ */
+  tokenNfce?: string | null;
 };
 
 export type TransmitirVendaInput = {

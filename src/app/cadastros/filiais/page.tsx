@@ -55,6 +55,8 @@ type Filial = {
   tipo_filial: TipoFilial | null;
   ambiente_nfe: AmbienteFiscal | null;
   ambiente_nfce: AmbienteFiscal | null;
+  token_id: string | null;
+  token_nfce: string | null;
 };
 
 type FilialForm = {
@@ -76,6 +78,8 @@ type FilialForm = {
   tipo_filial: TipoFilial;
   ambiente_nfe: AmbienteFiscal;
   ambiente_nfce: AmbienteFiscal;
+  token_id: string;
+  token_nfce: string;
 };
 
 type UfRow = { codigo: string; descricao: string };
@@ -107,6 +111,8 @@ const emptyForm: FilialForm = {
   tipo_filial: "posto",
   ambiente_nfe: 2,
   ambiente_nfce: 2,
+  token_id: "",
+  token_nfce: "",
 };
 
 const columns = [
@@ -158,6 +164,8 @@ function toForm(item: Filial): FilialForm {
     tipo_filial: normalizeTipoFilial(item.tipo_filial),
     ambiente_nfe: normalizeAmbienteFiscal(item.ambiente_nfe),
     ambiente_nfce: normalizeAmbienteFiscal(item.ambiente_nfce),
+    token_id: item.token_id ?? "",
+    token_nfce: item.token_nfce ?? "",
   };
 }
 
@@ -188,6 +196,8 @@ function toPayload(form: FilialForm) {
     tipo_filial: normalizeTipoFilial(form.tipo_filial),
     ambiente_nfe: normalizeAmbienteFiscal(form.ambiente_nfe),
     ambiente_nfce: normalizeAmbienteFiscal(form.ambiente_nfce),
+    token_id: blank(form.token_id)?.replace(/\D/g, "").slice(0, 6) ?? null,
+    token_nfce: blank(form.token_nfce) ?? null,
   };
 }
 
@@ -294,7 +304,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
         )
         .order("created_at", { ascending: false });
 
@@ -601,7 +611,7 @@ export default function FilialPage() {
             codigo,
           })
           .select(
-            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce",
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
           )
           .single();
         if (error) throw new Error(error.message);
@@ -1044,6 +1054,44 @@ export default function FilialPage() {
                   </select>
                   <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
                     Ambiente SEFAZ (tpAmb). Homologação = testes; Produção = notas válidas.
+                  </p>
+                </CadastroField>
+
+                <CadastroField label="Token ID (idCSC)" htmlFor="token_id">
+                  <input
+                    id="token_id"
+                    className="input-base input-compact"
+                    value={form.token_id}
+                    onChange={(e) =>
+                      updateField(
+                        "token_id",
+                        e.target.value.replace(/\D/g, "").slice(0, 6),
+                      )
+                    }
+                    disabled={busy}
+                    inputMode="numeric"
+                    placeholder="Ex.: 000001"
+                    autoComplete="off"
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Identificador do CSC cadastrado na SEFAZ para NFC-e.
+                  </p>
+                </CadastroField>
+
+                <CadastroField label="Token NFC-e (CSC)" htmlFor="token_nfce">
+                  <input
+                    id="token_nfce"
+                    className="input-base input-compact"
+                    value={form.token_nfce}
+                    onChange={(e) =>
+                      updateField("token_nfce", e.target.value.trim().slice(0, 60))
+                    }
+                    disabled={busy}
+                    placeholder="Código CSC da SEFAZ"
+                    autoComplete="off"
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Token CSC usado no QR Code da NFC-e.
                   </p>
                 </CadastroField>
 

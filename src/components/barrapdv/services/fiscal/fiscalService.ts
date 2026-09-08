@@ -130,17 +130,28 @@ class FiscalService {
     const tipo = request.tipo || decidirTipoDocumento(request.buyer?.document)
 
     let ambiente: 1 | 2 = 2
+    let tokenId: string | null = null
+    let tokenNfce: string | null = null
     try {
       const filialId = await getOperadorFilialId()
       if (filialId) {
         const col = tipo === 'NFC-e' ? 'ambiente_nfce' : 'ambiente_nfe'
         const { data } = await supabase
           .from('filial')
-          .select(col)
+          .select(`${col}, token_id, token_nfce`)
           .eq('id', filialId)
           .maybeSingle()
-        const raw = data ? (data as Record<string, unknown>)[col] : null
+        const row = data as Record<string, unknown> | null
+        const raw = row ? row[col] : null
         ambiente = normalizeAmbienteFiscal(raw)
+        tokenId =
+          row?.token_id != null && String(row.token_id).trim()
+            ? String(row.token_id).replace(/\D/g, '').slice(0, 6)
+            : null
+        tokenNfce =
+          row?.token_nfce != null && String(row.token_nfce).trim()
+            ? String(row.token_nfce).trim().slice(0, 60)
+            : null
       }
     } catch {
       /* mantém homologação */
@@ -154,14 +165,23 @@ class FiscalService {
       const res = await fetch(`${this.bridgeUrl}/fiscal/emit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...request, tipo, ambiente }),
+        body: JSON.stringify({
+          ...request,
+          tipo,
+          ambiente,
+          emitenteTokens: { tokenId, tokenNfce },
+        }),
       })
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error || `Falha ao emitir (${res.status})`)
       }
       const result = (await res.json()) as FiscalEmitResult
-      document = result.document
+      document = {
+        ...result.document,
+        tokenId: tokenId || result.document.tokenId,
+        tokenNfce: tokenNfce || result.document.tokenNfce,
+      }
       message = result.message
     } else {
       const tx = await transmitirDocumentoFiscal({
@@ -199,6 +219,8 @@ class FiscalService {
           razaoSocial: FISCAL_CONFIG.emitter.razaoSocial,
           fantasia: FISCAL_CONFIG.emitter.nomeFantasia,
           uf: FISCAL_CONFIG.emitter.uf,
+          tokenId,
+          tokenNfce,
         },
       })
 
@@ -224,6 +246,8 @@ class FiscalService {
         payments: request.payments.map((p) => ({ ...p })),
         xml: d.xml,
         error: d.error ?? null,
+        tokenId: tokenId || undefined,
+        tokenNfce: tokenNfce || undefined,
       }
       message = tx.message
     }
