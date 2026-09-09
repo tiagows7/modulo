@@ -580,7 +580,7 @@ export default function ConfiguracaoPdvPage() {
       ) : null}
 
       <ModulePage
-        title="Cadastro de PDV"
+        title="Configuração PDV"
         description="Configuração TEF e numeração fiscal por filial e terminal"
         icon={<MonitorSmartphone size={22} />}
         columns={columns}

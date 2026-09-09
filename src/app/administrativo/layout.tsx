@@ -38,8 +38,8 @@ const navItems = [
   { icon: DollarSign, label: "Financeiro", href: "/financeiro", group: "financeiro" },
   { icon: Monitor, label: "Movimento PDV", href: "/pdv", group: "pdv" },
   { icon: ClipboardList, label: "Rotinas Sped", href: "/sped", group: "fiscal" },
+  { icon: MonitorSmartphone, label: "Configuração PDV", href: "/configuracao-pdv", group: "config" },
   { icon: Settings, label: "Usuários", href: "/usuarios", group: "config" },
-  { icon: MonitorSmartphone, label: "Cadastro de PDV", href: "/configuracao-pdv", group: "config" },
   { icon: Download, label: "Importa Cadastros", href: "/importa", group: "config" },
 ];
 
