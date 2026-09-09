@@ -1237,7 +1237,7 @@ export default function ConfiguracaoPdvPage() {
             <CadastroFormActions
               onCancel={closeDelete}
               onConfirm={handleDelete}
-              confirmLabel="Excluir"
+              submitLabel="Excluir"
               disabled={busy}
               busy={busy}
               danger
