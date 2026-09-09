@@ -15,7 +15,6 @@ import {
   IdCard,
   FolderTree,
   Percent,
-  MonitorSmartphone,
 } from "lucide-react";
 import { useAuthProfile } from "@/lib/authRole";
 import { useTemFilialPosto } from "@/lib/useTemFilialPosto";
@@ -27,12 +26,6 @@ const submenus = [
     icon: Building2,
     description: "Dados cadastrais das filiais",
     superAdminOnly: true,
-  },
-  {
-    href: "/configuracao-pdv",
-    label: "Configuração PDV",
-    icon: MonitorSmartphone,
-    description: "TEF e numeração fiscal por terminal",
   },
   {
     href: "/cadastros/clientes",

@@ -14,6 +14,7 @@ import {
   Monitor,
   ClipboardList,
   Settings,
+  Download,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -36,7 +37,9 @@ const navItems = [
   { icon: DollarSign, label: "Financeiro", href: "/financeiro", group: "financeiro" },
   { icon: Monitor, label: "Movimento PDV", href: "/pdv", group: "pdv" },
   { icon: ClipboardList, label: "Rotinas Sped", href: "/sped", group: "fiscal" },
-  { icon: Settings, label: "Configurações", href: "/configuracoes", group: "config" },
+  { icon: Settings, label: "Usuários", href: "/usuarios", group: "config" },
+  { icon: Monitor, label: "Pdv", href: "/configuracao-pdv", group: "config" },
+  { icon: Download, label: "Importa Cadastros", href: "/importa", group: "config" },
 ];
 
 const groupLabels: Record<string, string> = {
