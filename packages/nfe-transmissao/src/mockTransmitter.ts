@@ -68,7 +68,15 @@ export function createMockTransmitter(): FiscalTransmitter {
           ? roundMoney(input.total)
           : roundMoney(input.items.reduce((s, i) => s + i.qty * i.price, 0));
 
-      const numero = tipo === "NFC-e" ? ++seqNfce : ++seqNfe;
+      const numeroReservado = Number(input.numero);
+      const numero =
+        Number.isInteger(numeroReservado) && numeroReservado > 0
+          ? numeroReservado
+          : tipo === "NFC-e"
+            ? ++seqNfce
+            : ++seqNfe;
+      if (tipo === "NFC-e") seqNfce = Math.max(seqNfce, numero);
+      else seqNfe = Math.max(seqNfe, numero);
       const serie = String(input.serie || "1");
       const ambiente: AmbienteSefaz = input.ambiente === 1 ? 1 : 2;
       const { emissao, hora, issuedAt } = nowParts();

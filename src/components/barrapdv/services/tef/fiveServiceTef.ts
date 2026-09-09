@@ -1,4 +1,5 @@
 import { TEF_CONFIG } from './config'
+import { getConfiguracaoTefAtual } from './configuracaoTefDb'
 import type { TefStartRequest, TefTransactionState } from './types'
 
 /**
@@ -29,15 +30,19 @@ class FiveServiceTefClient {
   }
 
   async start(request: TefStartRequest): Promise<TefTransactionState> {
+    const dbConfig = await getConfiguracaoTefAtual()
     const res = await fetch(`${this.bridgeUrl}/tef/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...request,
-        sitefIp: TEF_CONFIG.sitefIp,
-        storeId: TEF_CONFIG.storeId,
-        terminalId: TEF_CONFIG.terminalId,
-        operator: request.operator || TEF_CONFIG.defaultOperator,
+        sitefIp: dbConfig?.ip_tef || TEF_CONFIG.sitefIp,
+        storeId: dbConfig?.idloja || TEF_CONFIG.storeId,
+        terminalId: dbConfig?.idterminal || TEF_CONFIG.terminalId,
+        operator:
+          request.operator ||
+          dbConfig?.operador ||
+          TEF_CONFIG.defaultOperator,
         mode: TEF_CONFIG.mode,
       }),
     })

@@ -40,6 +40,7 @@ import {
 } from '@/lib/nfe/transmissao'
 import { normalizeAmbienteFiscal } from '@/lib/filialAmbienteFiscal'
 import { getOperadorFilialId } from '../produtos/buscarProduto'
+import { reservarNumeroFiscalTef } from '../tef/configuracaoTefDb'
 import { supabase } from '@/lib/supabase'
 
 function resolvePrintModel(
@@ -157,6 +158,8 @@ class FiscalService {
       /* mantém homologação */
     }
 
+    const numeracao = await reservarNumeroFiscalTef(tipo)
+
     let document: FiscalDocument
     let message: string
     let receitas: ReceitaFiscalLinha[] | undefined
@@ -169,6 +172,8 @@ class FiscalService {
           ...request,
           tipo,
           ambiente,
+          numero: numeracao.numero,
+          serie: String(numeracao.serie),
           emitenteTokens: { tokenId, tokenNfce },
         }),
       })
@@ -211,8 +216,9 @@ class FiscalService {
         saleRef: request.saleRef,
         operator: request.operator,
         total: request.total,
+        numero: numeracao.numero,
         ambiente,
-        serie: FISCAL_CONFIG.series[tipo],
+        serie: String(numeracao.serie),
         emitente: {
           cnpj: FISCAL_CONFIG.emitter.cnpj,
           ie: FISCAL_CONFIG.emitter.ie,

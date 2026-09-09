@@ -90,13 +90,13 @@ function suggestTipo(buyer) {
   return 'NFC-e'
 }
 
-function buildChave(tipo, numero) {
+function buildChave(tipo, numero, serieNumero = 1) {
   const uf = '35'
   const d = new Date()
   const aamm = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1, 2)}`
   const cnpj = onlyDigits(EMITTER.cnpj).padStart(14, '0').slice(0, 14)
   const mod = tipo === 'NFC-e' ? '65' : '55'
-  const serie = '001'
+  const serie = pad(Number(serieNumero) || 1, 3)
   const nNF = pad(numero, 9)
   const tpEmis = '1'
   const cNF = pad(parseInt(randomBytes(4).toString('hex').slice(0, 8), 16) % 1e8, 8)
@@ -150,14 +150,23 @@ function emitDoc(payload) {
       ? Math.round(Number(payload.total) * 100) / 100
       : Math.round(items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0) * 100) / 100
 
-  const numeroInt = tipo === 'NFC-e' ? seqNfce++ : seqNfe++
+  const reservado = Number(payload.numero)
+  const numeroInt =
+    Number.isInteger(reservado) && reservado > 0
+      ? reservado
+      : tipo === 'NFC-e'
+        ? seqNfce++
+        : seqNfe++
+  if (tipo === 'NFC-e') seqNfce = Math.max(seqNfce, numeroInt + 1)
+  else seqNfe = Math.max(seqNfe, numeroInt + 1)
+  const serie = String(Number(payload.serie) || 1)
   const now = new Date()
   const doc = {
     id: `doc-${Date.now()}-${randomBytes(3).toString('hex')}`,
     tipo,
     numero: pad(numeroInt, 6),
-    serie: '1',
-    chave: buildChave(tipo, numeroInt),
+    serie,
+    chave: buildChave(tipo, numeroInt, Number(serie)),
     emissao: now.toLocaleDateString('pt-BR'),
     hora: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     valor: total,

@@ -12,6 +12,7 @@ import {
   FileText,
   DollarSign,
   Monitor,
+  MonitorSmartphone,
   ClipboardList,
   Settings,
   Download,
@@ -38,6 +39,7 @@ const navItems = [
   { icon: Monitor, label: "Movimento PDV", href: "/pdv", group: "pdv" },
   { icon: ClipboardList, label: "Rotinas Sped", href: "/sped", group: "fiscal" },
   { icon: Settings, label: "Usuários", href: "/usuarios", group: "config" },
+  { icon: MonitorSmartphone, label: "Cadastro de PDV", href: "/configuracao-pdv", group: "config" },
   { icon: Download, label: "Importa Cadastros", href: "/importa", group: "config" },
 ];
 

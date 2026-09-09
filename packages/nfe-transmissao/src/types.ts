@@ -86,6 +86,8 @@ export type TransmitirVendaInput = {
   saleRef: string;
   operator?: string | null;
   total?: number;
+  /** Número fiscal previamente reservado no host. */
+  numero?: number;
   serie?: string;
   /** tpAmb: 1 produção · 2 homologação */
   ambiente?: AmbienteSefaz;

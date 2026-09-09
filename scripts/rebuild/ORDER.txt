@@ -66,3 +66,4 @@
 59_filial_ambiente_fiscal.sql
 60_receitas_nfce_nfe.sql
 61_filial_token_nfce.sql
+62_configuracao_tef.sql
