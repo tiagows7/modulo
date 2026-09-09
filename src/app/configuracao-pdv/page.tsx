@@ -586,6 +586,7 @@ export default function ConfiguracaoPdvPage() {
         columns={columns}
         rows={rows}
         addLabel="Novo PDV"
+        backUrl="/configuracoes"
         onAdd={busy ? undefined : openCreate}
         filters={
           <select
