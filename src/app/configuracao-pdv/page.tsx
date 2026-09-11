@@ -29,15 +29,10 @@ type ConfigPdv = {
   ip_tef: string | null;
   idterminal: string | null;
   idloja: string | null;
-  codempresa: string | null;
-  operador: string | null;
-  portapinpad: string | null;
   cnpj: string | null;
   mensagempinpad: string | null;
   comexterna: number | null;
-  isdoublevalidation: number | null;
   otp: string | null;
-  cnpjautomacao: string | null;
   transacaohabilitadas: string | null;
   obrigadooperador: string | null;
   postipo: number | null;
@@ -46,8 +41,6 @@ type ConfigPdv = {
   nfcenumero: number | null;
   modelo: number | null;
   otpnome: string | null;
-  idcielo: string | null;
-  secretcielo: string | null;
   imprimebanri: number | null;
   aceitavalorparcial: string | null;
   vendaproduto: string | null;
@@ -59,7 +52,6 @@ type ConfigPdv = {
   tlstoken: string | null;
   tlstipoproxy: string | null;
   tlsenderecoproxy: string | null;
-  tef_gsurfuid: string | null;
 };
 
 type ConfigPdvForm = {
@@ -69,15 +61,10 @@ type ConfigPdvForm = {
   ip_tef: string;
   idterminal: string;
   idloja: string;
-  codempresa: string;
-  operador: string;
-  portapinpad: string;
   cnpj: string;
   mensagempinpad: string;
   comexterna: string;
-  isdoublevalidation: string;
   otp: string;
-  cnpjautomacao: string;
   transacaohabilitadas: string;
   obrigadooperador: string;
   postipo: string;
@@ -86,8 +73,6 @@ type ConfigPdvForm = {
   nfcenumero: string;
   modelo: string;
   otpnome: string;
-  idcielo: string;
-  secretcielo: string;
   imprimebanri: string;
   aceitavalorparcial: string;
   vendaproduto: string;
@@ -99,7 +84,6 @@ type ConfigPdvForm = {
   tlstoken: string;
   tlstipoproxy: string;
   tlsenderecoproxy: string;
-  tef_gsurfuid: string;
 };
 
 type TabId = "geral" | "tef";
@@ -111,15 +95,10 @@ const emptyForm: ConfigPdvForm = {
   ip_tef: "",
   idterminal: "",
   idloja: "",
-  codempresa: "",
-  operador: "",
-  portapinpad: "",
   cnpj: "",
   mensagempinpad: "",
   comexterna: "",
-  isdoublevalidation: "",
   otp: "",
-  cnpjautomacao: "",
   transacaohabilitadas: "",
   obrigadooperador: "",
   postipo: "",
@@ -128,8 +107,6 @@ const emptyForm: ConfigPdvForm = {
   nfcenumero: "1",
   modelo: "",
   otpnome: "",
-  idcielo: "",
-  secretcielo: "",
   imprimebanri: "",
   aceitavalorparcial: "S",
   vendaproduto: "",
@@ -141,7 +118,6 @@ const emptyForm: ConfigPdvForm = {
   tlstoken: "",
   tlstipoproxy: "",
   tlsenderecoproxy: "",
-  tef_gsurfuid: "",
 };
 
 const tabs: { id: TabId; label: string }[] = [
@@ -161,7 +137,7 @@ const columns = [
 ];
 
 const SELECT_COLS =
-  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, codempresa, operador, portapinpad, cnpj, mensagempinpad, comexterna, isdoublevalidation, otp, cnpjautomacao, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, idcielo, secretcielo, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy, tef_gsurfuid";
+  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, cnpj, mensagempinpad, comexterna, otp, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy";
 
 function blank(v: string) {
   const t = v.trim();
@@ -203,18 +179,11 @@ function mapRow(row: Record<string, unknown>): ConfigPdv {
     ip_tef: row.ip_tef != null ? String(row.ip_tef) : null,
     idterminal: row.idterminal != null ? String(row.idterminal) : null,
     idloja: row.idloja != null ? String(row.idloja) : null,
-    codempresa: row.codempresa != null ? String(row.codempresa) : null,
-    operador: row.operador != null ? String(row.operador) : null,
-    portapinpad: row.portapinpad != null ? String(row.portapinpad) : null,
     cnpj: row.cnpj != null ? String(row.cnpj) : null,
     mensagempinpad:
       row.mensagempinpad != null ? String(row.mensagempinpad) : null,
     comexterna: row.comexterna != null ? Number(row.comexterna) : null,
-    isdoublevalidation:
-      row.isdoublevalidation != null ? Number(row.isdoublevalidation) : null,
     otp: row.otp != null ? String(row.otp) : null,
-    cnpjautomacao:
-      row.cnpjautomacao != null ? String(row.cnpjautomacao) : null,
     transacaohabilitadas:
       row.transacaohabilitadas != null
         ? String(row.transacaohabilitadas)
@@ -228,8 +197,6 @@ function mapRow(row: Record<string, unknown>): ConfigPdv {
     nfcenumero: row.nfcenumero != null ? Number(row.nfcenumero) : null,
     modelo: row.modelo != null ? Number(row.modelo) : null,
     otpnome: row.otpnome != null ? String(row.otpnome) : null,
-    idcielo: row.idcielo != null ? String(row.idcielo) : null,
-    secretcielo: row.secretcielo != null ? String(row.secretcielo) : null,
     imprimebanri: row.imprimebanri != null ? Number(row.imprimebanri) : null,
     aceitavalorparcial:
       row.aceitavalorparcial != null ? String(row.aceitavalorparcial) : null,
@@ -244,7 +211,6 @@ function mapRow(row: Record<string, unknown>): ConfigPdv {
     tlstipoproxy: row.tlstipoproxy != null ? String(row.tlstipoproxy) : null,
     tlsenderecoproxy:
       row.tlsenderecoproxy != null ? String(row.tlsenderecoproxy) : null,
-    tef_gsurfuid: row.tef_gsurfuid != null ? String(row.tef_gsurfuid) : null,
   };
 }
 
@@ -256,15 +222,10 @@ function toForm(item: ConfigPdv): ConfigPdvForm {
     ip_tef: strOrEmpty(item.ip_tef),
     idterminal: strOrEmpty(item.idterminal),
     idloja: strOrEmpty(item.idloja),
-    codempresa: strOrEmpty(item.codempresa),
-    operador: strOrEmpty(item.operador),
-    portapinpad: strOrEmpty(item.portapinpad),
     cnpj: strOrEmpty(item.cnpj),
     mensagempinpad: strOrEmpty(item.mensagempinpad),
     comexterna: numOrEmpty(item.comexterna),
-    isdoublevalidation: numOrEmpty(item.isdoublevalidation),
     otp: strOrEmpty(item.otp),
-    cnpjautomacao: strOrEmpty(item.cnpjautomacao),
     transacaohabilitadas: strOrEmpty(item.transacaohabilitadas),
     obrigadooperador: strOrEmpty(item.obrigadooperador),
     postipo: numOrEmpty(item.postipo),
@@ -273,8 +234,6 @@ function toForm(item: ConfigPdv): ConfigPdvForm {
     nfcenumero: numOrEmpty(item.nfcenumero),
     modelo: numOrEmpty(item.modelo),
     otpnome: strOrEmpty(item.otpnome),
-    idcielo: strOrEmpty(item.idcielo),
-    secretcielo: strOrEmpty(item.secretcielo),
     imprimebanri: numOrEmpty(item.imprimebanri),
     aceitavalorparcial: strOrEmpty(item.aceitavalorparcial) || "S",
     vendaproduto: strOrEmpty(item.vendaproduto),
@@ -286,7 +245,6 @@ function toForm(item: ConfigPdv): ConfigPdvForm {
     tlstoken: strOrEmpty(item.tlstoken),
     tlstipoproxy: strOrEmpty(item.tlstipoproxy),
     tlsenderecoproxy: strOrEmpty(item.tlsenderecoproxy),
-    tef_gsurfuid: strOrEmpty(item.tef_gsurfuid),
   };
 }
 
@@ -445,19 +403,10 @@ export default function ConfiguracaoPdvPage() {
         ip_tef: blank(form.ip_tef)?.slice(0, 30) ?? null,
         idterminal: blank(form.idterminal)?.slice(0, 50) ?? null,
         idloja: blank(form.idloja)?.slice(0, 50) ?? null,
-        codempresa: blank(form.codempresa)?.slice(0, 50) ?? null,
-        operador: blank(form.operador)?.slice(0, 50) ?? null,
-        portapinpad: blank(form.portapinpad)?.slice(0, 20) ?? null,
         cnpj: blank(form.cnpj)?.replace(/\D/g, "").slice(0, 14) ?? null,
         mensagempinpad: blank(form.mensagempinpad)?.slice(0, 20) ?? null,
         comexterna: parseOptInt("Com. externa", form.comexterna),
-        isdoublevalidation: parseOptInt(
-          "Double validation",
-          form.isdoublevalidation,
-        ),
         otp: blank(form.otp)?.slice(0, 50) ?? null,
-        cnpjautomacao:
-          blank(form.cnpjautomacao)?.replace(/\D/g, "").slice(0, 20) ?? null,
         transacaohabilitadas:
           blank(form.transacaohabilitadas)?.slice(0, 90) ?? null,
         obrigadooperador: blank(form.obrigadooperador)?.slice(0, 1) ?? null,
@@ -467,8 +416,6 @@ export default function ConfiguracaoPdvPage() {
         nfcenumero,
         modelo: parseOptInt("Modelo", form.modelo),
         otpnome: blank(form.otpnome)?.slice(0, 30) ?? null,
-        idcielo: blank(form.idcielo)?.slice(0, 80) ?? null,
-        secretcielo: blank(form.secretcielo)?.slice(0, 80) ?? null,
         imprimebanri: parseOptInt("Imprime Banri", form.imprimebanri),
         aceitavalorparcial:
           blank(form.aceitavalorparcial)?.slice(0, 1).toUpperCase() ?? "S",
@@ -482,7 +429,6 @@ export default function ConfiguracaoPdvPage() {
         tlstoken: blank(form.tlstoken)?.slice(0, 50) ?? null,
         tlstipoproxy: blank(form.tlstipoproxy)?.slice(0, 50) ?? null,
         tlsenderecoproxy: blank(form.tlsenderecoproxy)?.slice(0, 50) ?? null,
-        tef_gsurfuid: blank(form.tef_gsurfuid)?.slice(0, 20) ?? null,
       };
 
       setFormError("");
@@ -719,19 +665,6 @@ export default function ConfiguracaoPdvPage() {
                   />
                 </CadastroField>
 
-                <CadastroField label="Operador" htmlFor="cfg-operador">
-                  <input
-                    id="cfg-operador"
-                    className="input-base input-compact"
-                    value={form.operador}
-                    onChange={(e) =>
-                      setField("operador", e.target.value.slice(0, 50))
-                    }
-                    disabled={busy}
-                    maxLength={50}
-                  />
-                </CadastroField>
-
                 <CadastroField label="CNPJ" htmlFor="cfg-cnpj">
                   <input
                     id="cfg-cnpj"
@@ -746,19 +679,6 @@ export default function ConfiguracaoPdvPage() {
                     inputMode="numeric"
                     disabled={busy}
                     maxLength={14}
-                  />
-                </CadastroField>
-
-                <CadastroField label="Cód. empresa" htmlFor="cfg-codempresa">
-                  <input
-                    id="cfg-codempresa"
-                    className="input-base input-compact"
-                    value={form.codempresa}
-                    onChange={(e) =>
-                      setField("codempresa", e.target.value.slice(0, 50))
-                    }
-                    disabled={busy}
-                    maxLength={50}
                   />
                 </CadastroField>
 
@@ -953,19 +873,6 @@ export default function ConfiguracaoPdvPage() {
                   />
                 </CadastroField>
 
-                <CadastroField label="Porta pinpad" htmlFor="cfg-porta">
-                  <input
-                    id="cfg-porta"
-                    className="input-base input-compact"
-                    value={form.portapinpad}
-                    onChange={(e) =>
-                      setField("portapinpad", e.target.value.slice(0, 20))
-                    }
-                    disabled={busy}
-                    maxLength={20}
-                  />
-                </CadastroField>
-
                 <CadastroField label="Mensagem pinpad" htmlFor="cfg-msgpin">
                   <input
                     id="cfg-msgpin"
@@ -1003,22 +910,6 @@ export default function ConfiguracaoPdvPage() {
                     onChange={(e) =>
                       setField(
                         "comexterna",
-                        e.target.value.replace(/[^\d-]/g, "").slice(0, 6),
-                      )
-                    }
-                    inputMode="numeric"
-                    disabled={busy}
-                  />
-                </CadastroField>
-
-                <CadastroField label="Double validation" htmlFor="cfg-dbl">
-                  <input
-                    id="cfg-dbl"
-                    className="input-base input-compact"
-                    value={form.isdoublevalidation}
-                    onChange={(e) =>
-                      setField(
-                        "isdoublevalidation",
                         e.target.value.replace(/[^\d-]/g, "").slice(0, 6),
                       )
                     }
@@ -1111,49 +1002,6 @@ export default function ConfiguracaoPdvPage() {
                   />
                 </CadastroField>
 
-                <CadastroField label="CNPJ automação" htmlFor="cfg-cnpjauto">
-                  <input
-                    id="cfg-cnpjauto"
-                    className="input-base input-compact"
-                    value={form.cnpjautomacao}
-                    onChange={(e) =>
-                      setField(
-                        "cnpjautomacao",
-                        e.target.value.replace(/\D/g, "").slice(0, 20),
-                      )
-                    }
-                    inputMode="numeric"
-                    disabled={busy}
-                    maxLength={20}
-                  />
-                </CadastroField>
-
-                <CadastroField label="ID Cielo" htmlFor="cfg-idcielo">
-                  <input
-                    id="cfg-idcielo"
-                    className="input-base input-compact"
-                    value={form.idcielo}
-                    onChange={(e) =>
-                      setField("idcielo", e.target.value.slice(0, 80))
-                    }
-                    disabled={busy}
-                    maxLength={80}
-                  />
-                </CadastroField>
-
-                <CadastroField label="Secret Cielo" htmlFor="cfg-secretcielo">
-                  <input
-                    id="cfg-secretcielo"
-                    className="input-base input-compact"
-                    value={form.secretcielo}
-                    onChange={(e) =>
-                      setField("secretcielo", e.target.value.slice(0, 80))
-                    }
-                    disabled={busy}
-                    maxLength={80}
-                  />
-                </CadastroField>
-
                 <CadastroField label="TLS externa" htmlFor="cfg-tlsext">
                   <input
                     id="cfg-tlsext"
@@ -1203,19 +1051,6 @@ export default function ConfiguracaoPdvPage() {
                     }
                     disabled={busy}
                     maxLength={50}
-                  />
-                </CadastroField>
-
-                <CadastroField label="TEF GSURF UID" htmlFor="cfg-gsurf" span="full">
-                  <input
-                    id="cfg-gsurf"
-                    className="input-base input-compact"
-                    value={form.tef_gsurfuid}
-                    onChange={(e) =>
-                      setField("tef_gsurfuid", e.target.value.slice(0, 20))
-                    }
-                    disabled={busy}
-                    maxLength={20}
                   />
                 </CadastroField>
               </CadastroFormGrid>

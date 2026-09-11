@@ -10,9 +10,6 @@ export type ConfiguracaoTef = {
   ip_tef: string | null
   idterminal: string | null
   idloja: string | null
-  codempresa: string | null
-  operador: string | null
-  portapinpad: string | null
   cnpj: string | null
   nfceserie: number | null
   nfcenumero: number | null
@@ -52,7 +49,7 @@ export async function getConfiguracaoTefAtual(): Promise<ConfiguracaoTef | null>
   const { data, error } = await supabase
     .from('configuracao_tef')
     .select(
-      'filial,pdv,tipo,ip_tef,idterminal,idloja,codempresa,operador,portapinpad,cnpj,nfceserie,nfcenumero,nfeserie,nfenumero',
+      'filial,pdv,tipo,ip_tef,idterminal,idloja,cnpj,nfceserie,nfcenumero,nfeserie,nfenumero',
     )
     .eq('filial', filialId)
     .eq('pdv', pdv)

@@ -39,10 +39,7 @@ class FiveServiceTefClient {
         sitefIp: dbConfig?.ip_tef || TEF_CONFIG.sitefIp,
         storeId: dbConfig?.idloja || TEF_CONFIG.storeId,
         terminalId: dbConfig?.idterminal || TEF_CONFIG.terminalId,
-        operator:
-          request.operator ||
-          dbConfig?.operador ||
-          TEF_CONFIG.defaultOperator,
+        operator: request.operator || TEF_CONFIG.defaultOperator,
         mode: TEF_CONFIG.mode,
       }),
     })
