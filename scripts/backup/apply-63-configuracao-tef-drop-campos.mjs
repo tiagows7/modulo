@@ -61,3 +61,4 @@ const cols = await client.query(`
 console.log(cols.rows.map((r) => r.column_name));
 await client.end();
 console.log("OK 63_configuracao_tef_drop_campos");
+

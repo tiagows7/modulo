@@ -52,6 +52,10 @@ type ConfigPdv = {
   tlstoken: string | null;
   tlstipoproxy: string | null;
   tlsenderecoproxy: string | null;
+  vero_idloja: string | null;
+  vero_idterminal: string | null;
+  vero_token: string | null;
+  vero_cnpj: string | null;
 };
 
 type ConfigPdvForm = {
@@ -84,9 +88,14 @@ type ConfigPdvForm = {
   tlstoken: string;
   tlstipoproxy: string;
   tlsenderecoproxy: string;
+  vero_idloja: string;
+  vero_idterminal: string;
+  vero_token: string;
+  vero_cnpj: string;
 };
 
 type TabId = "geral" | "tef";
+type TefSubTabId = "tls" | "vero";
 
 const emptyForm: ConfigPdvForm = {
   filial: "",
@@ -118,11 +127,20 @@ const emptyForm: ConfigPdvForm = {
   tlstoken: "",
   tlstipoproxy: "",
   tlsenderecoproxy: "",
+  vero_idloja: "",
+  vero_idterminal: "",
+  vero_token: "",
+  vero_cnpj: "",
 };
 
 const tabs: { id: TabId; label: string }[] = [
   { id: "geral", label: "Geral" },
   { id: "tef", label: "TEF" },
+];
+
+const tefSubTabs: { id: TefSubTabId; label: string }[] = [
+  { id: "tls", label: "Config TLS FiveService" },
+  { id: "vero", label: "Config Vero" },
 ];
 
 const columns = [
@@ -137,7 +155,7 @@ const columns = [
 ];
 
 const SELECT_COLS =
-  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, cnpj, mensagempinpad, comexterna, otp, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy";
+  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, cnpj, mensagempinpad, comexterna, otp, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy, vero_idloja, vero_idterminal, vero_token, vero_cnpj";
 
 function blank(v: string) {
   const t = v.trim();
@@ -211,6 +229,11 @@ function mapRow(row: Record<string, unknown>): ConfigPdv {
     tlstipoproxy: row.tlstipoproxy != null ? String(row.tlstipoproxy) : null,
     tlsenderecoproxy:
       row.tlsenderecoproxy != null ? String(row.tlsenderecoproxy) : null,
+    vero_idloja: row.vero_idloja != null ? String(row.vero_idloja) : null,
+    vero_idterminal:
+      row.vero_idterminal != null ? String(row.vero_idterminal) : null,
+    vero_token: row.vero_token != null ? String(row.vero_token) : null,
+    vero_cnpj: row.vero_cnpj != null ? String(row.vero_cnpj) : null,
   };
 }
 
@@ -245,6 +268,10 @@ function toForm(item: ConfigPdv): ConfigPdvForm {
     tlstoken: strOrEmpty(item.tlstoken),
     tlstipoproxy: strOrEmpty(item.tlstipoproxy),
     tlsenderecoproxy: strOrEmpty(item.tlsenderecoproxy),
+    vero_idloja: strOrEmpty(item.vero_idloja),
+    vero_idterminal: strOrEmpty(item.vero_idterminal),
+    vero_token: strOrEmpty(item.vero_token),
+    vero_cnpj: strOrEmpty(item.vero_cnpj),
   };
 }
 
@@ -261,6 +288,7 @@ export default function ConfiguracaoPdvPage() {
   const [form, setForm] = useState<ConfigPdvForm>(emptyForm);
   const [formError, setFormError] = useState("");
   const [tab, setTab] = useState<TabId>("geral");
+  const [tefSub, setTefSub] = useState<TefSubTabId>("tls");
 
   const filialById = useMemo(() => {
     const map = new Map<string, FilialOpt>();
@@ -325,6 +353,7 @@ export default function ConfiguracaoPdvPage() {
     });
     setFormError("");
     setTab("geral");
+    setTefSub("tls");
     setModalOpen(true);
   };
 
@@ -334,6 +363,7 @@ export default function ConfiguracaoPdvPage() {
     setFormError("");
     setActionError("");
     setTab("geral");
+    setTefSub("tls");
     setModalOpen(true);
   };
 
@@ -429,6 +459,10 @@ export default function ConfiguracaoPdvPage() {
         tlstoken: blank(form.tlstoken)?.slice(0, 50) ?? null,
         tlstipoproxy: blank(form.tlstipoproxy)?.slice(0, 50) ?? null,
         tlsenderecoproxy: blank(form.tlsenderecoproxy)?.slice(0, 50) ?? null,
+        vero_idloja: blank(form.vero_idloja)?.slice(0, 50) ?? null,
+        vero_idterminal: blank(form.vero_idterminal)?.slice(0, 50) ?? null,
+        vero_token: blank(form.vero_token)?.slice(0, 80) ?? null,
+        vero_cnpj: blank(form.vero_cnpj)?.replace(/\D/g, "").slice(0, 14) ?? null,
       };
 
       setFormError("");
@@ -978,82 +1012,177 @@ export default function ConfiguracaoPdvPage() {
                   />
                 </CadastroField>
 
-                <CadastroField label="OTP" htmlFor="cfg-otp">
-                  <input
-                    id="cfg-otp"
-                    className="input-base input-compact"
-                    value={form.otp}
-                    onChange={(e) => setField("otp", e.target.value.slice(0, 50))}
-                    disabled={busy}
-                    maxLength={50}
-                  />
-                </CadastroField>
-
-                <CadastroField label="OTP nome" htmlFor="cfg-otpnome">
-                  <input
-                    id="cfg-otpnome"
-                    className="input-base input-compact"
-                    value={form.otpnome}
-                    onChange={(e) =>
-                      setField("otpnome", e.target.value.slice(0, 30))
-                    }
-                    disabled={busy}
-                    maxLength={30}
-                  />
-                </CadastroField>
-
-                <CadastroField label="TLS externa" htmlFor="cfg-tlsext">
-                  <input
-                    id="cfg-tlsext"
-                    className="input-base input-compact"
-                    value={form.tlsexterna}
-                    onChange={(e) =>
-                      setField("tlsexterna", e.target.value.slice(0, 20))
-                    }
-                    disabled={busy}
-                    maxLength={20}
-                  />
-                </CadastroField>
-
-                <CadastroField label="TLS token" htmlFor="cfg-tlstoken">
-                  <input
-                    id="cfg-tlstoken"
-                    className="input-base input-compact"
-                    value={form.tlstoken}
-                    onChange={(e) =>
-                      setField("tlstoken", e.target.value.slice(0, 50))
-                    }
-                    disabled={busy}
-                    maxLength={50}
-                  />
-                </CadastroField>
-
-                <CadastroField label="TLS tipo proxy" htmlFor="cfg-tlsproxy">
-                  <input
-                    id="cfg-tlsproxy"
-                    className="input-base input-compact"
-                    value={form.tlstipoproxy}
-                    onChange={(e) =>
-                      setField("tlstipoproxy", e.target.value.slice(0, 50))
-                    }
-                    disabled={busy}
-                    maxLength={50}
-                  />
-                </CadastroField>
-
-                <CadastroField label="TLS endereço proxy" htmlFor="cfg-tlsend">
-                  <input
-                    id="cfg-tlsend"
-                    className="input-base input-compact"
-                    value={form.tlsenderecoproxy}
-                    onChange={(e) =>
-                      setField("tlsenderecoproxy", e.target.value.slice(0, 50))
-                    }
-                    disabled={busy}
-                    maxLength={50}
-                  />
-                </CadastroField>
               </CadastroFormGrid>
+
+              <div style={{ marginTop: 8 }}>
+                <div className="cadastro-tabs" role="tablist" aria-label="Configuração TEF">
+                  {tefSubTabs.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={tefSub === item.id}
+                      className={`cadastro-tab${tefSub === item.id ? " active" : ""}`}
+                      onClick={() => setTefSub(item.id)}
+                      disabled={busy}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {tefSub === "tls" ? (
+                  <div className="cadastro-tab-panel" role="tabpanel">
+                    <CadastroFormGrid>
+                      <CadastroField label="OTP" htmlFor="cfg-otp">
+                        <input
+                          id="cfg-otp"
+                          className="input-base input-compact"
+                          value={form.otp}
+                          onChange={(e) =>
+                            setField("otp", e.target.value.slice(0, 50))
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="OTP nome" htmlFor="cfg-otpnome">
+                        <input
+                          id="cfg-otpnome"
+                          className="input-base input-compact"
+                          value={form.otpnome}
+                          onChange={(e) =>
+                            setField("otpnome", e.target.value.slice(0, 30))
+                          }
+                          disabled={busy}
+                          maxLength={30}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="TLS externa" htmlFor="cfg-tlsext">
+                        <input
+                          id="cfg-tlsext"
+                          className="input-base input-compact"
+                          value={form.tlsexterna}
+                          onChange={(e) =>
+                            setField("tlsexterna", e.target.value.slice(0, 20))
+                          }
+                          disabled={busy}
+                          maxLength={20}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="TLS token" htmlFor="cfg-tlstoken">
+                        <input
+                          id="cfg-tlstoken"
+                          className="input-base input-compact"
+                          value={form.tlstoken}
+                          onChange={(e) =>
+                            setField("tlstoken", e.target.value.slice(0, 50))
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="TLS tipo proxy" htmlFor="cfg-tlsproxy">
+                        <input
+                          id="cfg-tlsproxy"
+                          className="input-base input-compact"
+                          value={form.tlstipoproxy}
+                          onChange={(e) =>
+                            setField("tlstipoproxy", e.target.value.slice(0, 50))
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="TLS endereço proxy" htmlFor="cfg-tlsend">
+                        <input
+                          id="cfg-tlsend"
+                          className="input-base input-compact"
+                          value={form.tlsenderecoproxy}
+                          onChange={(e) =>
+                            setField(
+                              "tlsenderecoproxy",
+                              e.target.value.slice(0, 50),
+                            )
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+                    </CadastroFormGrid>
+                  </div>
+                ) : null}
+
+                {tefSub === "vero" ? (
+                  <div className="cadastro-tab-panel" role="tabpanel">
+                    <CadastroFormGrid>
+                      <CadastroField label="ID loja" htmlFor="cfg-vero-loja">
+                        <input
+                          id="cfg-vero-loja"
+                          className="input-base input-compact"
+                          value={form.vero_idloja}
+                          onChange={(e) =>
+                            setField("vero_idloja", e.target.value.slice(0, 50))
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="ID terminal" htmlFor="cfg-vero-terminal">
+                        <input
+                          id="cfg-vero-terminal"
+                          className="input-base input-compact"
+                          value={form.vero_idterminal}
+                          onChange={(e) =>
+                            setField(
+                              "vero_idterminal",
+                              e.target.value.slice(0, 50),
+                            )
+                          }
+                          disabled={busy}
+                          maxLength={50}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="Token" htmlFor="cfg-vero-token" span="full">
+                        <input
+                          id="cfg-vero-token"
+                          className="input-base input-compact"
+                          value={form.vero_token}
+                          onChange={(e) =>
+                            setField("vero_token", e.target.value.slice(0, 80))
+                          }
+                          disabled={busy}
+                          maxLength={80}
+                        />
+                      </CadastroField>
+
+                      <CadastroField label="CNPJ" htmlFor="cfg-vero-cnpj">
+                        <input
+                          id="cfg-vero-cnpj"
+                          className="input-base input-compact"
+                          value={form.vero_cnpj}
+                          onChange={(e) =>
+                            setField(
+                              "vero_cnpj",
+                              e.target.value.replace(/\D/g, "").slice(0, 14),
+                            )
+                          }
+                          disabled={busy}
+                          inputMode="numeric"
+                          maxLength={14}
+                        />
+                      </CadastroField>
+                    </CadastroFormGrid>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
