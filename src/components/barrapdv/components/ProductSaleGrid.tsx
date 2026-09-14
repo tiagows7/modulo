@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePdvModo } from '../hooks/usePdvModo'
 import { useAlert } from '../context/AlertContext'
 import { useCart } from '../context/CartContext'
 import { formatCurrency } from '../data/mock'
@@ -27,6 +28,7 @@ type PreviewItem = {
 export function ProductSaleGrid({ embedded = false }: Props) {
   const { addItem } = useCart()
   const { showAlert } = useAlert()
+  const { isLoja } = usePdvModo()
   const [query, setQuery] = useState('')
   const [scan, setScan] = useState('')
   const [added, setAdded] = useState<string | null>(null)
@@ -55,7 +57,7 @@ export function ProductSaleGrid({ embedded = false }: Props) {
     return () => {
       cancelled = true
     }
-  }, [embedded])
+  }, [embedded, isLoja])
 
   const filteredDb = useMemo(() => {
     const q = query.trim().toLowerCase()

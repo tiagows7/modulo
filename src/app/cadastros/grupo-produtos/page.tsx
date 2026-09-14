@@ -27,6 +27,7 @@ type GrupoProduto = {
   codigo: string;
   descricao: string;
   status: string | null;
+  combustivel: boolean;
   grupocomissao_id: string | null;
   produto_grupocomissao?: {
     codigo: string;
@@ -39,6 +40,7 @@ type GrupoProduto = {
 const columns = [
   { key: "codigo", label: "Código" },
   { key: "descricao", label: "Descrição do Grupo" },
+  { key: "combustivel", label: "Combustível", align: "center" as const },
   { key: "comissao", label: "Grupo comissão" },
   { key: "status", label: "Status", align: "center" as const },
   { key: "acoes", label: "Ações", align: "center" as const },
@@ -82,6 +84,7 @@ export default function GrupoProdutosPage() {
   const [editing, setEditing] = useState<GrupoProduto | null>(null);
   const [deleting, setDeleting] = useState<GrupoProduto | null>(null);
   const [descricao, setDescricao] = useState("");
+  const [combustivel, setCombustivel] = useState<"S" | "N">("N");
   const [grupocomissaoId, setGrupocomissaoId] = useState("");
   const [formError, setFormError] = useState("");
 
@@ -93,7 +96,7 @@ export default function GrupoProdutosPage() {
           .from("grupo_produtos")
           .select(
             `
-            id, codigo, descricao, status, grupocomissao_id,
+            id, codigo, descricao, status, combustivel, grupocomissao_id,
             produto_grupocomissao ( codigo, descricao, tipo, valor )
           `,
           )
@@ -117,6 +120,7 @@ export default function GrupoProdutosPage() {
           codigo: String(r.codigo ?? ""),
           descricao: String(r.descricao ?? ""),
           status: r.status != null ? String(r.status) : null,
+          combustivel: r.combustivel === true,
           grupocomissao_id:
             r.grupocomissao_id != null ? String(r.grupocomissao_id) : null,
           produto_grupocomissao: asOne(
@@ -158,6 +162,7 @@ export default function GrupoProdutosPage() {
   const openCreate = () => {
     setEditing(null);
     setDescricao("");
+    setCombustivel("N");
     setGrupocomissaoId(comissoes.length === 1 ? comissoes[0].id : "");
     setFormError("");
     setModalOpen(true);
@@ -166,6 +171,7 @@ export default function GrupoProdutosPage() {
   const openEdit = (item: GrupoProduto) => {
     setEditing(item);
     setDescricao(item.descricao);
+    setCombustivel(item.combustivel ? "S" : "N");
     setGrupocomissaoId(item.grupocomissao_id ?? "");
     setFormError("");
     setActionError("");
@@ -244,6 +250,7 @@ export default function GrupoProdutosPage() {
     setFormError("");
     const payload = {
       descricao: desc,
+      combustivel: combustivel === "S",
       grupocomissao_id: grupocomissaoId || null,
     };
 
@@ -269,6 +276,7 @@ export default function GrupoProdutosPage() {
       setModalOpen(false);
       setEditing(null);
       setDescricao("");
+      setCombustivel("N");
       setGrupocomissaoId("");
       await loadData();
     } catch (err) {
@@ -281,6 +289,7 @@ export default function GrupoProdutosPage() {
     return {
       codigo: item.codigo,
       descricao: item.descricao,
+      combustivel: item.combustivel ? "Sim" : "Não",
       comissao: c ? `${c.codigo} — ${c.descricao}` : "—",
       status: (
         <span
@@ -372,6 +381,21 @@ export default function GrupoProdutosPage() {
                 required
                 disabled={busy}
               />
+            </CadastroField>
+
+            <CadastroField label="Combustível" htmlFor="grupo-combustivel" span="full">
+              <select
+                id="grupo-combustivel"
+                className="input-base input-compact"
+                value={combustivel}
+                onChange={(e) =>
+                  setCombustivel(e.target.value === "S" ? "S" : "N")
+                }
+                disabled={busy}
+              >
+                <option value="N">Não</option>
+                <option value="S">Sim</option>
+              </select>
             </CadastroField>
 
             <CadastroField
