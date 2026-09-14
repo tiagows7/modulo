@@ -69,3 +69,4 @@
 62_configuracao_tef.sql
 63_configuracao_tef_drop_campos.sql
 64_configuracao_tef_vero.sql
+65_configuracao_tef_drop_otp.sql

@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.configuracao_tef (
   cnpj VARCHAR(14),
   mensagempinpad VARCHAR(20),
   comexterna INTEGER,
-  otp VARCHAR(50),
   transacaohabilitadas VARCHAR(90),
   obrigadooperador VARCHAR(1),
   postipo INTEGER,

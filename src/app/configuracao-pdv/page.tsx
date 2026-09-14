@@ -32,7 +32,6 @@ type ConfigPdv = {
   cnpj: string | null;
   mensagempinpad: string | null;
   comexterna: number | null;
-  otp: string | null;
   transacaohabilitadas: string | null;
   obrigadooperador: string | null;
   postipo: number | null;
@@ -68,7 +67,6 @@ type ConfigPdvForm = {
   cnpj: string;
   mensagempinpad: string;
   comexterna: string;
-  otp: string;
   transacaohabilitadas: string;
   obrigadooperador: string;
   postipo: string;
@@ -107,7 +105,6 @@ const emptyForm: ConfigPdvForm = {
   cnpj: "",
   mensagempinpad: "",
   comexterna: "",
-  otp: "",
   transacaohabilitadas: "",
   obrigadooperador: "",
   postipo: "",
@@ -155,7 +152,7 @@ const columns = [
 ];
 
 const SELECT_COLS =
-  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, cnpj, mensagempinpad, comexterna, otp, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy, vero_idloja, vero_idterminal, vero_token, vero_cnpj";
+  "id, filial, pdv, tipo, ip_tef, idterminal, idloja, cnpj, mensagempinpad, comexterna, transacaohabilitadas, obrigadooperador, postipo, imprimevialoja, nfceserie, nfcenumero, modelo, otpnome, imprimebanri, aceitavalorparcial, vendaproduto, tipodocumento, nfeserie, nfenumero, obrigadobico, tlsexterna, tlstoken, tlstipoproxy, tlsenderecoproxy, vero_idloja, vero_idterminal, vero_token, vero_cnpj";
 
 function blank(v: string) {
   const t = v.trim();
@@ -201,7 +198,6 @@ function mapRow(row: Record<string, unknown>): ConfigPdv {
     mensagempinpad:
       row.mensagempinpad != null ? String(row.mensagempinpad) : null,
     comexterna: row.comexterna != null ? Number(row.comexterna) : null,
-    otp: row.otp != null ? String(row.otp) : null,
     transacaohabilitadas:
       row.transacaohabilitadas != null
         ? String(row.transacaohabilitadas)
@@ -248,7 +244,6 @@ function toForm(item: ConfigPdv): ConfigPdvForm {
     cnpj: strOrEmpty(item.cnpj),
     mensagempinpad: strOrEmpty(item.mensagempinpad),
     comexterna: numOrEmpty(item.comexterna),
-    otp: strOrEmpty(item.otp),
     transacaohabilitadas: strOrEmpty(item.transacaohabilitadas),
     obrigadooperador: strOrEmpty(item.obrigadooperador),
     postipo: numOrEmpty(item.postipo),
@@ -436,7 +431,6 @@ export default function ConfiguracaoPdvPage() {
         cnpj: blank(form.cnpj)?.replace(/\D/g, "").slice(0, 14) ?? null,
         mensagempinpad: blank(form.mensagempinpad)?.slice(0, 20) ?? null,
         comexterna: parseOptInt("Com. externa", form.comexterna),
-        otp: blank(form.otp)?.slice(0, 50) ?? null,
         transacaohabilitadas:
           blank(form.transacaohabilitadas)?.slice(0, 90) ?? null,
         obrigadooperador: blank(form.obrigadooperador)?.slice(0, 1) ?? null,
@@ -1034,19 +1028,6 @@ export default function ConfiguracaoPdvPage() {
                 {tefSub === "tls" ? (
                   <div className="cadastro-tab-panel" role="tabpanel">
                     <CadastroFormGrid>
-                      <CadastroField label="OTP" htmlFor="cfg-otp">
-                        <input
-                          id="cfg-otp"
-                          className="input-base input-compact"
-                          value={form.otp}
-                          onChange={(e) =>
-                            setField("otp", e.target.value.slice(0, 50))
-                          }
-                          disabled={busy}
-                          maxLength={50}
-                        />
-                      </CadastroField>
-
                       <CadastroField label="OTP nome" htmlFor="cfg-otpnome">
                         <input
                           id="cfg-otpnome"
