@@ -8,16 +8,23 @@
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readPdvModo } from '../server/pdv-modo.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const pdvModo = readPdvModo()
+const skipCbc = pdvModo === 'loja'
 
-const services = [
+const allServices = [
   { name: 'CBC', file: 'server/cbc-bridge.mjs', url: 'http://127.0.0.1:39100' },
   { name: 'TEF', file: 'server/tef-bridge.mjs', url: 'http://127.0.0.1:39101' },
   { name: 'Fiscal', file: 'server/fiscal-bridge.mjs', url: 'http://127.0.0.1:39102' },
   { name: 'SmartPOS', file: 'server/smartpos-bridge.mjs', url: 'http://127.0.0.1:39103' },
   { name: 'Web', file: 'server/posto-web-proxy.mjs', url: 'http://127.0.0.1:39199/pdv' },
 ]
+
+const services = skipCbc
+  ? allServices.filter((service) => service.name !== 'CBC')
+  : allServices
 
 const children = []
 
@@ -77,7 +84,12 @@ function start(service) {
 console.log('')
 console.log('=== Módulo Info · pontes do posto ===')
 console.log('Site (nuvem): https://modulo-e9xc.vercel.app')
-console.log('Concentrador CBC: use CBC_HOST / CBC_PORT se precisar (padrão 192.168.1.150:1771)')
+console.log(`Modo PDV: ${pdvModo}`)
+if (skipCbc) {
+  console.log('CBC: não iniciado (PDV em modo loja)')
+} else {
+  console.log('Concentrador CBC: use CBC_HOST / CBC_PORT se precisar (padrão 192.168.1.150:1771)')
+}
 console.log('Ctrl+C para parar todas as pontes.')
 console.log('')
 

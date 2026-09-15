@@ -14,11 +14,14 @@ Não use `https://modulo-e9xc.vercel.app/pdv` no caixa: o navegador bloqueia a p
 ```
 Login Windows
    → watchdog (oculto)
-       → CBC :39100 (+ HTTPS :39110 fallback)
+       → CBC :39100 (+ HTTPS :39110 fallback) — só se PDV modo posto
        → TEF / Fiscal / SmartPOS
        → proxy web :39199  →  Vercel + /__local/cbc
    → abre http://127.0.0.1:39199/pdv
 ```
+
+No modo **loja** (configuração do PDV), o `posto.mjs` **não sobe** a ponte CBC.
+O modo fica gravado em `server/.pdv-modo.json` (ou `PDV_MODO=loja` no ambiente).
 
 ## Instalação única (TI)
 

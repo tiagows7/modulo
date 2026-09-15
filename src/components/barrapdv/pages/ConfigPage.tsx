@@ -20,7 +20,8 @@ export function ConfigPage() {
               <h3>Modelo do PDV</h3>
               <p style={{ marginBottom: 10 }}>
                 Escolha o tipo de operação. O modo <strong>loja</strong> remove
-                combustível e o concentrador CBC.
+                combustível e o concentrador CBC. Ao mudar o modo, reinicie as
+                pontes locais (`npm run posto`) para aplicar no CBC.
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {(

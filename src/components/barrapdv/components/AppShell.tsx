@@ -6,6 +6,7 @@ import { useCaixaStatus } from '../context/CaixaStatusContext'
 import { startFullscreenLock } from '../utils/fullscreen'
 import { supabase } from '@/lib/supabase'
 import { usePdvModo } from '../hooks/usePdvModo'
+import { syncPdvModoLocal } from '../config/pdvConfig'
 
 const navItemsPosto = [
   { to: '/venda', label: 'Venda', icon: IconPump },
@@ -162,6 +163,11 @@ export function AppShell() {
 
   // Tela cheia travada: Esc/F11 não devem tirar o PDV da tela cheia.
   useEffect(() => startFullscreenLock(), [])
+
+  // Grava o modo (posto/loja) no PC local para o posto.mjs não subir CBC em loja.
+  useEffect(() => {
+    syncPdvModoLocal()
+  }, [])
 
   const stationLabel = fantasia || station.name
   const operatorLabel = operatorName || operator.name

@@ -25,6 +25,7 @@
 /server/clisitef64/*.dll
 /server/clisitef64/files/
 /server/certs/
+/server/.pdv-modo.json
 
 # Supabase CLI temp
 /supabase/.temp/
