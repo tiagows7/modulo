@@ -161,6 +161,16 @@ export type FiscalListFilter = {
   tipo?: FiscalDocTipo | 'Todos'
   q?: string
   status?: FiscalDocStatus
+  /**
+   * Quando true, lista só notas do caixa corrente do PDV
+   * (`caixa_codigo` + `caixa_pdv` + `caixa_data` em venda_nfce / venda_nfe).
+   */
+  caixaCorrente?: boolean
+  /** Filtro explícito (sobrescreve snapshot do getUltimoCaixa quando informado). */
+  caixaCodigo?: string | number | null
+  caixaPdv?: string | null
+  caixaData?: string | null
+  caixaTurno?: string | number | null
 }
 
 export type FiscalFinalizeOptions = {

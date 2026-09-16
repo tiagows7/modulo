@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdmBackButton } from '../components/AdmBackButton'
 import { useAlert } from '../context/AlertContext'
+import { useCaixaStatus } from '../context/CaixaStatusContext'
 import { formatCurrency } from '../data/mock'
 import { useGridKeyboardNav } from '../hooks/useGridKeyboardNav'
 import { fiscalService, type FiscalDocTipo, type FiscalDocument } from '../services/fiscal'
@@ -11,7 +12,8 @@ const FILTROS: FiltroTipo[] = ['Todos', 'NFC-e', 'NF-e']
 
 export function ReimpressaoPage() {
   const { showAlert } = useAlert()
-  const [filtro, setFiltro] = useState<FiltroTipo>('Todos')
+  const { caixa, status: caixaStatus } = useCaixaStatus()
+  const [filtro, setFiltro] = useState<FiltroTipo>('NFC-e')
   const [busca, setBusca] = useState('')
   const [docs, setDocs] = useState<FiscalDocument[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,12 +21,37 @@ export function ReimpressaoPage() {
   const [reprintingId, setReprintingId] = useState<string | null>(null)
   const tableWrapRef = useRef<HTMLDivElement | null>(null)
 
+  const caixaLabel = useMemo(() => {
+    if (!caixa) return null
+    const parts = [
+      `Caixa ${caixa.codigo}`,
+      caixa.pdv ? `PDV ${caixa.pdv}` : null,
+      caixa.data ? String(caixa.data).slice(0, 10) : null,
+    ].filter(Boolean)
+    return parts.join(' · ')
+  }, [caixa])
+
   async function loadDocs() {
+    if (caixaStatus === 'loading') return
     setLoading(true)
     try {
-      const list = await fiscalService.list()
+      if (!caixa) {
+        setDocs([])
+        setSelectedId(null)
+        return
+      }
+      const list = await fiscalService.list({
+        caixaCorrente: true,
+        caixaCodigo: caixa.codigo,
+        caixaPdv: caixa.pdv,
+        caixaData: caixa.data,
+        caixaTurno: caixa.turno,
+      })
       setDocs(list)
-      setSelectedId((prev) => prev ?? list[0]?.id ?? null)
+      setSelectedId((prev) => {
+        if (prev && list.some((d) => d.id === prev)) return prev
+        return list[0]?.id ?? null
+      })
     } catch (err) {
       showAlert({
         title: 'Reimpressão',
@@ -36,9 +63,10 @@ export function ReimpressaoPage() {
   }
 
   useEffect(() => {
-    setTimeout(() => { void loadDocs() }, 0)
+    if (caixaStatus === 'loading') return
+    void loadDocs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [caixaStatus, caixa?.id, caixa?.codigo, caixa?.pdv, caixa?.data, caixa?.turno])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -103,7 +131,9 @@ export function ReimpressaoPage() {
       <section className="panel reimpressao-panel">
         <div className="panel-header">
           <h2>Reimpressão NFC-e / NF-e</h2>
-          <span className="chip">Cupons · ↑↓ ←→ Enter</span>
+          <span className="chip">
+            {caixaLabel ? `${caixaLabel} · ↑↓ ←→ Enter` : 'Cupons · ↑↓ ←→ Enter'}
+          </span>
         </div>
 
         <div className="reimpressao-toolbar">
@@ -130,10 +160,17 @@ export function ReimpressaoPage() {
           </div>
         </div>
 
-        {loading ? (
+        {loading || caixaStatus === 'loading' ? (
           <div className="empty">Carregando documentos…</div>
+        ) : !caixa ? (
+          <div className="empty">
+            Nenhum caixa encontrado neste PDV. Abra o caixa para listar as notas emitidas.
+          </div>
         ) : filtrados.length === 0 ? (
-          <div className="empty">Nenhum cupom NFC-e / NF-e encontrado.</div>
+          <div className="empty">
+            Nenhuma nota emitida neste caixa
+            {caixaLabel ? ` (${caixaLabel})` : ''}.
+          </div>
         ) : (
           <div className="table-wrap" ref={tableWrapRef}>
             <table className="data abastecidas-table reimpressao-table">

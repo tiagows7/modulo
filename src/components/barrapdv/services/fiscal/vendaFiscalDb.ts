@@ -236,6 +236,35 @@ export async function listVendaFiscalDocuments(
   const wantNfe = !filter.tipo || filter.tipo === 'Todos' || filter.tipo === 'NF-e'
   const situacao = filter.status ? STATUS_TO_SITUACAO[filter.status] : null
 
+  let caixaCodigo =
+    filter.caixaCodigo != null && String(filter.caixaCodigo).trim() !== ''
+      ? String(filter.caixaCodigo).trim()
+      : null
+  let caixaPdv =
+    filter.caixaPdv != null && String(filter.caixaPdv).trim() !== ''
+      ? String(filter.caixaPdv).trim()
+      : null
+  let caixaData =
+    filter.caixaData != null && String(filter.caixaData).trim() !== ''
+      ? String(filter.caixaData).trim().slice(0, 10)
+      : null
+  let caixaTurno =
+    filter.caixaTurno != null && String(filter.caixaTurno).trim() !== ''
+      ? Number(filter.caixaTurno)
+      : null
+
+  if (filter.caixaCorrente) {
+    const caixa = await getUltimoCaixa()
+    if (!caixa) return []
+    caixaCodigo = caixaCodigo ?? String(caixa.codigo)
+    caixaPdv = caixaPdv ?? (caixa.pdv != null ? String(caixa.pdv) : null)
+    caixaData = caixaData ?? (caixa.data ? String(caixa.data).slice(0, 10) : null)
+    if (caixaTurno == null && caixa.turno != null && String(caixa.turno).trim() !== '') {
+      const t = Number(caixa.turno)
+      caixaTurno = Number.isFinite(t) ? t : null
+    }
+  }
+
   const docs: FiscalDocument[] = []
 
   async function fetchTable(tipo: FiscalDocTipo) {
@@ -250,6 +279,12 @@ export async function listVendaFiscalDocuments(
 
     if (filialId) query = query.eq('filial', filialId)
     if (situacao) query = query.eq('situacao', situacao)
+    if (caixaCodigo) query = query.eq('caixa_codigo', caixaCodigo)
+    if (caixaPdv) query = query.eq('caixa_pdv', caixaPdv)
+    if (caixaData) query = query.eq('caixa_data', caixaData)
+    if (caixaTurno != null && Number.isFinite(caixaTurno)) {
+      query = query.eq('caixa_turno', caixaTurno)
+    }
 
     const { data, error } = await query
     if (error) throw new Error(error.message)
