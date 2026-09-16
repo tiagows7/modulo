@@ -4,8 +4,10 @@
  */
 export const FISCAL_CONFIG = {
   /**
-   * mock = emite/autoriza/imprime/envia em memória (sem SEFAZ)
-   * live = HTTP na ponte local (preparado para ACBr/SEFAZ)
+   * mock = emite/autoriza em memória (sem SEFAZ)
+   * live = POST /api/fiscal/transmitir → SEFAZ com certificado A1 da filial
+   *
+   * Para produção/homologação real: mode: 'live' + .pfx, CSC e IE na filial.
    */
   mode: 'mock' as 'mock' | 'live',
   bridgeUrl: 'http://127.0.0.1:39102',

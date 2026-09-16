@@ -71,3 +71,4 @@
 64_configuracao_tef_vero.sql
 65_configuracao_tef_drop_otp.sql
 66_grupo_produtos_combustivel.sql
+67_filial_tipo_empresa.sql

@@ -39,9 +39,14 @@ import {
   type ReceitaFiscalLinha,
 } from '@/lib/nfe/transmissao'
 import { normalizeAmbienteFiscal } from '@/lib/filialAmbienteFiscal'
+import { tipoEmpresaToCrt } from '@/lib/filialTipoEmpresa'
 import { getOperadorFilialId } from '../produtos/buscarProduto'
 import { reservarNumeroFiscalTef } from '../tef/configuracaoTefDb'
 import { supabase } from '@/lib/supabase'
+import {
+  aplicarImpostoNoItem,
+  carregarImpostosProdutos,
+} from './impostosProduto'
 
 function resolvePrintModel(
   doc: FiscalDocument,
@@ -126,36 +131,93 @@ class FiscalService {
    * Emite e autoriza NFC-e ou NF-e via `@modulo/nfe-transmissao`.
    * CPF / documento em branco → NFC-e; CNPJ → NF-e.
    * Grava venda_* + receitas_*.
+   *
+   * mode=mock → autoriza localmente (sem SEFAZ)
+   * mode=live → POST /api/fiscal/transmitir (certificado A1 da filial)
    */
   async emit(request: FiscalEmitRequest): Promise<FiscalEmitResult> {
     const tipo = request.tipo || decidirTipoDocumento(request.buyer?.document)
 
     let ambiente: 1 | 2 = 2
-    let tokenId: string | null = null
-    let tokenNfce: string | null = null
+    let filialId: string | null = null
+    let emitente = {
+      cnpj: FISCAL_CONFIG.emitter.cnpj,
+      ie: FISCAL_CONFIG.emitter.ie as string | null,
+      razaoSocial: FISCAL_CONFIG.emitter.razaoSocial as string | null,
+      fantasia: FISCAL_CONFIG.emitter.nomeFantasia as string | null,
+      uf: FISCAL_CONFIG.emitter.uf as string | null,
+      municipioIbge: null as string | null,
+      cidade: FISCAL_CONFIG.emitter.cidade as string | null,
+      endereco: FISCAL_CONFIG.emitter.endereco as string | null,
+      numero: null as string | null,
+      bairro: FISCAL_CONFIG.emitter.bairro as string | null,
+      cep: FISCAL_CONFIG.emitter.cep as string | null,
+      telefone: FISCAL_CONFIG.emitter.telefone as string | null,
+      tokenId: null as string | null,
+      tokenNfce: null as string | null,
+      crt: 1 as 1 | 2 | 3,
+    }
+
     try {
-      const filialId = await getOperadorFilialId()
+      filialId = await getOperadorFilialId()
       if (filialId) {
         const col = tipo === 'NFC-e' ? 'ambiente_nfce' : 'ambiente_nfe'
         const { data } = await supabase
           .from('filial')
-          .select(`${col}, token_id, token_nfce`)
+          .select(
+            `${col}, token_id, token_nfce, tipo_empresa, cnpj, razao_social, fantasia, inscricao_estadual, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, cep, telefone`,
+          )
           .eq('id', filialId)
           .maybeSingle()
         const row = data as Record<string, unknown> | null
-        const raw = row ? row[col] : null
-        ambiente = normalizeAmbienteFiscal(raw)
-        tokenId =
-          row?.token_id != null && String(row.token_id).trim()
-            ? String(row.token_id).replace(/\D/g, '').slice(0, 6)
-            : null
-        tokenNfce =
-          row?.token_nfce != null && String(row.token_nfce).trim()
-            ? String(row.token_nfce).trim().slice(0, 60)
-            : null
+        if (row) {
+          ambiente = normalizeAmbienteFiscal(row[col])
+          emitente = {
+            cnpj: row.cnpj != null ? String(row.cnpj) : emitente.cnpj,
+            ie:
+              row.inscricao_estadual != null
+                ? String(row.inscricao_estadual)
+                : emitente.ie,
+            razaoSocial:
+              row.razao_social != null
+                ? String(row.razao_social)
+                : emitente.razaoSocial,
+            fantasia:
+              row.fantasia != null ? String(row.fantasia) : emitente.fantasia,
+            uf:
+              row.endereco_uf != null ? String(row.endereco_uf) : emitente.uf,
+            municipioIbge:
+              row.endereco_cidade != null
+                ? String(row.endereco_cidade).replace(/\D/g, '').padStart(7, '0')
+                : null,
+            cidade: emitente.cidade,
+            endereco:
+              row.endereco != null ? String(row.endereco) : emitente.endereco,
+            numero:
+              row.endereco_numero != null ? String(row.endereco_numero) : null,
+            bairro:
+              row.endereco_bairro != null
+                ? String(row.endereco_bairro)
+                : emitente.bairro,
+            cep: row.cep != null ? String(row.cep) : emitente.cep,
+            telefone:
+              row.telefone != null ? String(row.telefone) : emitente.telefone,
+            tokenId:
+              row.token_id != null && String(row.token_id).trim()
+                ? String(row.token_id).replace(/\D/g, '').slice(0, 6)
+                : null,
+            tokenNfce:
+              row.token_nfce != null && String(row.token_nfce).trim()
+                ? String(row.token_nfce).trim().slice(0, 60)
+                : null,
+            crt: tipoEmpresaToCrt(
+              row.tipo_empresa != null ? String(row.tipo_empresa) : null,
+            ),
+          }
+        }
       }
     } catch {
-      /* mantém homologação */
+      /* mantém defaults / homologação */
     }
 
     const numeracao = await reservarNumeroFiscalTef(tipo)
@@ -164,71 +226,96 @@ class FiscalService {
     let message: string
     let receitas: ReceitaFiscalLinha[] | undefined
 
+    let itemsTx = request.items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      qty: i.qty,
+      price: i.price,
+      unit: i.unit,
+      kind: i.kind,
+      productCode: i.productCode,
+      discount: i.discount,
+      pumpId: i.pumpId,
+    }))
+
+    try {
+      const impostos = await carregarImpostosProdutos(
+        itemsTx.map((i) => String(i.id || '')).filter(Boolean),
+      )
+      itemsTx = itemsTx.map((item) =>
+        aplicarImpostoNoItem(item, impostos.get(String(item.id || ''))),
+      )
+    } catch (err) {
+      console.warn(
+        '[fiscal] impostos do produto:',
+        err instanceof Error ? err.message : err,
+      )
+    }
+
+    const payloadBase = {
+      tipo,
+      items: itemsTx,
+      payments: request.payments.map((p) => ({
+        methodId: p.methodId,
+        label: p.label,
+        amount: p.amount,
+        isTef: p.isTef,
+        nsu: p.nsu,
+        authorizationCode: p.authorizationCode,
+        brand: p.brand,
+        tef: p.tef,
+      })),
+      buyer: request.buyer,
+      saleRef: request.saleRef,
+      operator: request.operator,
+      total: request.total,
+      numero: numeracao.numero,
+      ambiente,
+      serie: String(numeracao.serie),
+      filialId,
+      emitente,
+    }
+
     if (FISCAL_CONFIG.mode === 'live') {
-      const res = await fetch(`${this.bridgeUrl}/fiscal/emit`, {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        throw new Error(
+          'Sessão expirada. Faça login novamente para emitir na SEFAZ.',
+        )
+      }
+
+      const res = await fetch('/api/fiscal/transmitir', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...request,
-          tipo,
-          ambiente,
-          numero: numeracao.numero,
-          serie: String(numeracao.serie),
-          emitenteTokens: { tokenId, tokenNfce },
-        }),
-      })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || `Falha ao emitir (${res.status})`)
-      }
-      const result = (await res.json()) as FiscalEmitResult
-      document = {
-        ...result.document,
-        tokenId: tokenId || result.document.tokenId,
-        tokenNfce: tokenNfce || result.document.tokenNfce,
-      }
-      message = result.message
-    } else {
-      const tx = await transmitirDocumentoFiscal({
-        tipo,
-        items: request.items.map((i) => ({
-          id: i.id,
-          name: i.name,
-          qty: i.qty,
-          price: i.price,
-          unit: i.unit,
-          kind: i.kind,
-          productCode: i.productCode,
-          discount: i.discount,
-          pumpId: i.pumpId,
-        })),
-        payments: request.payments.map((p) => ({
-          methodId: p.methodId,
-          label: p.label,
-          amount: p.amount,
-          isTef: p.isTef,
-          nsu: p.nsu,
-          authorizationCode: p.authorizationCode,
-          brand: p.brand,
-          tef: p.tef,
-        })),
-        buyer: request.buyer,
-        saleRef: request.saleRef,
-        operator: request.operator,
-        total: request.total,
-        numero: numeracao.numero,
-        ambiente,
-        serie: String(numeracao.serie),
-        emitente: {
-          cnpj: FISCAL_CONFIG.emitter.cnpj,
-          ie: FISCAL_CONFIG.emitter.ie,
-          razaoSocial: FISCAL_CONFIG.emitter.razaoSocial,
-          fantasia: FISCAL_CONFIG.emitter.nomeFantasia,
-          uf: FISCAL_CONFIG.emitter.uf,
-          tokenId,
-          tokenNfce,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify(payloadBase),
       })
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string
+        document?: FiscalDocument
+        message?: string
+        receitas?: ReceitaFiscalLinha[]
+      }
+      if (!res.ok) {
+        throw new Error(body.error || `Falha ao emitir na SEFAZ (${res.status})`)
+      }
+      if (!body.document) {
+        throw new Error('Resposta SEFAZ sem documento.')
+      }
+      document = {
+        ...body.document,
+        tokenId: emitente.tokenId || body.document.tokenId,
+        tokenNfce: emitente.tokenNfce || body.document.tokenNfce,
+      }
+      message = body.message || 'NFC-e autorizada pela SEFAZ.'
+      receitas = body.receitas
+    } else {
+      const tx = await transmitirDocumentoFiscal(payloadBase)
 
       receitas = tx.receitas
       const d = tx.document
@@ -252,8 +339,8 @@ class FiscalService {
         payments: request.payments.map((p) => ({ ...p })),
         xml: d.xml,
         error: d.error ?? null,
-        tokenId: tokenId || undefined,
-        tokenNfce: tokenNfce || undefined,
+        tokenId: emitente.tokenId || undefined,
+        tokenNfce: emitente.tokenNfce || undefined,
       }
       message = tx.message
     }

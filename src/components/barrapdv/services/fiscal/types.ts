@@ -88,8 +88,10 @@ export type FiscalDocument = {
   buyerEmail?: string
   items: CartItem[]
   payments: FiscalPaymentLine[]
-  /** XML autorizado (mock / caminho futuro). */
+  /** XML autorizado (mock / SEFAZ). */
   xml?: string
+  /** DigestValue da assinatura (quando SEFAZ). */
+  digVal?: string
   /** idCSC / Token ID da filial (NFC-e). */
   tokenId?: string
   /** CSC / Token NFC-e da filial. */

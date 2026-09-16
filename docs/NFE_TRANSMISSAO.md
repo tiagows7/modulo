@@ -1,15 +1,13 @@
 # Transmissão NFC-e / NF-e
 
-Rotina compartilhada para **emitir e autorizar** documentos fiscais de venda (saída):
+Rotina compartilhada para **emitir e autorizar** documentos fiscais de venda (saída) na SEFAZ:
 
 | Destinatário | Modelo | Código | Tabelas sugeridas no host |
 |--------------|--------|--------|---------------------------|
 | Documento em branco ou **CPF** | **NFC-e** | 65 | `venda_nfce` + `venda_nfceprodutos` + `receitas_nfce` |
 | **CNPJ** (14 dígitos) | **NF-e** | 55 | `venda_nfe` + `venda_nfeprodutos` + `receitas_nfe` |
 
-Serve para **qualquer módulo deste projeto** e para **outros sistemas** da empresa. O pacote **não depende** de Next.js, Supabase ou UI — a persistência fica a cargo do host.
-
-> **Estado atual do transmissor:** por padrão usa **mock** (chave/protocolo locais, sem SEFAZ). Para produção, injete um `FiscalTransmitter` (ponte ACBr / HTTP / outro motor).
+Serve para **qualquer módulo deste projeto** e para **outros sistemas** da empresa (lib Node ou API HTTP). O pacote **não depende** de Next.js, Supabase ou UI — a persistência fica a cargo do host.
 
 Relacionado: distribuição de DF-e de entrada → [`NFE_DISTRIBUICAO_DFE.md`](./NFE_DISTRIBUICAO_DFE.md).
 
@@ -22,6 +20,8 @@ Relacionado: distribuição de DF-e de entrada → [`NFE_DISTRIBUICAO_DFE.md`](.
 | `packages/nfe-transmissao/` | Pacote portátil (`@modulo/nfe-transmissao`) |
 | `src/lib/nfe/transmissao.ts` | Reexport no app pdv-web |
 | `src/lib/nfe/index.ts` | Barrel do kit NF-e |
+| `POST /api/nfe/transmitir` | API genérica (sem gravar venda) — outros projetos |
+| `POST /api/fiscal/transmitir` | PDV live (filial do operador + impostos do cadastro) |
 | `src/components/barrapdv/services/fiscal/` | Integração PDV (emit, print, cancel, DB) |
 | `scripts/57_venda_nfce.sql` / `58_venda_nfe.sql` | Cabeçalho + itens |
 | `scripts/60_receitas_nfce_nfe.sql` | Receitas / TEF por pagamento |
@@ -33,7 +33,7 @@ Alias TypeScript (pdv-web):
 "@modulo/nfe-transmissao": ["./packages/nfe-transmissao/src/index.ts"]
 ```
 
-`package.json`:
+`package.json` do host:
 
 ```json
 "@modulo/nfe-transmissao": "file:./packages/nfe-transmissao"
@@ -45,13 +45,15 @@ Alias TypeScript (pdv-web):
 transpilePackages: ["@modulo/nfe-transmissao"]
 ```
 
+Dependências do pacote: `node-forge`, `xml-crypto`, `@xmldom/xmldom` (Node ≥ 18).
+
 ---
 
 ## 1) Uso em outro projeto (TypeScript / Node)
 
 ### Instalação
 
-Copie a pasta `packages/nfe-transmissao` para o outro repositório **ou** referencie via `file:` / monorepo:
+Copie a pasta `packages/nfe-transmissao` **ou** referencie via `file:` / monorepo:
 
 ```json
 {
@@ -61,32 +63,42 @@ Copie a pasta `packages/nfe-transmissao` para o outro repositório **ou** refere
 }
 ```
 
-Node **≥ 18**. Sem dependências npm externas.
+```bash
+npm install
+```
 
-### Exemplo mínimo
+### API principal — NFC-e na SEFAZ
 
 ```ts
-import {
-  transmitirDocumentoFiscal,
-  decidirTipoDocumento,
-  montarReceitasFromPayments,
-} from "@modulo/nfe-transmissao";
+import { readFileSync } from "node:fs";
+import { emitirNfce } from "@modulo/nfe-transmissao";
+// alias: transmitirNfce
 
-const result = await transmitirDocumentoFiscal({
+const result = await emitirNfce({
+  pfx: readFileSync("./certificado.pfx"),
+  passphrase: "senha-do-pfx",
+  tpAmb: 2, // 1 produção | 2 homologação
   saleRef: "PDV000123",
-  ambiente: 2, // 1 = produção · 2 = homologação
   serie: "1",
+  numero: 1, // opcional — se omitido, o pacote gera um número local
   emitente: {
     cnpj: "12345678000199",
     ie: "123456789",
     razaoSocial: "POSTO EXEMPLO LTDA",
     fantasia: "Posto Exemplo",
-    uf: "SP",
+    uf: "SC",
+    municipioIbge: "4205407", // 7 dígitos — obrigatório
+    endereco: "Rua das Flores",
+    numero: "100",
+    bairro: "Centro",
+    cep: "88010000",
+    tokenId: "1",       // idCSC
+    tokenNfce: "ABCDEF", // CSC
+    crt: 1,             // 1 Simples · 2 excesso · 3 Regime Normal
   },
   buyer: {
-    document: "12345678901", // CPF → NFC-e; 14 dígitos → NF-e; vazio → NFC-e
+    document: "12345678901", // CPF → NFC-e; vazio → NFC-e; CNPJ → use transmitirDocumentoFiscal
     name: "Cliente Final",
-    email: "cliente@email.com",
   },
   items: [
     {
@@ -96,22 +108,48 @@ const result = await transmitirDocumentoFiscal({
       unit: "L",
       kind: "combustivel",
       productCode: "1",
+      ncm: "27101259",
+      cfop: "5656",
+      csosn: "102",
+      // IBS/CBS (opcional — NT 2025.002)
+      cstIbscbs: "000",
+      cClassTrib: "000001",
+      indGibscbs: 1,
+      pIbsUf: 0.1,
+      pIbsMun: 0,
+      pCbs: 0.9,
     },
   ],
   payments: [
-    {
-      methodId: "dinheiro",
-      label: "Dinheiro",
-      amount: 238.55,
-    },
+    { methodId: "dinheiro", label: "Dinheiro", amount: 238.55 },
   ],
-  total: 238.55,
 });
 
-console.log(result.document.tipo);   // "NFC-e"
-console.log(result.document.chave);
-console.log(result.document.protocolo);
-console.log(result.receitas);        // linhas para gravar em receitas_*
+// O host grava o que precisar:
+console.log(result.document.chave, result.document.protocolo, result.document.xml);
+console.log(result.receitas); // linhas para receitas_nfce
+```
+
+### Orquestração genérica (mock ou transmitter próprio)
+
+```ts
+import {
+  transmitirDocumentoFiscal,
+  createMockTransmitter,
+  createSefazTransmitter,
+  decidirTipoDocumento,
+} from "@modulo/nfe-transmissao";
+
+// Mock (sem SEFAZ) — útil para UI/testes
+await transmitirDocumentoFiscal(input); // usa createMockTransmitter()
+
+// SEFAZ real
+await transmitirDocumentoFiscal(input, {
+  transmitter: createSefazTransmitter({
+    pfx: bufferDoPfx,
+    passphrase: senha,
+  }),
+});
 ```
 
 ### Decisão de modelo
@@ -119,48 +157,165 @@ console.log(result.receitas);        // linhas para gravar em receitas_*
 ```ts
 import { decidirTipoDocumento, modeloCodigo } from "@modulo/nfe-transmissao";
 
-decidirTipoDocumento("");              // "NFC-e"
-decidirTipoDocumento("123.456.789-01"); // "NFC-e" (CPF)
-decidirTipoDocumento("12.345.678/0001-99"); // "NF-e" (CNPJ)
-decidirTipoDocumento("123", "NF-e");   // força "NF-e"
+decidirTipoDocumento("");                 // "NFC-e"
+decidirTipoDocumento("123.456.789-01");   // "NFC-e"
+decidirTipoDocumento("12.345.678/0001-99"); // "NF-e"
+decidirTipoDocumento("123", "NF-e");      // força "NF-e"
 
 modeloCodigo("NFC-e"); // "65"
 modeloCodigo("NF-e");  // "55"
 ```
 
-### API pública exportada
+### Helpers / API pública
 
 | Função / tipo | Descrição |
 |---------------|-----------|
-| `transmitirDocumentoFiscal(input, options?)` | Orquestra tipo → transmissão → receitas |
-| `decidirTipoDocumento(doc, forced?)` | CPF/vazio → NFC-e; CNPJ → NF-e |
-| `modeloCodigo(tipo)` | `"65"` \| `"55"` |
-| `onlyDigitsDoc(value)` | Só dígitos do documento |
-| `montarReceitasFromPayments(payments, saleRef?)` | Linhas de receita (TEF) |
-| `createMockTransmitter()` | Engine mock (padrão) |
-| `FiscalTransmitter` | Interface para plugar SEFAZ/ACBr |
-| `TransmitirVendaInput` / `TransmitirVendaResult` | Contratos de entrada/saída |
-| `DocumentoFiscalTransmitido` | Nota autorizada (ou erro) |
-| `ReceitaFiscalLinha` | Payload pronto para `receitas_*` |
-| `TransmitTefReceita` / `TransmitPayment` | Pagamentos + TEF |
+| **`emitirNfce` / `transmitirNfce`** | NFC-e completa: XML + assina A1 + autoriza SEFAZ |
+| `transmitirDocumentoFiscal(input, options?)` | Orquestra tipo → transmitter → receitas |
+| `createSefazTransmitter({ pfx, passphrase })` | Engine SEFAZ (NFC-e) |
+| `createMockTransmitter()` | Engine mock (chave/protocolo locais) |
+| `decidirTipoDocumento` / `modeloCodigo` / `onlyDigitsDoc` | Decisão CPF×CNPJ |
+| `montarReceitasFromPayments` | Linhas TEF/receita |
+| `buildInfNFeXml` / `assinarNFeXml` / `autorizarNfce` | Passos SEFAZ isolados |
+| `buildChaveAcesso` / `buildQrCodeUrl` / `ufToIbge` | Utilitários |
+| `TransmitirVendaInput` / `EmitirNfceInput` | Contratos de entrada |
+| `TransmitirVendaResult` / `DocumentoFiscalTransmitido` | Saída |
+| `ReceitaFiscalLinha` | Payload para `receitas_*` |
+| `FiscalTransmitter` | Interface para plugar ACBr / ponte própria |
+
+### Ambiente (variáveis)
+
+| Variável | Uso |
+|----------|-----|
+| `NFCE_TP_AMB` / `NFE_TP_AMB` | `2` = homologação; demais = produção (quando `tpAmb` omitido) |
+| `NFCE_P_IBS_UF` / `NFCE_P_IBS_MUN` / `NFCE_P_CBS` | Alíquotas IBS/CBS padrão (%) se o item não informar |
+| `NFE_TRANSMISSAO_API_KEY` | Chave para outros sistemas chamarem a API HTTP |
+| `NFE_DISTRIBUICAO_API_KEY` | Aceita como fallback da chave acima |
 
 ---
 
-## 2) Contrato de entrada (`TransmitirVendaInput`)
+## 2) Uso dentro deste projeto
+
+```ts
+import { emitirNfce, transmitirDocumentoFiscal } from "@/lib/nfe";
+// equivalente:
+// import { emitirNfce } from "@modulo/nfe-transmissao";
+```
+
+No PDV (`FISCAL_CONFIG.mode = 'live'`):
+
+1. `fiscalService.emitAndFinalize` monta itens/pagamentos
+2. Carrega impostos do cadastro (ICMS, PIS/COFINS, IBS/CBS)
+3. Chama `POST /api/fiscal/transmitir` (certificado da filial do operador)
+4. Persiste `document` + `receitas` em `venda_nfce` / `receitas_nfce`
+
+Reimpressão / cancelamento leem `venda_nfce` ∪ `venda_nfe`.
+
+---
+
+## 3) API HTTP para outros projetos
+
+**Endpoint:** `POST /api/nfe/transmitir`  
+**Runtime:** Node (mTLS com o PFX).  
+**Não persiste** venda nem receitas — o cliente grava o que precisar.
+
+### Autenticação (uma das opções)
+
+1. `Authorization: Bearer <JWT do usuário Supabase>`
+2. `X-Nfe-Api-Key: <NFE_TRANSMISSAO_API_KEY>` (ou `NFE_DISTRIBUICAO_API_KEY`)
+
+### A) Modo autônomo (recomendado para outros sistemas)
+
+```http
+POST /api/nfe/transmitir
+Content-Type: application/json
+X-Nfe-Api-Key: sua-chave
+
+{
+  "pfxBase64": "<base64 do .pfx>",
+  "passphrase": "senha",
+  "tpAmb": 2,
+  "saleRef": "EXT-001",
+  "emitente": {
+    "cnpj": "12345678000199",
+    "ie": "123456789",
+    "razaoSocial": "EMPRESA LTDA",
+    "uf": "SC",
+    "municipioIbge": "4205407",
+    "tokenId": "1",
+    "tokenNfce": "CSC...",
+    "crt": 1
+  },
+  "items": [
+    { "name": "Produto", "qty": 1, "price": 10.5, "csosn": "102" }
+  ],
+  "payments": [
+    { "methodId": "dinheiro", "amount": 10.5 }
+  ]
+}
+```
+
+### B) Modo filial (ERP)
+
+```json
+{
+  "filialId": "<uuid da filial>",
+  "saleRef": "PDV-999",
+  "items": [ ... ],
+  "payments": [ ... ]
+}
+```
+
+O servidor baixa o A1 do Storage da filial e preenche emitente/CRT/ambiente.
+
+### Resposta
+
+```json
+{
+  "document": {
+    "tipo": "NFC-e",
+    "modelo": "65",
+    "numero": 1,
+    "serie": "1",
+    "chave": "42...",
+    "protocolo": "...",
+    "status": "authorized",
+    "xml": "<?xml ...",
+    "valor": 10.5
+  },
+  "receitas": [ ... ],
+  "message": "NFC-e 000001 autorizada..."
+}
+```
+
+PDV interno continua usando `POST /api/fiscal/transmitir` (mesma stack SEFAZ + enriquecimento de impostos do cadastro).
+
+---
+
+## 4) Contrato de entrada (`TransmitirVendaInput` / `EmitirNfceInput`)
 
 | Campo | Obrigatório | Descrição |
 |-------|-------------|-----------|
-| `saleRef` | sim | Referência da venda / cupom PDV |
-| `items` | sim | Itens (nome, qtd, preço, …) |
+| `saleRef` | sim | Referência da venda / cupom |
+| `items` | sim | Itens (nome, qtd, preço, impostos…) |
 | `payments` | sim | Formas de pagamento (pode ser `[]`) |
+| `pfx` + `passphrase` | só em `emitirNfce` | Certificado A1 |
+| `emitente` | sim no SEFAZ | CNPJ, IE, município IBGE, CSC, CRT… |
 | `buyer` | não | Destinatário; `document` decide NFC-e vs NF-e |
 | `tipo` | não | Força `"NFC-e"` ou `"NF-e"` |
-| `total` | não | Se omitido, soma `qty * price` dos itens |
-| `serie` | não | Padrão `"1"` |
-| `ambiente` | não | `1` produção · `2` homologação (mock usa o valor) |
-| `emitente` | não | CNPJ/IE/razão (necessário no SEFAZ real) |
-| `operator` | não | Operador |
-| `pdvCodigo` / `filialId` | não | Contexto para o host persistir |
+| `total` | não | Se omitido, soma `qty * price` |
+| `serie` / `numero` | não | Série e número fiscal |
+| `ambiente` / `tpAmb` | não | `1` produção · `2` homologação |
+
+### Item — impostos
+
+| Campo | Uso |
+|-------|-----|
+| `csosn` / `cstIcms` / `pIcms` / `pRedBc` | ICMS (CRT 1–2 vs 3) |
+| `cstPis` / `pPis` / `cstCofins` / `pCofins` | PIS/COFINS |
+| `cstIbscbs` / `cClassTrib` | IBS/CBS (NT 2025.002) |
+| `indGibscbs` / `indGibscbsMono` / `indGred` | Indicadores do CST |
+| `pIbsUf` / `pIbsMun` / `pCbs` / `pRedIbs` / `pRedCbs` / `pMono` | Cálculo IBS/CBS |
 
 ### Pagamento com TEF
 
@@ -174,16 +329,12 @@ modeloCodigo("NF-e");  // "55"
   authorizationCode: "789012",
   brand: "VISA",
   tef: {
-    campo_131: "REDE X",       // CliSiTef 131 — rede destino
-    campo_132: "CREDITO",      // CliSiTef 132 — tipo cartão
+    campo_131: "REDE X",
+    campo_132: "CREDITO",
     recebimento_cartao: 100.0,
-    data_prevista: "2026-09-10", // YYYY-MM-DD
+    data_prevista: "2026-09-10",
     modalidade: "credito",
-    bin_rede: "412345",
-    data_cartao: "20260903",     // AAAAMMDD
-    hora_cartao: "181530",       // HHMMSS
     autorizacao: "789012",
-    taxa_cartao: 1.5,
     bandeira: "VISA",
     nsu: "123456",
   },
@@ -192,12 +343,12 @@ modeloCodigo("NF-e");  // "55"
 
 ---
 
-## 3) Contrato de saída
+## 5) Contrato de saída
 
 ```ts
 type TransmitirVendaResult = {
-  document: DocumentoFiscalTransmitido; // nota
-  receitas: ReceitaFiscalLinha[];       // 1 linha por pagamento
+  document: DocumentoFiscalTransmitido;
+  receitas: ReceitaFiscalLinha[];
   message: string;
 };
 ```
@@ -209,41 +360,12 @@ type TransmitirVendaResult = {
 - `valor`, `cliente`, `buyerDocument`, `saleRef`, `issuedAt`, `emissao`, `hora`
 - `items`, `payments`, `xml?`, `digVal?`, `error?`
 
-### `receitas` → gravação sugerida
+### Persistência sugerida no host
 
-Para cada pagamento, grave em `receitas_nfce` ou `receitas_nfe` (conforme `document.tipo`), vinculando ao `id` da venda:
-
-| Campo receita | Origem |
-|---------------|--------|
-| `campo_131` | CliSiTef 131 REDE_DESTINO |
-| `campo_132` | CliSiTef 132 TIPO_CARTAO |
-| `autorizacao` | TEF / campo 134 |
-| `bandeira` | TEF / campo 156 |
-| `nsu` | TEF / campo 133 |
-| `recebimento_cartao` | valor cartão / TEF |
-| `data_prevista` | previsão de recebimento |
-| `modalidade` | crédito / débito / pix / … |
-| `bin_rede` | BIN / rede |
-| `data_cartao` / `hora_cartao` | data/hora da transação |
-| `taxa_cartao` | taxa |
-| `valor`, `method_id`, `forma_pagamento`, `sale_ref` | pagamento |
-
-DDL de referência: `scripts/60_receitas_nfce_nfe.sql`.
-
----
-
-## 4) Persistência no host (padrão Modulo)
-
-O pacote **não grava banco**. No pdv-web a sequência é:
-
-1. `transmitirDocumentoFiscal(...)` → `document` + `receitas`
+1. `emitirNfce` / `transmitirDocumentoFiscal` → `document` + `receitas`
 2. `INSERT` cabeçalho em `venda_nfce` **ou** `venda_nfe`
 3. `INSERT` itens em `venda_nfceprodutos` **ou** `venda_nfeprodutos`
 4. `INSERT` pagamentos/TEF em `receitas_nfce` **ou** `receitas_nfe`
-
-Ambiente SEFAZ da filial: `filial.ambiente_nfce` / `filial.ambiente_nfe` (`1` ou `2`).
-
-Mapeamento de situação:
 
 | `document.status` | Coluna `situacao` |
 |-------------------|-------------------|
@@ -254,85 +376,42 @@ Mapeamento de situação:
 | `cancelled` | `cancelada` |
 | `error` | `erro` |
 
-### XML
-
-Colunas `xml_nfce` / `xml_nfe` existem, mas há opção futura de gravar XML só na máquina local (ver regra do projeto). Outros sistemas podem:
-
-- guardar o XML no próprio storage; ou
-- manter só chave/protocolo no banco.
+DDL: `scripts/57_venda_nfce.sql`, `58_venda_nfe.sql`, `60_receitas_nfce_nfe.sql`.
 
 ---
 
-## 5) Plugar transmissão real (SEFAZ / ACBr)
+## 6) IBS / CBS (NT 2025.002)
 
-Implemente a interface e passe em `options.transmitter`:
+Na emissão SEFAZ, o XML inclui `IBSCBS` / `IBSCBSTot` quando o produto/item tem CST e `cClassTrib`:
 
-```ts
-import type {
-  FiscalTransmitter,
-  TransmitirVendaInput,
-  ModeloFiscal,
-} from "@modulo/nfe-transmissao";
-import { transmitirDocumentoFiscal } from "@modulo/nfe-transmissao";
+- CST sem tributação (`410`, `810`, `830` ou `ind_gibscbs = 0`): só `CST` + `cClassTrib`
+- Monofásico (`620`… ou `ind_gibscbsmono = 1`): `gIBSCBSMono`
+- Demais: `gIBSCBS` com `pIbsUf` / `pIbsMun` / `pCbs` (item ou env; default `0`)
+- Redução: `pRedIbs` / `pRedCbs` → `gRed` / `pAliqEfet`
 
-const acbrTransmitter: FiscalTransmitter = {
-  async transmit(input: TransmitirVendaInput & { tipo: ModeloFiscal }) {
-    // 1) Montar XML / chamar ponte local / ACBr / API própria
-    // 2) Retornar DocumentoFiscalTransmitido com chave, protocolo, xml, status
-    const document = await minhaPonte.emitir(input);
-    return {
-      document,
-      message: `${document.tipo} ${document.numero} autorizada.`,
-    };
-  },
-};
-
-const result = await transmitirDocumentoFiscal(input, {
-  transmitter: acbrTransmitter,
-});
-```
-
-Enquanto não houver transmitter, `createMockTransmitter()` gera chave/protocolo locais — útil para PDV, testes e integração de UI/DB.
-
----
-
-## 6) Uso dentro do pdv-web
-
-```ts
-import { transmitirDocumentoFiscal } from "@/lib/nfe";
-// equivalente:
-// import { transmitirDocumentoFiscal } from "@modulo/nfe-transmissao";
-```
-
-No PDV, o fluxo de pagamento chama `fiscalService.emitAndFinalize`, que:
-
-1. Decide NFC-e/NF-e pelo CPF/CNPJ
-2. Lê ambiente da filial
-3. Chama `transmitirDocumentoFiscal`
-4. Persiste venda + itens + receitas (`vendaFiscalDb`)
-
-Reimpressão / cancelamento leem `venda_nfce` ∪ `venda_nfe`.
+CRT da filial (`tipo_empresa` → 1/2/3) governa ICMS (CSOSN vs CST).
 
 ---
 
 ## 7) Checklist para outro projeto
 
-1. Dependência `@modulo/nfe-transmissao` (pasta ou `file:`)
-2. Alias TS / transpile se Next
-3. Chamar `transmitirDocumentoFiscal` após fechar a venda
-4. Persistir `document` + `receitas` nas tabelas do seu domínio (ou reutilizar os scripts `57`/`58`/`60`)
-5. Configurar `ambiente` (1/2) por empresa/filial
-6. Quando for ao ar: implementar `FiscalTransmitter` com certificado A1 + schemas
-7. (Opcional) TEF: preencher `payments[].tef` com campos 131/132/autorização/bandeira/nsu
+1. Dependência `@modulo/nfe-transmissao` (pasta ou `file:`) + `npm install`
+2. Alias TS / `transpilePackages` se Next
+3. Chamar `emitirNfce({ pfx, passphrase, ... })` **ou** `POST /api/nfe/transmitir`
+4. Persistir `document` + `receitas` no seu domínio
+5. Configurar CSC (`tokenId`/`tokenNfce`), município IBGE e ambiente
+6. (Opcional) TEF: preencher `payments[].tef`
+7. (Opcional) IBS/CBS nos itens conforme reforma tributária
 
 ---
 
 ## 8) Limitações atuais
 
-- Transmissor padrão = **mock** (sem autorização SEFAZ real)
-- Não envia e-mail/XML ao destinatário (isso fica no host / `fiscalService.sendNfe`)
-- Não imprime cupom/DANFE (host: `fiscalService.print` / ponte `:39102`)
-- Cancelamento SEFAZ (evento) ainda não está no pacote — no PDV o cancel atualiza só o banco (`situacao=cancelada`)
+- **NFC-e (65)** autorizada na SEFAZ via `emitirNfce` / `createSefazTransmitter`
+- **NF-e (55)** ainda usa mock / transmitter externo (`FiscalTransmitter`) — XML 55 não está no pacote
+- Não envia e-mail/XML ao destinatário (fica no host)
+- Não imprime DANFE/cupom (host / ponte `:39102`)
+- Cancelamento SEFAZ (evento) ainda não está no pacote
 
 ---
 
@@ -344,6 +423,7 @@ scripts/57_venda_nfce.sql           # NFC-e + itens
 scripts/58_venda_nfe.sql            # NF-e + itens
 scripts/59_filial_ambiente_fiscal.sql
 scripts/60_receitas_nfce_nfe.sql    # receitas + TEF
+scripts/67_filial_tipo_empresa.sql  # CRT / tipo_empresa
 scripts/backup/apply-56-58-venda-fiscal.mjs
 scripts/backup/apply-59-filial-ambiente-fiscal.mjs
 scripts/backup/apply-60-receitas-nfce-nfe.mjs

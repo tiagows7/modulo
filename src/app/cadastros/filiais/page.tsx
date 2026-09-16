@@ -18,6 +18,12 @@ import {
   type TipoFilial,
 } from "@/lib/filialTipo";
 import {
+  labelTipoEmpresa,
+  normalizeTipoEmpresa,
+  TIPO_EMPRESA_OPTIONS,
+  type TipoEmpresa,
+} from "@/lib/filialTipoEmpresa";
+import {
   normalizeAmbienteFiscal,
   type AmbienteFiscal,
 } from "@/lib/filialAmbienteFiscal";
@@ -53,6 +59,7 @@ type Filial = {
   schemas_atualizado_em: string | null;
   ult_nsu: string | null;
   tipo_filial: TipoFilial | null;
+  tipo_empresa: TipoEmpresa | null;
   ambiente_nfe: AmbienteFiscal | null;
   ambiente_nfce: AmbienteFiscal | null;
   token_id: string | null;
@@ -76,6 +83,7 @@ type FilialForm = {
   certificado_senha: string;
   ult_nsu: string;
   tipo_filial: TipoFilial;
+  tipo_empresa: TipoEmpresa;
   ambiente_nfe: AmbienteFiscal;
   ambiente_nfce: AmbienteFiscal;
   token_id: string;
@@ -109,6 +117,7 @@ const emptyForm: FilialForm = {
   certificado_senha: "",
   ult_nsu: "",
   tipo_filial: "posto",
+  tipo_empresa: "simples",
   ambiente_nfe: 2,
   ambiente_nfce: 2,
   token_id: "",
@@ -121,6 +130,7 @@ const columns = [
   { key: "fantasia", label: "Fantasia" },
   { key: "cnpj", label: "CNPJ" },
   { key: "tipo", label: "Tipo" },
+  { key: "regime", label: "Regime" },
   { key: "cidade", label: "Cidade" },
   { key: "uf", label: "UF", align: "center" as const },
   { key: "telefone", label: "Telefone" },
@@ -162,6 +172,7 @@ function toForm(item: Filial): FilialForm {
     certificado_senha: item.certificado_senha ?? "",
     ult_nsu: item.ult_nsu ?? "",
     tipo_filial: normalizeTipoFilial(item.tipo_filial),
+    tipo_empresa: normalizeTipoEmpresa(item.tipo_empresa),
     ambiente_nfe: normalizeAmbienteFiscal(item.ambiente_nfe),
     ambiente_nfce: normalizeAmbienteFiscal(item.ambiente_nfce),
     token_id: item.token_id ?? "",
@@ -194,6 +205,7 @@ function toPayload(form: FilialForm) {
     certificado_senha: blank(form.certificado_senha),
     ult_nsu: blank(form.ult_nsu)?.replace(/\D/g, "") ?? null,
     tipo_filial: normalizeTipoFilial(form.tipo_filial),
+    tipo_empresa: normalizeTipoEmpresa(form.tipo_empresa),
     ambiente_nfe: normalizeAmbienteFiscal(form.ambiente_nfe),
     ambiente_nfce: normalizeAmbienteFiscal(form.ambiente_nfce),
     token_id: blank(form.token_id)?.replace(/\D/g, "").slice(0, 6) ?? null,
@@ -304,7 +316,7 @@ export default function FilialPage() {
       const { data, error } = await supabase
         .from("filial")
         .select(
-          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
+          "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, tipo_empresa, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
         )
         .order("created_at", { ascending: false });
 
@@ -611,7 +623,7 @@ export default function FilialPage() {
             codigo,
           })
           .select(
-            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
+            "id, codigo, razao_social, fantasia, cnpj, inscricao_estadual, inscricao_municipal, cep, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, telefone, status, certificado_nome, certificado_storage_path, certificado_senha, schemas_storage_path, schemas_atualizado_em, ult_nsu, tipo_filial, tipo_empresa, ambiente_nfe, ambiente_nfce, token_id, token_nfce",
           )
           .single();
         if (error) throw new Error(error.message);
@@ -679,6 +691,7 @@ export default function FilialPage() {
     fantasia: item.fantasia || "—",
     cnpj: item.cnpj || "—",
     tipo: labelTipoFilial(item.tipo_filial),
+    regime: labelTipoEmpresa(item.tipo_empresa),
     cidade:
       item.endereco_cidade != null
         ? cidadeNomes[String(item.endereco_cidade)] ||
@@ -1018,6 +1031,31 @@ export default function FilialPage() {
               ) : null}
 
               <CadastroFormGrid>
+                <CadastroField label="Tipo de empresa" htmlFor="tipo_empresa" span="full">
+                  <select
+                    id="tipo_empresa"
+                    className="input-base input-compact"
+                    value={form.tipo_empresa}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        tipo_empresa: normalizeTipoEmpresa(e.target.value),
+                      }))
+                    }
+                    disabled={busy}
+                  >
+                    {TIPO_EMPRESA_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label} (CRT {opt.crt})
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Define o CRT da NF-e/NFC-e e qual grupo de imposto do produto
+                    usar (CSOSN no Simples ou CST no Regime Normal).
+                  </p>
+                </CadastroField>
+
                 <CadastroField label="Ambiente NF-e" htmlFor="ambiente_nfe">
                   <select
                     id="ambiente_nfe"

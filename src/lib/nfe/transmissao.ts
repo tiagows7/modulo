@@ -1,15 +1,30 @@
 /**
  * Reexporta a rotina portátil de transmissão NFC-e / NF-e.
+ * Prefira importar de `@/lib/nfe` ou `@modulo/nfe-transmissao`.
  */
 export {
+  assinarNFeXml,
+  autorizarNfce,
+  buildChaveAcesso,
+  buildInfNFeXml,
+  buildQrCodeUrl,
   createMockTransmitter,
+  createSefazTransmitter,
   decidirTipoDocumento,
+  emitirNfce,
+  extractPfxPem,
+  hashCscQr,
   modeloCodigo,
   montarReceitasFromPayments,
+  nfceAutorizacaoUrl,
+  onlyDigits,
   onlyDigitsDoc,
   transmitirDocumentoFiscal,
+  transmitirNfce,
+  ufToIbge,
   type AmbienteSefaz,
   type DocumentoFiscalTransmitido,
+  type EmitirNfceInput,
   type FiscalTransmitter,
   type ModeloFiscal,
   type ReceitaFiscalLinha,

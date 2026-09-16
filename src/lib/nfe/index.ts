@@ -1,6 +1,8 @@
 /**
  * Kit NF-e compartilhado do pdv-web.
- * Distribuição DF-e: pacote portátil `@modulo/nfe-distribuicao-dfe`.
+ *
+ * - Distribuição DF-e (entrada): `@modulo/nfe-distribuicao-dfe`
+ * - Transmissão NFC-e / NF-e (saída): `@modulo/nfe-transmissao`
  */
 export {
   consultarDistribuicaoDfe,
@@ -19,14 +21,27 @@ export {
 } from "./distribuicaoDfe";
 
 export {
+  assinarNFeXml,
+  autorizarNfce,
+  buildChaveAcesso,
+  buildInfNFeXml,
+  buildQrCodeUrl,
   createMockTransmitter,
+  createSefazTransmitter,
   decidirTipoDocumento,
+  emitirNfce,
+  extractPfxPem,
+  hashCscQr,
   modeloCodigo,
   montarReceitasFromPayments,
+  nfceAutorizacaoUrl,
+  onlyDigits,
   onlyDigitsDoc,
   transmitirDocumentoFiscal,
+  transmitirNfce,
   type AmbienteSefaz,
   type DocumentoFiscalTransmitido,
+  type EmitirNfceInput,
   type FiscalTransmitter,
   type ModeloFiscal,
   type ReceitaFiscalLinha,

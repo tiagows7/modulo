@@ -15,6 +15,41 @@ export type TransmitItem = {
   discount?: number;
   ncm?: string;
   cfop?: string;
+  /** Origem da mercadoria (0–8). Default 0. */
+  origem?: string | number;
+  /** CSOSN (Simples) */
+  csosn?: string | null;
+  /** CST ICMS (Regime Normal) */
+  cstIcms?: string | null;
+  /** Alíquota ICMS % */
+  pIcms?: number | null;
+  /** % redução base ICMS */
+  pRedBc?: number | null;
+  /** CST PIS */
+  cstPis?: string | null;
+  /** Alíquota PIS % */
+  pPis?: number | null;
+  /** CST COFINS */
+  cstCofins?: string | null;
+  /** Alíquota COFINS % */
+  pCofins?: number | null;
+  /** CST IBS/CBS (3 dígitos) */
+  cstIbscbs?: string | null;
+  /** cClassTrib IBS/CBS (6 dígitos) */
+  cClassTrib?: string | null;
+  /** Indicadores do CST IBS/CBS */
+  indGibscbs?: number | null;
+  indGibscbsMono?: number | null;
+  indGred?: number | null;
+  /** % redução IBS / CBS (cClassTrib) */
+  pRedIbs?: number | null;
+  pRedCbs?: number | null;
+  /** Alíquotas IBS UF / Mun / CBS % (opcional; default 0) */
+  pIbsUf?: number | null;
+  pIbsMun?: number | null;
+  pCbs?: number | null;
+  /** Alíquota monofásica % (quando aplicável) */
+  pMono?: number | null;
   pumpId?: string | number;
 };
 
@@ -70,11 +105,23 @@ export type TransmitEmitente = {
   razaoSocial?: string | null;
   fantasia?: string | null;
   uf?: string | null;
+  /** Código IBGE do município (7 dígitos) */
   municipioIbge?: string | null;
+  cidade?: string | null;
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cep?: string | null;
+  telefone?: string | null;
   /** idCSC (Token ID) da NFC-e — SEFAZ */
   tokenId?: string | null;
   /** CSC (Token NFC-e) — SEFAZ */
   tokenNfce?: string | null;
+  /**
+   * Código de Regime Tributário (CRT):
+   * 1 Simples · 2 Simples excesso · 3 Regime Normal
+   */
+  crt?: 1 | 2 | 3 | null;
 };
 
 export type TransmitirVendaInput = {

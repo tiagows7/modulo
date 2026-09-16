@@ -1,41 +1,69 @@
-# Transmissão NFC-e / NF-e (`@modulo/nfe-transmissao`)
+# @modulo/nfe-transmissao
 
-Pacote portátil para emitir/autorizar **NFC-e** e **NF-e** em qualquer projeto da empresa (Node/TS ≥ 18).
+Rotina **Node 18+** (sem Next/Supabase) para emitir **NFC-e** / orquestrar **NF-e**:
 
-- **CPF** ou documento em branco → **NFC-e** (modelo 65)
-- **CNPJ** → **NF-e** (modelo 55)
-- Monta linhas de **receita** (pagamentos + TEF 131/132, bandeira, autorização, …)
-- Sem Next.js / Supabase — o **host** persiste no banco
+- Monta XML 4.00 (ICMS, PIS/COFINS, IBS/CBS)
+- Assina com certificado **A1** (PFX)
+- Autoriza na **SEFAZ** (NFC-e)
+- Monta linhas de **receita/TEF** para o host gravar
 
-## Documentação completa
+Documentação completa no monorepo: [`docs/NFE_TRANSMISSAO.md`](../../docs/NFE_TRANSMISSAO.md).
 
-Guia para outros sistemas (instalação, contratos, TEF, SEFAZ, SQL):
-
-**[`docs/NFE_TRANSMISSAO.md`](../../docs/NFE_TRANSMISSAO.md)**
-
-## Uso rápido
+## Uso rápido (NFC-e SEFAZ)
 
 ```ts
-import { transmitirDocumentoFiscal } from "@modulo/nfe-transmissao";
+import { readFileSync } from "node:fs";
+import { emitirNfce } from "@modulo/nfe-transmissao";
 
-const result = await transmitirDocumentoFiscal({
-  saleRef: "PDV123456",
-  buyer: { document: "12345678901", name: "Cliente" }, // CPF → NFC-e
-  items: [{ name: "Gasolina", qty: 10, price: 5.89, unit: "L", kind: "combustivel" }],
-  payments: [{ methodId: "dinheiro", label: "Dinheiro", amount: 58.9 }],
-  ambiente: 2, // homologação
+const result = await emitirNfce({
+  pfx: readFileSync("./certificado.pfx"),
+  passphrase: "senha-do-pfx",
+  tpAmb: 2, // 1 produção | 2 homologação
+  saleRef: "PDV0001",
+  emitente: {
+    cnpj: "12345678000199",
+    ie: "123456789",
+    razaoSocial: "EMPRESA LTDA",
+    uf: "SC",
+    municipioIbge: "4205407",
+    tokenId: "1",
+    tokenNfce: "SEU_CSC",
+    crt: 1,
+  },
+  items: [{ name: "Produto", qty: 1, price: 10, csosn: "102" }],
+  payments: [{ methodId: "dinheiro", amount: 10 }],
 });
 
-// result.document  → gravar venda_nfce ou venda_nfe
-// result.receitas  → gravar receitas_nfce ou receitas_nfe
+// result.document → chave, protocolo, xml, status
+// result.receitas → gravar em receitas_nfce
 ```
 
-## Plugar SEFAZ real
+## Mock / transmitter próprio
 
 ```ts
+import {
+  transmitirDocumentoFiscal,
+  createSefazTransmitter,
+} from "@modulo/nfe-transmissao";
+
+// mock (padrão)
+await transmitirDocumentoFiscal(input);
+
+// SEFAZ
 await transmitirDocumentoFiscal(input, {
-  transmitter: meuTransmitterAcbr, // implementa FiscalTransmitter
+  transmitter: createSefazTransmitter({ pfx, passphrase }),
 });
 ```
 
-Sem `transmitter`, usa mock (chave/protocolo locais).
+## Reuso em outro repositório
+
+1. Copie `packages/nfe-transmissao` **ou** use `file:../pdv-web/packages/nfe-transmissao`
+2. `npm install` (puxa `node-forge`, `xml-crypto`, `@xmldom/xmldom`)
+3. Chame `emitirNfce` **ou** a API HTTP deste sistema: `POST /api/nfe/transmitir`
+
+## Dentro do pdv-web
+
+```ts
+import { emitirNfce } from "@/lib/nfe";
+// ou: import { emitirNfce } from "@modulo/nfe-transmissao";
+```
