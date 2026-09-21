@@ -81,6 +81,21 @@ const server = http.createServer((req, res) => {
   const url = req.url || '/'
   const method = req.method || 'GET'
 
+  // Preflight CORS / Private Network Access (Vercel → localhost)
+  if (method === 'OPTIONS' && url.startsWith('/__local/')) {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers':
+        'Content-Type, Access-Control-Request-Private-Network',
+      'Access-Control-Allow-Private-Network': 'true',
+      'Access-Control-Max-Age': '86400',
+      'Cache-Control': 'no-store',
+    })
+    res.end()
+    return
+  }
+
   // Ponte CBC same-origin (sem mixed content / sem certificado)
   if (url === '/__local/cbc' || url.startsWith('/__local/cbc/')) {
     const rest = url.slice('/__local/cbc'.length) || '/'
@@ -89,17 +104,6 @@ const server = http.createServer((req, res) => {
   }
 
   if (url === '/__local/pdv-modo' || url.startsWith('/__local/pdv-modo?')) {
-    if (method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Private-Network': 'true',
-      })
-      res.end()
-      return
-    }
-
     if (method === 'GET') {
       const modo = readPdvModo()
       sendJson(res, 200, {
@@ -124,7 +128,7 @@ const server = http.createServer((req, res) => {
           if (modo !== 'loja' && modo !== 'posto') {
             sendJson(res, 400, {
               ok: false,
-              error: 'modo deve ser "posto" ou "loja"',
+              error: 'modo deve ser "loja" ou "posto"',
             })
             return
           }

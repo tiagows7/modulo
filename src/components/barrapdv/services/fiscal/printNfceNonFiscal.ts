@@ -11,7 +11,10 @@ function escapeHtml(value: string) {
 }
 
 function money(value: number) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  // toLocaleString usa NBSP/NNBSP entre R$ e o valor — térmica vira "?"
+  return value
+    .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    .replace(/[\u00a0\u202f\u2007\u2009]/g, ' ')
 }
 
 function formatChaveGroups(chave: string) {
@@ -154,18 +157,17 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
   }
 
   const tribApprox = round2(doc.valor * 0.1675)
-  // QR à esquerda + tributos ao lado
-  lines.push('<<QR_BESIDE>>')
-  lines.push('Tributos totais incidentes')
-  lines.push('(Lei Federal 12.741/2012)')
+  // QR primeiro; tributos abaixo com a mesma fonte do cupom (<<SMALL>>)
+  lines.push('<<QR>>')
+  lines.push('Tributos totais incidentes (Lei Federal 12.741/2012)')
   lines.push(`Valor approx.: ${money(tribApprox)}`)
-  lines.push('<<END_QR_BESIDE>>')
   lines.push(RULE_SMALL)
   lines.push('CUPOM NFC-e')
   lines.push(`Ref. venda: ${doc.saleRef}`)
+  lines.push('')
   lines.push('<<NORMAL>>')
 
-  return lines.filter((l) => l !== '').join('\n')
+  return lines.join('\n')
 }
 
 /**
@@ -251,38 +253,31 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
     .pay-line { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; font-size: 9px; }
     .pay-line small { color: #444; }
     .qr {
-      margin: 0;
+      margin: 6px 0;
       width: 96px;
       height: 96px;
       display: block;
       border: 0;
       background: #fff;
-      flex-shrink: 0;
     }
-    .qr-trib {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 6px;
+    .qr-block {
       margin: 6px 0;
     }
-    .qr-trib .trib {
-      flex: 1;
-      font-size: 8px;
+    .trib {
+      font-size: 9px;
       line-height: 1.3;
       text-align: left;
+      margin: 4px 0 6px;
     }
     .qr-fallback {
-      margin: 0;
+      margin: 6px 0;
       width: 96px;
       height: 96px;
       display: grid;
       place-items: center;
       border: 1px dashed #444;
-      font-size: 8px;
+      font-size: 9px;
       color: #333;
-      flex-shrink: 0;
     }
     .badge { text-align: center; font-weight: 700; margin-top: 6px; font-size: 8px; }
     .header { text-align: center; font-size: 8px; }
@@ -342,16 +337,14 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
   <div class="total"><span>TOTAL A PAGAR</span><span>${money(doc.valor)}</span></div>
   ${payRows ? `<hr class="rule" /><div><strong>FORMA DE PAGAMENTO</strong>${payRows}</div>` : ''}
   <hr class="rule" />
-  <div class="qr-trib">
-    ${qrBlock}
-    <div class="trib">
-      <strong>Tributos totais incidentes</strong><br />
-      (Lei Federal 12.741/2012)<br />
-      Valor approx.: ${money(tribApprox)}
-    </div>
+  <div class="qr-block">${qrBlock}</div>
+  <div class="trib">
+    Tributos totais incidentes (Lei Federal 12.741/2012)<br />
+    Valor approx.: ${money(tribApprox)}
   </div>
   <div class="badge">CUPOM NFC-e</div>
   <div class="muted" style="margin-top:6px;text-align:center">Ref. ${escapeHtml(doc.saleRef)}</div>
+  <div style="height:12px"></div>
 </body>
 </html>`
 }

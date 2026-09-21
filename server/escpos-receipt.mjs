@@ -155,6 +155,17 @@ const ACCENT_FOLD = {
 function encodeCp850(text) {
   const bytes = []
   for (const ch of String(text || '')) {
+    // Espaços unicode (NBSP etc.) → espaço ASCII (evita "?" na térmica)
+    if (
+      ch === '\u00a0' ||
+      ch === '\u202f' ||
+      ch === '\u2007' ||
+      ch === '\u2009' ||
+      ch === '\u2008'
+    ) {
+      bytes.push(0x20)
+      continue
+    }
     const code = ch.codePointAt(0) ?? 63
     if (code <= 0x7f) {
       bytes.push(code)
@@ -183,12 +194,23 @@ function setPixel(pixels, x, y) {
  * @param {number} x0
  * @param {number} y0
  * @param {number} [scale]
+ * @param {{ bold?: boolean }} [opts]
  */
-function drawText5x7(pixels, text, x0, y0, scale = 1) {
+function drawText5x7(pixels, text, x0, y0, scale = 1, opts = {}) {
   const s = Math.max(1, scale | 0)
+  const bold = Boolean(opts.bold)
   let x = x0
   for (const raw of text) {
-    const ch = ACCENT_FOLD[raw] || raw
+    // NBSP / NNBSP → espaço (R$?12,34 na térmica)
+    const normalized =
+      raw === '\u00a0' ||
+      raw === '\u202f' ||
+      raw === '\u2007' ||
+      raw === '\u2009' ||
+      raw === '\u2008'
+        ? ' '
+        : raw
+    const ch = ACCENT_FOLD[normalized] || normalized
     const glyph = FONT5X7[ch] || FONT5X7[ch.toUpperCase()] || FONT5X7['.']
     for (let row = 0; row < 7; row++) {
       const bits = glyph[row]
@@ -197,11 +219,15 @@ function drawText5x7(pixels, text, x0, y0, scale = 1) {
         for (let dy = 0; dy < s; dy++) {
           for (let dx = 0; dx < s; dx++) {
             setPixel(pixels, x + col * s + dx, y0 + row * s + dy)
+            // Traço mais grosso — térmica 203dpi engole pixel único
+            if (bold) {
+              setPixel(pixels, x + col * s + dx + 1, y0 + row * s + dy)
+            }
           }
         }
       }
     }
-    x += 6 * s // 5px + 1 gap, escalado
+    x += 6 * s + (bold ? 1 : 0) // 5px + gap (+ negrito)
   }
 }
 
@@ -240,7 +266,7 @@ function pixelsToRaster(pixels) {
 }
 
 /**
- * QR à esquerda + tributos à direita (letra menor), numa única imagem.
+ * QR à esquerda + tributos à direita (letra grande/negrita), numa única imagem.
  * @param {string} qrPayload
  * @param {string[]} besideLines
  * @returns {Buffer}
@@ -263,26 +289,30 @@ function buildQrBesideBlock(qrPayload, besideLines) {
   const modSize = modules.size
   const scale = 2 // QR compacto para sobrar espaço ao texto
   const qrPx = modSize * scale
-  const gap = 10
+  const gap = 12
   const paperDots = 576 // ~80mm @ 203dpi
-  const textAreaW = Math.max(120, paperDots - qrPx - gap)
-  const fontScale = 2 // letra maior ao lado do QR
-  const charW = 6 * fontScale
-  const lineH = 10 * fontScale
-  const maxChars = Math.floor(textAreaW / charW)
+  const textAreaW = Math.max(160, paperDots - qrPx - gap)
+  // Escala 3 + negrito: legível na Elgin i8 / térmica 80mm
+  const fontScale = 3
+  const charW = 6 * fontScale + 1
+  const lineH = 10 * fontScale + 2
+  const maxChars = Math.max(8, Math.floor(textAreaW / charW))
 
-  // Quebra linhas longas
+  // Quebra linhas longas; maiúsculas leem melhor no bitmap 5x7
   const wrapped = []
   for (const line of lines) {
-    let rest = line
+    let rest = String(line).toUpperCase()
     while (rest.length > maxChars) {
-      wrapped.push(rest.slice(0, maxChars))
-      rest = rest.slice(maxChars)
+      let cut = maxChars
+      const space = rest.lastIndexOf(' ', maxChars)
+      if (space >= Math.floor(maxChars * 0.45)) cut = space
+      wrapped.push(rest.slice(0, cut).trimEnd())
+      rest = rest.slice(cut).trimStart()
     }
     if (rest) wrapped.push(rest)
   }
 
-  const textH = wrapped.length * lineH + 2
+  const textH = wrapped.length * lineH + 4
   const width = Math.min(paperDots, qrPx + gap + textAreaW)
   const height = Math.max(qrPx, textH)
 
@@ -306,7 +336,9 @@ function buildQrBesideBlock(qrPayload, besideLines) {
   const textX = qrPx + gap
   const textY = Math.max(0, Math.floor((qrPx - textH) / 2))
   for (let i = 0; i < wrapped.length; i++) {
-    drawText5x7(pixels, wrapped[i], textX, textY + i * lineH, fontScale)
+    drawText5x7(pixels, wrapped[i], textX, textY + i * lineH, fontScale, {
+      bold: true,
+    })
   }
 
   const raster = pixelsToRaster(pixels)
@@ -410,7 +442,21 @@ export function buildEscPosReceipt(options) {
       continue
     }
 
-    if (line === '<<END_QR_BESIDE>>' || line === '<<QR>>') {
+    if (line === '<<END_QR_BESIDE>>') {
+      continue
+    }
+
+    // QR sozinho neste ponto; texto seguinte usa a fonte atual do cupom
+    if (line === '<<QR>>') {
+      if (qrPayload) {
+        parts.push(Buffer.from([0x1b, 0x61, 0x00]))
+        const qr = buildQrRaster(qrPayload, 3)
+        if (qr.length) {
+          parts.push(qr)
+          parts.push(Buffer.from([0x0a]))
+        }
+        qrEmbedded = true
+      }
       continue
     }
 
@@ -428,7 +474,7 @@ export function buildEscPosReceipt(options) {
     }
   }
 
-  parts.push(Buffer.from([0x0a, 0x0a, 0x0a]))
+  parts.push(Buffer.from([0x0a, 0x0a, 0x0a, 0x0a]))
   if (options.cut !== false) {
     parts.push(Buffer.from([0x1d, 0x56, 0x01]))
   }

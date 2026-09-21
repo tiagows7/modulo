@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 const WAKE_URL = "http://127.0.0.1:39200/wake";
 const HEALTH_URL = "http://127.0.0.1:39199/__local/health";
 const HANDOFF_BASE = "http://127.0.0.1:39199/pdv-auth-handoff";
-const MAX_WAIT_MS = 45000;
-const POLL_MS = 1500;
+const MAX_WAIT_MS = 20000;
+const POLL_MS = 800;
+const FORCE_REDIRECT_AFTER_MS = 6000;
 
 type Phase = "session" | "waking" | "waiting" | "redirect" | "error";
 
@@ -15,65 +16,88 @@ type Phase = "session" | "waking" | "waiting" | "redirect" | "error";
  * 1) Login na Vercel
  * 2) Esta página acorda o watchdog local (:39200) → sobe pontes + proxy :39199
  * 3) Transfere a sessão e abre o PDV local
+ *
+ * Se o Chrome bloquear fetch Vercel→localhost (Private Network Access),
+ * após alguns segundos redireciona direto para o handoff local (navegação
+ * same-tab não depende de CORS).
  */
 export default function PdvLaunchPage() {
   const [phase, setPhase] = useState<Phase>("session");
   const [detail, setDetail] = useState("Lendo sessão…");
   const [sessionRaw, setSessionRaw] = useState<string | null>(null);
 
-  const wakeAndWait = useCallback(async (session: string) => {
-    setPhase("waking");
-    setDetail("Pedindo ao PC do posto para subir as pontes…");
-
-    try {
-      await fetch(WAKE_URL, {
-        method: "POST",
-        mode: "cors",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-    } catch {
-      // Watchdog pode estar subindo; seguimos tentando o health do proxy.
-      setDetail(
-        "Não foi possível falar com o agente local (39200). Tentando o proxy…",
-      );
-    }
-
-    setPhase("waiting");
-    const started = Date.now();
-    while (Date.now() - started < MAX_WAIT_MS) {
-      setDetail("Aguardando proxy local (39199)…");
-      try {
-        const res = await fetch(HEALTH_URL, {
-          method: "GET",
-          mode: "cors",
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            ok?: boolean;
-          } | null;
-          if (body?.ok) {
-            setPhase("redirect");
-            setDetail("Abrindo PDV local…");
-            window.location.replace(
-              `${HANDOFF_BASE}#${encodeURIComponent(session)}`,
-            );
-            return;
-          }
-        }
-      } catch {
-        /* retry */
-      }
-      await new Promise((r) => window.setTimeout(r, POLL_MS));
-    }
-
-    setPhase("error");
-    setDetail(
-      "Proxy local não subiu a tempo. No PC do caixa rode: npm run posto:autostart (uma vez) ou npm run posto.",
+  const goHandoff = useCallback((session: string) => {
+    setPhase("redirect");
+    setDetail("Abrindo PDV local…");
+    window.location.replace(
+      `${HANDOFF_BASE}#${encodeURIComponent(session)}`,
     );
   }, []);
+
+  const wakeAndWait = useCallback(
+    async (session: string) => {
+      setPhase("waking");
+      setDetail("Pedindo ao PC do posto para subir as pontes…");
+
+      try {
+        await fetch(WAKE_URL, {
+          method: "POST",
+          mode: "cors",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+      } catch {
+        setDetail(
+          "Agente local (39200) offline. Tentando o proxy 39199…",
+        );
+      }
+
+      setPhase("waiting");
+      const started = Date.now();
+      let forced = false;
+
+      while (Date.now() - started < MAX_WAIT_MS) {
+        const elapsed = Date.now() - started;
+        setDetail(
+          forced
+            ? "Abrindo PDV local…"
+            : `Aguardando proxy local (39199)… (${Math.ceil(elapsed / 1000)}s)`,
+        );
+
+        // Após alguns segundos, navega direto (evita bloqueio CORS/PNA do Chrome).
+        if (!forced && elapsed >= FORCE_REDIRECT_AFTER_MS) {
+          forced = true;
+          goHandoff(session);
+          return;
+        }
+
+        try {
+          const res = await fetch(HEALTH_URL, {
+            method: "GET",
+            mode: "cors",
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const body = (await res.json().catch(() => null)) as {
+              ok?: boolean;
+            } | null;
+            if (body?.ok) {
+              goHandoff(session);
+              return;
+            }
+          }
+        } catch {
+          /* retry — comum se Chrome bloquear Private Network Access */
+        }
+        await new Promise((r) => window.setTimeout(r, POLL_MS));
+      }
+
+      // Última tentativa: abre o handoff mesmo assim (proxy pode estar no ar).
+      goHandoff(session);
+    },
+    [goHandoff],
+  );
 
   useEffect(() => {
     try {
@@ -131,7 +155,10 @@ export default function PdvLaunchPage() {
             >
               {`npm run posto:autostart
 # ou, manualmente:
-npm run posto`}
+npm run posto
+
+# PDV local direto:
+http://127.0.0.1:39199/pdv`}
             </pre>
             <button
               type="button"
@@ -153,6 +180,24 @@ npm run posto`}
               Tentar novamente
             </button>
           </div>
+        ) : null}
+        {phase === "waiting" && sessionRaw ? (
+          <button
+            type="button"
+            style={{
+              marginTop: 20,
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "1px solid #3b82f6",
+              background: "transparent",
+              color: "#93c5fd",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            onClick={() => goHandoff(sessionRaw)}
+          >
+            Abrir PDV agora
+          </button>
         ) : null}
       </div>
     </div>

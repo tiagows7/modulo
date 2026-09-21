@@ -11,7 +11,10 @@ function escapeHtml(value: string) {
 }
 
 function money(value: number) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  // toLocaleString usa NBSP/NNBSP entre R$ e o valor — térmica vira "?"
+  return value
+    .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    .replace(/[\u00a0\u202f\u2007\u2009]/g, ' ')
 }
 
 function formatChaveGroups(chave: string) {
