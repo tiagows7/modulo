@@ -23,6 +23,7 @@ type CustomerData = {
   address: string
   number: string
   city: string
+  municipioIbge: string
   neighborhood: string
   uf: string
   phone: string
@@ -45,6 +46,7 @@ const emptyCustomer: CustomerData = {
   address: '',
   number: '',
   city: '',
+  municipioIbge: '',
   neighborhood: '',
   uf: '',
   phone: '',
@@ -536,6 +538,7 @@ export function PagamentoPage() {
           number: customer.number,
           neighborhood: customer.neighborhood,
           city: customer.city,
+          municipioIbge: customer.municipioIbge,
           uf: customer.uf,
           phone: customer.phone,
           plate: customer.plate,
@@ -770,6 +773,7 @@ export function PagamentoPage() {
         number: data.number || prev.number,
         neighborhood: data.neighborhood || prev.neighborhood,
         city: data.city || prev.city,
+        municipioIbge: data.municipioIbge || prev.municipioIbge,
         uf: data.uf || prev.uf,
         phone: data.phone || prev.phone,
         stateRegistration: data.stateRegistration || prev.stateRegistration,

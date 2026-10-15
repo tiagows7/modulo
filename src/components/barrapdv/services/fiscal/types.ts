@@ -24,6 +24,8 @@ export type FiscalBuyer = {
   city?: string
   uf?: string
   phone?: string
+  /** Código IBGE (7 dígitos) do município — usado na NF-e. */
+  municipioIbge?: string
   plate?: string
   km?: string
   fleet?: string

@@ -2817,12 +2817,14 @@ button.chip.fullscreen-toggle:hover {
 
 .reimpressao-table th:nth-child(7),
 .reimpressao-table td:nth-child(7) {
-  width: 28%;
+  width: 96px;
 }
 
-.reimpressao-table th:nth-child(8),
-.reimpressao-table td:nth-child(8) {
-  width: 100px;
+/* Chave (8ª col. na reimpressão; na cancelamento a 8ª é o botão) */
+.reimpressao-table th:nth-child(8):not(:last-child),
+.reimpressao-table td:nth-child(8):not(:last-child) {
+  width: auto;
+  min-width: 220px;
 }
 
 .reimpressao-table td {

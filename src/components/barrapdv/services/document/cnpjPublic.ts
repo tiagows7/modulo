@@ -10,6 +10,8 @@ export type CnpjLookupResult = {
   number: string
   neighborhood: string
   city: string
+  /** Código IBGE do município (7 dígitos), quando a consulta devolver. */
+  municipioIbge: string
   uf: string
   cep: string
   stateRegistration: string
@@ -97,6 +99,9 @@ function parseCnpjResponse(
   const cidadeObj = (estabelecimento?.cidade as Record<string, unknown> | null) ?? null
   const ufSede = String(estado?.sigla ?? '').trim()
   const cidade = String(cidadeObj?.nome ?? '').trim()
+  const municipioIbge = String(
+    cidadeObj?.ibge_id ?? cidadeObj?.codigo_ibge ?? cidadeObj?.ibge ?? '',
+  ).replace(/\D/g, '')
 
   const tipoLogradouro = String(estabelecimento?.tipo_logradouro ?? '').trim()
   const logradouro = String(estabelecimento?.logradouro ?? '').trim()
@@ -127,6 +132,7 @@ function parseCnpjResponse(
     number: String(estabelecimento?.numero ?? '').trim(),
     neighborhood: String(estabelecimento?.bairro ?? '').trim(),
     city: cidade,
+    municipioIbge: municipioIbge.length === 7 ? municipioIbge : '',
     uf: ufIe || ufSede,
     cep,
     stateRegistration: ie,

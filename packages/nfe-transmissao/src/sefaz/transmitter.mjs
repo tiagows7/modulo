@@ -48,6 +48,8 @@ export function createSefazTransmitter(cert) {
         }
       }
 
+      const tipo = built.tipo === 'NF-e' ? 'NF-e' : 'NFC-e'
+      const modelo = tipo === 'NF-e' ? '55' : '65'
       const ret = await autorizarNfce({
         nfeXmlAssinado: nfeAssinado,
         uf: built.uf,
@@ -55,6 +57,7 @@ export function createSefazTransmitter(cert) {
         pfx: cert.pfx,
         passphrase: cert.passphrase,
         idLote: built.numero,
+        modelo,
       })
 
       const { emissao, hora, issuedAt } = nowParts(built.dhEmi)
@@ -71,8 +74,8 @@ export function createSefazTransmitter(cert) {
 
       const document = {
         id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        tipo: 'NFC-e',
-        modelo: '65',
+        tipo,
+        modelo,
         numero: built.numero,
         serie: built.serie,
         chave: ret.chave || built.chave,
@@ -96,7 +99,7 @@ export function createSefazTransmitter(cert) {
 
       if (status !== 'authorized') {
         const err = new Error(
-          `SEFAZ recusou a NFC-e (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}`,
+          `SEFAZ recusou a ${tipo} (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}`,
         )
         err.document = document
         err.sefaz = ret
@@ -105,7 +108,7 @@ export function createSefazTransmitter(cert) {
 
       return {
         document,
-        message: `NFC-e ${pad(built.numero, 6)} autorizada pela SEFAZ (prot. ${ret.protocolo || '—'}).`,
+        message: `${tipo} ${pad(built.numero, 6)} autorizada pela SEFAZ (prot. ${ret.protocolo || '—'}).`,
       }
     },
   }

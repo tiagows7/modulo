@@ -373,14 +373,14 @@ export function buildQrCodeUrl({
 }
 
 /**
- * Monta XML da NFC-e (modelo 65) sem assinatura.
- * Retorna { xmlInfNFe, chave, dhEmi, total }.
+ * Monta XML da NFC-e (modelo 65) ou NF-e (modelo 55) sem assinatura.
+ * CNPJ no destinatário → NF-e; CPF ou sem documento → NFC-e.
+ * Retorna { xmlInfNFe, chave, dhEmi, total, modelo }.
  */
 export function buildInfNFeXml(input) {
-  const tipo = input.tipo || 'NFC-e'
-  if (tipo !== 'NFC-e') {
-    throw new Error('Transmissor SEFAZ atual cobre NFC-e (modelo 65). NF-e ainda não implementada.')
-  }
+  const tipo = input.tipo === 'NF-e' ? 'NF-e' : 'NFC-e'
+  const isNfe = tipo === 'NF-e'
+  const modelo = isNfe ? '55' : '65'
 
   const emit = input.emitente || {}
   const cnpj = onlyDigits(emit.cnpj || '')
@@ -404,10 +404,16 @@ export function buildInfNFeXml(input) {
 
   const tokenId = onlyDigits(emit.tokenId || '')
   const tokenNfce = String(emit.tokenNfce || '').trim()
-  if (!tokenId || !tokenNfce) {
+  if (!isNfe && (!tokenId || !tokenNfce)) {
     throw new Error(
       'Token ID (idCSC) e Token NFC-e (CSC) da filial são obrigatórios.',
     )
+  }
+
+  const buyer = input.buyer || {}
+  const buyerDoc = onlyDigits(buyer.document || '')
+  if (isNfe && buyerDoc.length !== 14) {
+    throw new Error('NF-e exige CNPJ do destinatário (14 dígitos).')
   }
 
   const items = Array.isArray(input.items) ? input.items : []
@@ -425,12 +431,15 @@ export function buildInfNFeXml(input) {
     cUF,
     dhEmi,
     cnpj,
-    modelo: '65',
+    modelo,
     serie,
     numero,
     tpEmis: '1',
     cNF,
   })
+
+  const destUf = String(buyer.uf || uf).trim().toUpperCase() || uf
+  const idDest = destUf && destUf !== uf ? '2' : '1'
 
   const total =
     input.total != null
@@ -478,9 +487,12 @@ export function buildInfNFeXml(input) {
       }
       xProd = escapeXml(xProd)
       const ncm = onlyDigits(item.ncm || '00000000').padStart(8, '0').slice(0, 8)
-      const cfop = onlyDigits(
+      let cfop = onlyDigits(
         item.cfop || (item.kind === 'combustivel' ? '5656' : '5102'),
       ).slice(0, 4)
+      if (idDest === '2' && cfop.startsWith('5')) {
+        cfop = `6${cfop.slice(1)}`
+      }
       const gtin = digitoVerificadorGtin(item.gtin || item.codigo_barras || '')
       const cEAN = gtin || 'SEM GTIN'
       const cEANTrib = cEAN
@@ -544,22 +556,64 @@ export function buildInfNFeXml(input) {
           .join('')
       : `<detPag><tPag>01</tPag><vPag>${money(total)}</vPag></detPag>`
 
-  const buyerDoc = onlyDigits(input.buyer?.document || '')
+  const destIe = onlyDigits(buyer.ie || '')
+  const indIEDest = destIe ? '1' : '9'
+  const destNome =
+    isNfe && tpAmb === 2
+      ? 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
+      : escapeXml(buyer.name || (isNfe ? 'DESTINATARIO' : 'CONSUMIDOR'))
+  const destMun = onlyDigits(buyer.municipioIbge || '')
+  const destCMun =
+    destMun.length === 7 ? destMun : idDest === '1' ? cMun : ''
+  if (isNfe && destCMun.length !== 7) {
+    throw new Error(
+      'NF-e precisa do código IBGE do município do destinatário (consulte o CNPJ).',
+    )
+  }
+  const destXmlEnder = isNfe
+    ? [
+        `<enderDest>`,
+        `<xLgr>${escapeXml(buyer.address || emit.endereco || 'S/N')}</xLgr>`,
+        `<nro>${escapeXml(buyer.number || emit.numero || 'S/N')}</nro>`,
+        `<xBairro>${escapeXml(buyer.neighborhood || emit.bairro || 'CENTRO')}</xBairro>`,
+        `<cMun>${destCMun}</cMun>`,
+        `<xMun>${escapeXml(buyer.city || emit.cidade || 'MUNICIPIO')}</xMun>`,
+        `<UF>${destUf}</UF>`,
+        `<CEP>${onlyDigits(buyer.cep || emit.cep || '').padStart(8, '0').slice(0, 8)}</CEP>`,
+        `<cPais>1058</cPais>`,
+        `<xPais>BRASIL</xPais>`,
+        onlyDigits(buyer.phone || '').length >= 6
+          ? `<fone>${onlyDigits(buyer.phone).slice(0, 14)}</fone>`
+          : '',
+        `</enderDest>`,
+      ].join('')
+    : ''
   const dest =
     buyerDoc.length === 11
-      ? `<dest><CPF>${buyerDoc}</CPF><xNome>${escapeXml(input.buyer?.name || 'CONSUMIDOR')}</xNome><indIEDest>9</indIEDest></dest>`
+      ? `<dest><CPF>${buyerDoc}</CPF><xNome>${destNome}</xNome><indIEDest>9</indIEDest></dest>`
       : buyerDoc.length === 14
-        ? `<dest><CNPJ>${buyerDoc}</CNPJ><xNome>${escapeXml(input.buyer?.name || 'DESTINATARIO')}</xNome><indIEDest>9</indIEDest></dest>`
+        ? [
+            `<dest>`,
+            `<CNPJ>${buyerDoc}</CNPJ>`,
+            `<xNome>${isNfe && tpAmb === 2 ? destNome : escapeXml(buyer.name || 'DESTINATARIO')}</xNome>`,
+            destXmlEnder,
+            `<indIEDest>${indIEDest}</indIEDest>`,
+            destIe ? `<IE>${destIe}</IE>` : '',
+            buyer.email ? `<email>${escapeXml(buyer.email)}</email>` : '',
+            `</dest>`,
+          ].join('')
         : ''
 
-  const qrCode = buildQrCodeUrl({
-    uf,
-    tpAmb,
-    chave,
-    idCsc: tokenId,
-    csc: tokenNfce,
-  })
-  const urlChave = qrCode.split('?')[0]
+  const qrCode = isNfe
+    ? ''
+    : buildQrCodeUrl({
+        uf,
+        tpAmb,
+        chave,
+        idCsc: tokenId,
+        csc: tokenNfce,
+      })
+  const urlChave = qrCode ? qrCode.split('?')[0] : ''
 
   const ibscbsTot = temIbscbs
     ? [
@@ -609,19 +663,19 @@ export function buildInfNFeXml(input) {
     `<cUF>${cUF}</cUF>`,
     `<cNF>${cNF}</cNF>`,
     `<natOp>VENDA</natOp>`,
-    `<mod>65</mod>`,
+    `<mod>${modelo}</mod>`,
     `<serie>${serie}</serie>`,
     `<nNF>${numero}</nNF>`,
     `<dhEmi>${dhEmiIso}</dhEmi>`,
     `<tpNF>1</tpNF>`,
-    `<idDest>1</idDest>`,
+    `<idDest>${isNfe ? idDest : '1'}</idDest>`,
     `<cMunFG>${cMun}</cMun>`,
-    `<tpImp>4</tpImp>`,
+    `<tpImp>${isNfe ? '1' : '4'}</tpImp>`,
     `<tpEmis>1</tpEmis>`,
     `<cDV>${chave.slice(-1)}</cDV>`,
     `<tpAmb>${tpAmb}</tpAmb>`,
     `<finNFe>1</finNFe>`,
-    `<indFinal>1</indFinal>`,
+    `<indFinal>${isNfe && indIEDest === '1' ? '0' : '1'}</indFinal>`,
     `<indPres>1</indPres>`,
     `<procEmi>0</procEmi>`,
     `<verProc>ModuloPDV1.0</verProc>`,
@@ -683,12 +737,14 @@ export function buildInfNFeXml(input) {
     `</infNFe>`,
   ].join('')
 
-  const xmlInfNFeSupl = [
-    `<infNFeSupl>`,
-    `<qrCode>${escapeXml(qrCode)}</qrCode>`,
-    `<urlChave>${escapeXml(urlChave)}</urlChave>`,
-    `</infNFeSupl>`,
-  ].join('')
+  const xmlInfNFeSupl = isNfe
+    ? ''
+    : [
+        `<infNFeSupl>`,
+        `<qrCode>${escapeXml(qrCode)}</qrCode>`,
+        `<urlChave>${escapeXml(urlChave)}</urlChave>`,
+        `</infNFeSupl>`,
+      ].join('')
 
   return {
     chave,
@@ -697,6 +753,8 @@ export function buildInfNFeXml(input) {
     tpAmb,
     serie: String(serie),
     numero,
+    modelo,
+    tipo,
     cUF,
     uf,
     xmlInfNFe: infNFe,

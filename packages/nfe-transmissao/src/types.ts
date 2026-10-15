@@ -66,6 +66,8 @@ export type TransmitBuyer = {
   city?: string | null;
   uf?: string | null;
   phone?: string | null;
+  /** Código IBGE do município do destinatário (7 dígitos) — obrigatório na NF-e. */
+  municipioIbge?: string | null;
 };
 
 /**

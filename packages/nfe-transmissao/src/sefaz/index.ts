@@ -8,6 +8,7 @@ export { autorizarNfce } from "./autorizar.mjs";
 export {
   buildChaveAcesso,
   nfceAutorizacaoUrl,
+  nfeAutorizacaoUrl,
   onlyDigits,
   ufToIbge,
 } from "./utils.mjs";

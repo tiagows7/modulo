@@ -46,6 +46,7 @@ export {
   autorizarNfce,
   buildChaveAcesso,
   nfceAutorizacaoUrl,
+  nfeAutorizacaoUrl,
   onlyDigits,
   ufToIbge,
 } from "./sefaz/index";

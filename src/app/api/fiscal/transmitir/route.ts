@@ -111,7 +111,7 @@ export async function POST(req: Request) {
   const { data: filial, error: filialError } = await admin
     .from("filial")
     .select(
-      "id, cnpj, razao_social, fantasia, inscricao_estadual, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, cep, telefone, certificado_storage_path, certificado_senha, token_id, token_nfce, ambiente_nfce, tipo_empresa",
+      "id, cnpj, razao_social, fantasia, inscricao_estadual, endereco, endereco_numero, endereco_bairro, endereco_uf, endereco_cidade, cep, telefone, certificado_storage_path, certificado_senha, token_id, token_nfce, ambiente_nfce, ambiente_nfe, tipo_empresa",
     )
     .eq("id", filialId)
     .maybeSingle();
@@ -315,7 +315,11 @@ export async function POST(req: Request) {
       },
       ambiente:
         body.ambiente ??
-        (Number(filial.ambiente_nfce) === 1 ? 1 : 2),
+        (Number(
+          (body.tipo === "NF-e" ? filial.ambiente_nfe : filial.ambiente_nfce),
+        ) === 1
+          ? 1
+          : 2),
     };
 
     const transmitter = createSefazTransmitter({

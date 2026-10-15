@@ -190,6 +190,60 @@ export function nfceAutorizacaoUrl(uf, tpAmb) {
     : 'https://nfce.svrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
 }
 
+/**
+ * URLs do webservice NFeAutorizacao4 (NF-e modelo 55).
+ * Homologação e produção por UF (SVRS + principais autônomos).
+ */
+export function nfeAutorizacaoUrl(uf, tpAmb) {
+  const sigla = String(uf || '').trim().toUpperCase()
+  const homolog = tpAmb === 2
+
+  if (sigla === 'SP') {
+    return homolog
+      ? 'https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx'
+      : 'https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx'
+  }
+  if (sigla === 'MG') {
+    return homolog
+      ? 'https://hnfe.fazenda.mg.gov.br/nfe2/services/NFeAutorizacao4'
+      : 'https://nfe.fazenda.mg.gov.br/nfe2/services/NFeAutorizacao4'
+  }
+  if (sigla === 'PR') {
+    return homolog
+      ? 'https://homologacao.nfe.sefa.pr.gov.br/nfe/NFeAutorizacao4?wsdl'
+      : 'https://nfe.sefa.pr.gov.br/nfe/NFeAutorizacao4?wsdl'
+  }
+  if (sigla === 'BA') {
+    return homolog
+      ? 'https://hnfe.sefaz.ba.gov.br/webservices/NFeAutorizacao4/NFeAutorizacao4.asmx'
+      : 'https://nfe.sefaz.ba.gov.br/webservices/NFeAutorizacao4/NFeAutorizacao4.asmx'
+  }
+  if (sigla === 'GO') {
+    return homolog
+      ? 'https://homolog.sefaz.go.gov.br/nfe/services/NFeAutorizacao4?wsdl'
+      : 'https://nfe.sefaz.go.gov.br/nfe/services/NFeAutorizacao4?wsdl'
+  }
+  if (sigla === 'MT') {
+    return homolog
+      ? 'https://homologacao.sefaz.mt.gov.br/nfews/v2/services/NfeAutorizacao4'
+      : 'https://nfe.sefaz.mt.gov.br/nfews/v2/services/NfeAutorizacao4'
+  }
+  if (sigla === 'MS') {
+    return homolog
+      ? 'https://hom.nfe.sefaz.ms.gov.br/ws/NFeAutorizacao4'
+      : 'https://nfe.sefaz.ms.gov.br/ws/NFeAutorizacao4'
+  }
+  if (sigla === 'AM') {
+    return homolog
+      ? 'https://homnfe.sefaz.am.gov.br/services2/services/NfeAutorizacao4'
+      : 'https://nfe.sefaz.am.gov.br/services2/services/NfeAutorizacao4'
+  }
+
+  return homolog
+    ? 'https://nfe-homologacao.svrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
+    : 'https://nfe.svrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
+}
+
 export function nfceQrUrlBase(uf, tpAmb) {
   const sigla = String(uf || '').trim().toUpperCase()
   const homolog = tpAmb === 2

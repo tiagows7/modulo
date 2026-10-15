@@ -407,8 +407,9 @@ CRT da filial (`tipo_empresa` → 1/2/3) governa ICMS (CSOSN vs CST).
 
 ## 8) Limitações atuais
 
-- **NFC-e (65)** autorizada na SEFAZ via `emitirNfce` / `createSefazTransmitter`
-- **NF-e (55)** ainda usa mock / transmitter externo (`FiscalTransmitter`) — XML 55 não está no pacote
+- **NFC-e (65)** e **NF-e (55)** autorizadas na SEFAZ via `createSefazTransmitter`
+- CNPJ do destinatário → NF-e; CPF ou sem documento → NFC-e
+- `emitirNfce` continua só NFC-e; a NF-e entra por `transmitirDocumentoFiscal` + transmitter SEFAZ
 - Não envia e-mail/XML ao destinatário (fica no host)
 - Não imprime DANFE/cupom (host / ponte `:39102`)
 - Cancelamento SEFAZ (evento) ainda não está no pacote

@@ -1,5 +1,5 @@
 import https from 'node:https'
-import { nfceAutorizacaoUrl } from './utils.mjs'
+import { nfceAutorizacaoUrl, nfeAutorizacaoUrl } from './utils.mjs'
 
 function tag(xml, name) {
   const re = new RegExp(
@@ -92,6 +92,7 @@ export async function autorizarNfce({
   pfx,
   passphrase,
   idLote,
+  modelo,
 }) {
   const lote = String(idLote || Date.now()).slice(-15).padStart(15, '0')
   const enviNFe =
@@ -101,7 +102,8 @@ export async function autorizarNfce({
     nfeXmlAssinado +
     `</enviNFe>`
 
-  const url = nfceAutorizacaoUrl(uf, tpAmb)
+  const isNfe = String(modelo) === '55'
+  const url = isNfe ? nfeAutorizacaoUrl(uf, tpAmb) : nfceAutorizacaoUrl(uf, tpAmb)
   const soap = buildSoapAutorizacao(enviNFe)
   const responseXml = await httpsPostPfx({
     url,
