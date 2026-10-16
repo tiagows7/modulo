@@ -72,12 +72,14 @@ export async function carregarImpostosProdutos(
 
   for (const row of data ?? []) {
     const r = row as Record<string, unknown>
-    const ncmRel = one(r.produto_ncm as never)
-    const cfopRel = one(r.produto_cfop as never)
-    const icm = one(r.categorias_icm as never)
-    const pis = one(r.produto_piscofins as never)
-    const ibsCst = one(r.produto_ibscbs_cst as never)
-    const ibsClass = one(r.produto_ibscbs_classtrib as never)
+    const ncmRel = one(r.produto_ncm as Record<string, unknown> | null)
+    const cfopRel = one(r.produto_cfop as Record<string, unknown> | null)
+    const icm = one(r.categorias_icm as Record<string, unknown> | null)
+    const pis = one(r.produto_piscofins as Record<string, unknown> | null)
+    const ibsCst = one(r.produto_ibscbs_cst as Record<string, unknown> | null)
+    const ibsClass = one(
+      r.produto_ibscbs_classtrib as Record<string, unknown> | null,
+    )
 
     const ncm =
       ncmRel?.ibpt_ncm != null ? String(ncmRel.ibpt_ncm).replace(/\D/g, '') : null

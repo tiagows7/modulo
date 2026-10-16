@@ -1,30 +1,18 @@
 /**
- * Reexporta a rotina portátil de transmissão NFC-e / NF-e.
- * Prefira importar de `@/lib/nfe` ou `@modulo/nfe-transmissao`.
+ * Reexporta a API segura para o browser (mock + regras de modelo).
+ * Não puxa assinatura A1 / SEFAZ (node:module, forge, xml-crypto).
+ *
+ * Para APIs Node: importe de `@modulo/nfe-transmissao` ou `@/lib/nfe/transmissao-sefaz`.
  */
 export {
-  assinarNFeXml,
-  autorizarNfce,
-  buildChaveAcesso,
-  buildInfNFeXml,
-  buildQrCodeUrl,
   createMockTransmitter,
-  createSefazTransmitter,
   decidirTipoDocumento,
-  emitirNfce,
-  extractPfxPem,
-  hashCscQr,
   modeloCodigo,
   montarReceitasFromPayments,
-  nfceAutorizacaoUrl,
-  onlyDigits,
   onlyDigitsDoc,
   transmitirDocumentoFiscal,
-  transmitirNfce,
-  ufToIbge,
   type AmbienteSefaz,
   type DocumentoFiscalTransmitido,
-  type EmitirNfceInput,
   type FiscalTransmitter,
   type ModeloFiscal,
   type ReceitaFiscalLinha,
@@ -36,4 +24,4 @@ export {
   type TransmitirOptions,
   type TransmitirVendaInput,
   type TransmitirVendaResult,
-} from "@modulo/nfe-transmissao";
+} from "@modulo/nfe-transmissao/client";

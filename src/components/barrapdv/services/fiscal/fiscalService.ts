@@ -37,6 +37,7 @@ import {
   decidirTipoDocumento,
   transmitirDocumentoFiscal,
   type ReceitaFiscalLinha,
+  type TransmitItem,
 } from '@/lib/nfe/transmissao'
 import { normalizeAmbienteFiscal } from '@/lib/filialAmbienteFiscal'
 import { tipoEmpresaToCrt } from '@/lib/filialTipoEmpresa'
@@ -226,7 +227,7 @@ class FiscalService {
     let message: string
     let receitas: ReceitaFiscalLinha[] | undefined
 
-    let itemsTx = request.items.map((i) => ({
+    let itemsTx: TransmitItem[] = request.items.map((i) => ({
       id: i.id,
       name: i.name,
       qty: i.qty,

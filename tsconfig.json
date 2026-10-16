@@ -25,6 +25,9 @@
       ],
       "@modulo/nfe-transmissao": [
         "./packages/nfe-transmissao/src/index.ts"
+      ],
+      "@modulo/nfe-transmissao/client": [
+        "./packages/nfe-transmissao/src/client.ts"
       ]
     }
   },

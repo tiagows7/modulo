@@ -3,6 +3,9 @@
  *
  * - Distribuição DF-e (entrada): `@modulo/nfe-distribuicao-dfe`
  * - Transmissão NFC-e / NF-e (saída): `@modulo/nfe-transmissao`
+ *
+ * Browser: use `@/lib/nfe/transmissao` (client-safe).
+ * Node/API: use `@/lib/nfe/transmissao-sefaz` ou `@modulo/nfe-transmissao`.
  */
 export {
   consultarDistribuicaoDfe,
@@ -21,27 +24,14 @@ export {
 } from "./distribuicaoDfe";
 
 export {
-  assinarNFeXml,
-  autorizarNfce,
-  buildChaveAcesso,
-  buildInfNFeXml,
-  buildQrCodeUrl,
   createMockTransmitter,
-  createSefazTransmitter,
   decidirTipoDocumento,
-  emitirNfce,
-  extractPfxPem,
-  hashCscQr,
   modeloCodigo,
   montarReceitasFromPayments,
-  nfceAutorizacaoUrl,
-  onlyDigits,
   onlyDigitsDoc,
   transmitirDocumentoFiscal,
-  transmitirNfce,
   type AmbienteSefaz,
   type DocumentoFiscalTransmitido,
-  type EmitirNfceInput,
   type FiscalTransmitter,
   type ModeloFiscal,
   type ReceitaFiscalLinha,
@@ -54,6 +44,23 @@ export {
   type TransmitirVendaInput,
   type TransmitirVendaResult,
 } from "./transmissao";
+
+export {
+  assinarNFeXml,
+  autorizarNfce,
+  buildChaveAcesso,
+  buildInfNFeXml,
+  buildQrCodeUrl,
+  createSefazTransmitter,
+  emitirNfce,
+  extractPfxPem,
+  hashCscQr,
+  nfceAutorizacaoUrl,
+  nfeAutorizacaoUrl,
+  onlyDigits,
+  transmitirNfce,
+  type EmitirNfceInput,
+} from "./transmissao-sefaz";
 
 export {
   parseNfeXml,
