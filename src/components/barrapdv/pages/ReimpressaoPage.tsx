@@ -220,8 +220,8 @@ export function ReimpressaoPage() {
                       </td>
                       <td>{doc.cliente}</td>
                       <td style={{ fontWeight: 700 }}>{formatCurrency(doc.valor)}</td>
-                      <td>{situacao}</td>
-                      <td>
+                      <td className="col-situacao">{situacao}</td>
+                      <td className="col-chave">
                         <code className="abastecidas-cbc-id">{doc.chave}</code>
                       </td>
                       <td>

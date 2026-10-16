@@ -2810,21 +2810,32 @@ button.chip.fullscreen-toggle:hover {
   width: 120px;
 }
 
+.reimpressao-table th:nth-child(5),
+.reimpressao-table td:nth-child(5) {
+  width: 140px;
+}
+
 .reimpressao-table th:nth-child(6),
 .reimpressao-table td:nth-child(6) {
   width: 96px;
 }
 
 .reimpressao-table th:nth-child(7),
-.reimpressao-table td:nth-child(7) {
-  width: 96px;
+.reimpressao-table td:nth-child(7),
+.reimpressao-table .col-situacao {
+  width: 88px;
 }
 
 /* Chave (8ª col. na reimpressão; na cancelamento a 8ª é o botão) */
 .reimpressao-table th:nth-child(8):not(:last-child),
-.reimpressao-table td:nth-child(8):not(:last-child) {
-  width: auto;
-  min-width: 220px;
+.reimpressao-table td:nth-child(8):not(:last-child),
+.reimpressao-table .col-chave {
+  width: 32%;
+}
+
+.reimpressao-table th:last-child,
+.reimpressao-table td:last-child {
+  width: 88px;
 }
 
 .reimpressao-table td {
