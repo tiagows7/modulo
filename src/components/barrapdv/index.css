@@ -2807,7 +2807,11 @@ button.chip.fullscreen-toggle:hover {
 
 .reimpressao-table th:nth-child(4),
 .reimpressao-table td:nth-child(4) {
-  width: 158px;
+  width: 138px;
+}
+
+.reimpressao-table td:nth-child(4) {
+  font-size: 0.68rem;
 }
 
 .reimpressao-table th:nth-child(5),
@@ -2830,7 +2834,7 @@ button.chip.fullscreen-toggle:hover {
 .reimpressao-table th:nth-child(8):not(:last-child),
 .reimpressao-table td:nth-child(8):not(:last-child),
 .reimpressao-table .col-chave {
-  width: 26%;
+  width: 30%;
 }
 
 .reimpressao-table th:last-child,
