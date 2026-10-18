@@ -2807,7 +2807,7 @@ button.chip.fullscreen-toggle:hover {
 
 .reimpressao-table th:nth-child(4),
 .reimpressao-table td:nth-child(4) {
-  width: 120px;
+  width: 158px;
 }
 
 .reimpressao-table th:nth-child(5),
@@ -2830,7 +2830,7 @@ button.chip.fullscreen-toggle:hover {
 .reimpressao-table th:nth-child(8):not(:last-child),
 .reimpressao-table td:nth-child(8):not(:last-child),
 .reimpressao-table .col-chave {
-  width: 32%;
+  width: 26%;
 }
 
 .reimpressao-table th:last-child,
