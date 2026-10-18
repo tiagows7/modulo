@@ -2823,7 +2823,7 @@ button.chip.fullscreen-toggle:hover {
 .reimpressao-table th:nth-child(7),
 .reimpressao-table td:nth-child(7),
 .reimpressao-table .col-situacao {
-  width: 88px;
+  width: 108px;
 }
 
 /* Chave (8ª col. na reimpressão; na cancelamento a 8ª é o botão) */
