@@ -27,8 +27,27 @@ function nowParts(d = new Date()) {
   return { emissao, hora, issuedAt: d.toISOString() }
 }
 
+const UF_IBGE: Record<string, string> = {
+  AC: '12', AL: '27', AP: '16', AM: '13', BA: '29', CE: '23', DF: '53',
+  ES: '32', GO: '52', MA: '21', MT: '51', MS: '50', MG: '31', PA: '15',
+  PB: '25', PR: '41', PE: '26', PI: '22', RJ: '33', RN: '24', RS: '43',
+  RO: '11', RR: '14', SC: '42', SP: '35', SE: '28', TO: '17',
+}
+
+function mod11Chave(base43: string) {
+  let sum = 0
+  let weight = 2
+  for (let i = base43.length - 1; i >= 0; i -= 1) {
+    sum += Number(base43[i]) * weight
+    weight = weight === 9 ? 2 : weight + 1
+  }
+  const rest = sum % 11
+  return String(rest === 0 || rest === 1 ? 0 : 11 - rest)
+}
+
 function buildChave(tipo: FiscalDocTipo, numero: number) {
-  const uf = '35'
+  const ufSigla = String(FISCAL_CONFIG.emitter.uf || 'SP').trim().toUpperCase()
+  const uf = UF_IBGE[ufSigla] || (/^\d{2}$/.test(ufSigla) ? ufSigla : '35')
   const aamm = (() => {
     const d = new Date()
     return `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1, 2)}`
@@ -40,8 +59,7 @@ function buildChave(tipo: FiscalDocTipo, numero: number) {
   const tpEmis = '1'
   const cNF = pad(Math.floor(Math.random() * 1e8), 8)
   const base = `${uf}${aamm}${cnpj}${mod}${serie}${nNF}${tpEmis}${cNF}`
-  const dv = String(base.split('').reduce((s, c) => s + Number(c), 0) % 10)
-  return `${base}${dv}`
+  return `${base}${mod11Chave(base)}`
 }
 
 const seedItems = (name: string, valor: number): CartItem[] => [

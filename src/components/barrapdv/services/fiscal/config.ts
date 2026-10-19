@@ -9,7 +9,7 @@ export const FISCAL_CONFIG = {
    *
    * Para produção/homologação real: mode: 'live' + .pfx, CSC e IE na filial.
    */
-  mode: 'mock' as 'mock' | 'live',
+  mode: 'live' as 'mock' | 'live',
   bridgeUrl: 'http://127.0.0.1:39102',
   /**
    * true = envia ESC/POS RAW pela ponte :39102 (sem diálogo do Windows),

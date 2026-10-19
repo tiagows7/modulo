@@ -1,18 +1,14 @@
 import { modeloCodigo } from "./decidirTipo";
+import { buildChaveAcesso, ufToIbge } from "./sefaz/utils.mjs";
 import type {
   AmbienteSefaz,
   DocumentoFiscalTransmitido,
   FiscalTransmitter,
-  ModeloFiscal,
   TransmitirVendaInput,
 } from "./types";
 
 function pad(n: number, size: number) {
   return String(n).padStart(size, "0");
-}
-
-function onlyDigits(value: string) {
-  return value.replace(/\D/g, "");
 }
 
 function roundMoney(value: number) {
@@ -28,41 +24,23 @@ function nowParts(d = new Date()) {
   return { emissao, hora, issuedAt: d.toISOString() };
 }
 
-function buildChaveMock(
-  tipo: ModeloFiscal,
-  numero: number,
-  serie: string,
-  cnpjEmit: string,
-  ufIbge = "35",
-) {
-  const d = new Date();
-  const aamm = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1, 2)}`;
-  const cnpj = onlyDigits(cnpjEmit).padStart(14, "0").slice(0, 14);
-  const mod = modeloCodigo(tipo);
-  const seriePad = pad(Number(serie) || 1, 3);
-  const nNF = pad(numero, 9);
-  const tpEmis = "1";
-  const cNF = pad(Math.floor(Math.random() * 1e8), 8);
-  const base = `${ufIbge}${aamm}${cnpj}${mod}${seriePad}${nNF}${tpEmis}${cNF}`;
-  const dv = String(base.split("").reduce((s, c) => s + Number(c), 0) % 10);
-  return `${base}${dv}`;
-}
-
 let seqNfce = 1000;
 let seqNfe = 100;
 
 /**
  * Transmissor mock (sem SEFAZ) — útil em PDV, testes e outros projetos
  * até plugar ACBr / ponte live.
+ *
+ * A chave usa CNPJ/UF da filial (emitente) e DV mod-11, igual à SEFAZ.
  */
 export function createMockTransmitter(): FiscalTransmitter {
   return {
-    async transmit(input) {
+    async transmit(input: TransmitirVendaInput) {
       if (!input.items?.length) {
         throw new Error("Informe ao menos um item para transmitir a nota.");
       }
 
-      const tipo = input.tipo;
+      const tipo = input.tipo === "NF-e" ? "NF-e" : "NFC-e";
       const total =
         input.total != null
           ? roundMoney(input.total)
@@ -80,8 +58,23 @@ export function createMockTransmitter(): FiscalTransmitter {
       const serie = String(input.serie || "1");
       const ambiente: AmbienteSefaz = input.ambiente === 1 ? 1 : 2;
       const { emissao, hora, issuedAt } = nowParts();
+      const dhEmi = new Date();
       const cnpjEmit = input.emitente?.cnpj || "00000000000000";
-      const chave = buildChaveMock(tipo, numero, serie, cnpjEmit);
+      const cUF =
+        ufToIbge(input.emitente?.uf) ||
+        ufToIbge("SP") ||
+        "35";
+      const modelo = modeloCodigo(tipo);
+      const chave = buildChaveAcesso({
+        cUF,
+        dhEmi,
+        cnpj: cnpjEmit,
+        modelo,
+        serie,
+        numero,
+        tpEmis: "1",
+        cNF: Math.floor(Math.random() * 1e8),
+      });
       const cliente =
         input.buyer?.name?.trim() ||
         input.buyer?.customerCode?.trim() ||
@@ -90,7 +83,7 @@ export function createMockTransmitter(): FiscalTransmitter {
       const document: DocumentoFiscalTransmitido = {
         id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         tipo,
-        modelo: modeloCodigo(tipo),
+        modelo,
         numero,
         serie,
         chave,
