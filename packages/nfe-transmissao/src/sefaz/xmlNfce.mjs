@@ -191,11 +191,12 @@ function defaultAliqIbscbs(item) {
     const n = Number(v)
     return Number.isFinite(n) ? n : null
   }
+  // Padrão alinhado ao ACBr Delphi (período de transição RTC): IBS-UF 0,1% · CBS 0,9%
   return {
     pIbsUf:
       item.pIbsUf != null && item.pIbsUf !== ''
         ? Number(item.pIbsUf)
-        : envNum('NFCE_P_IBS_UF') ?? 0,
+        : envNum('NFCE_P_IBS_UF') ?? 0.1,
     pIbsMun:
       item.pIbsMun != null && item.pIbsMun !== ''
         ? Number(item.pIbsMun)
@@ -203,7 +204,7 @@ function defaultAliqIbscbs(item) {
     pCbs:
       item.pCbs != null && item.pCbs !== ''
         ? Number(item.pCbs)
-        : envNum('NFCE_P_CBS') ?? 0,
+        : envNum('NFCE_P_CBS') ?? 0.9,
   }
 }
 
@@ -225,7 +226,11 @@ export function shouldEmitIbscbs(_tpAmb, _now = new Date()) {
  * Monta grupo IBSCBS (NT 2025.002) a partir do cadastro do produto.
  * Se o produto não tiver CST/cClassTrib, retorna vazio.
  */
-function buildIbscbsXml(item, vProd) {
+/**
+ * extras (igual ACBr Delphi): vDesc, vOutro, vPis, vCofins, vIcms, vFcp
+ * BC = vProd + frete + seg + outro - desc - PIS - COFINS - ICMS - FCP
+ */
+function buildIbscbsXml(item, vProd, extras = {}) {
   // sem cadastro IBS/CBS no produto → não emite o grupo
   if (!item.cstIbscbs && !item.cClassTrib) {
     return {
@@ -294,6 +299,16 @@ function buildIbscbsXml(item, vProd) {
     }
   }
 
+  const vDesc = Number(extras.vDesc) || 0
+  const vOutro = Number(extras.vOutro) || 0
+  const vPis = Number(extras.vPis) || 0
+  const vCofins = Number(extras.vCofins) || 0
+  const vIcms = Number(extras.vIcms) || 0
+  const vFcp = Number(extras.vFcp) || 0
+  const vBC = roundMoney(
+    Math.max(0, vProd + vOutro - vDesc - vPis - vCofins - vIcms - vFcp),
+  )
+
   const { pIbsUf, pIbsMun, pCbs } = defaultAliqIbscbs(item)
   const pRedIbs = Number(item.pRedIbs) || 0
   const pRedCbs = Number(item.pRedCbs) || 0
@@ -307,10 +322,10 @@ function buildIbscbsXml(item, vProd) {
     usaRed && pRedIbs > 0 ? aliqEfet(pIbsMun, pRedIbs) : pIbsMun
   const pCbsEfet = usaRed && pRedCbs > 0 ? aliqEfet(pCbs, pRedCbs) : pCbs
 
-  const vIbsUf = roundMoney((vProd * pIbsUfEfet) / 100)
-  const vIbsMun = roundMoney((vProd * pIbsMunEfet) / 100)
+  const vIbsUf = roundMoney((vBC * pIbsUfEfet) / 100)
+  const vIbsMun = roundMoney((vBC * pIbsMunEfet) / 100)
   const vIbs = roundMoney(vIbsUf + vIbsMun)
-  const vCbs = roundMoney((vProd * pCbsEfet) / 100)
+  const vCbs = roundMoney((vBC * pCbsEfet) / 100)
 
   const gRedIbs =
     usaRed && pRedIbs > 0
@@ -331,7 +346,7 @@ function buildIbscbsXml(item, vProd) {
       `<CST>${cstOut}</CST>`,
       `<cClassTrib>${classOut}</cClassTrib>`,
       `<gIBSCBS>`,
-      `<vBC>${money(vProd)}</vBC>`,
+      `<vBC>${money(vBC)}</vBC>`,
       `<gIBSUF>`,
       `<pIBSUF>${rate(pIbsUf)}</pIBSUF>`,
       gRedIbs,
@@ -351,7 +366,7 @@ function buildIbscbsXml(item, vProd) {
       `</gIBSCBS>`,
       `</IBSCBS>`,
     ].join(''),
-    vBC: vProd,
+    vBC,
     vIbsUf,
     vIbsMun,
     vIbs,
@@ -512,7 +527,14 @@ export function buildInfNFeXml(input) {
       const icmsVal = calcIcmsItem(item, crt, vProd)
       const pisCofins = buildPisCofinsXml(item, vProd)
       const ibscbs = emitirIbscbs
-        ? buildIbscbsXml(item, vProd)
+        ? buildIbscbsXml(item, vProd, {
+            vDesc,
+            vOutro: 0,
+            vPis: pisCofins.vPis,
+            vCofins: pisCofins.vCofins,
+            vIcms: icmsVal.vIcms,
+            vFcp: 0,
+          })
         : {
             xml: '',
             vBC: 0,
@@ -700,6 +722,8 @@ export function buildInfNFeXml(input) {
     `<finNFe>1</finNFe>`,
     `<indFinal>${isNfe && indIEDest === '1' ? '0' : '1'}</indFinal>`,
     `<indPres>1</indPres>`,
+    // ACBr Delphi: iiSemOperacao — obrigatório no leiaute atual
+    `<indIntermed>0</indIntermed>`,
     `<procEmi>0</procEmi>`,
     `<verProc>ModuloPDV1.0</verProc>`,
     `</ide>`,
@@ -747,6 +771,10 @@ export function buildInfNFeXml(input) {
     `<vNF>${money(total)}</vNF>`,
     `</ICMSTot>`,
     ibscbsTot,
+    // ACBr Delphi: Total.vNFTot := vNF + IBS + CBS
+    temIbscbs
+      ? `<vNFTot>${money(total + somaVIbs + somaVCbs)}</vNFTot>`
+      : '',
     `</total>`,
     `<transp><modFrete>9</modFrete></transp>`,
     `<pag>${detPag}</pag>`,
