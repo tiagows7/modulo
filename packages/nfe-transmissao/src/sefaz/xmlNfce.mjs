@@ -208,28 +208,17 @@ function defaultAliqIbscbs(item) {
 }
 
 /**
- * IBS/CBS (NT 2025.002) — ENCAT adiou ativação do schema:
- * homologação 26/10/2026 · produção 16/11/2026.
- * Emitir antes disso gera rejeição 225 (schema) em várias SEFAZ.
- * Force com NFE_EMITIR_IBSCBS=1 ou desligue com =0.
+ * IBS/CBS (NT 2025.002) — padrão: emitir quando o produto tiver CST/cClassTrib.
+ * Desligar com NFE_EMITIR_IBSCBS=0 (ou NFCE_EMITIR_IBSCBS=0).
  */
-export function shouldEmitIbscbs(tpAmb, now = new Date()) {
+export function shouldEmitIbscbs(_tpAmb, _now = new Date()) {
   const force = String(
     process.env.NFE_EMITIR_IBSCBS || process.env.NFCE_EMITIR_IBSCBS || '',
   )
     .trim()
     .toLowerCase()
   if (force === '0' || force === 'false' || force === 'off') return false
-  if (force === '1' || force === 'true' || force === 'on') return true
-
-  const y = now.getUTCFullYear()
-  const m = now.getUTCMonth() + 1
-  const d = now.getUTCDate()
-  const ymd = y * 10000 + m * 100 + d
-  // Homologação (tpAmb=2): a partir de 2026-10-26
-  // Produção (tpAmb=1): a partir de 2026-11-16
-  if (tpAmb === 1) return ymd >= 20261116
-  return ymd >= 20261026
+  return true
 }
 
 /**
