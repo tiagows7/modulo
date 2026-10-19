@@ -187,10 +187,10 @@ class FiscalService {
               row.fantasia != null ? String(row.fantasia) : emitente.fantasia,
             uf:
               row.endereco_uf != null ? String(row.endereco_uf) : emitente.uf,
-            municipioIbge:
-              row.endereco_cidade != null
-                ? String(row.endereco_cidade).replace(/\D/g, '').padStart(7, '0')
-                : null,
+            municipioIbge: (() => {
+              const dig = String(row.endereco_cidade ?? '').replace(/\D/g, '')
+              return dig.length === 7 ? dig : null
+            })(),
             cidade: emitente.cidade,
             endereco:
               row.endereco != null ? String(row.endereco) : emitente.endereco,

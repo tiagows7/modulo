@@ -137,10 +137,29 @@ export async function POST(req: Request) {
     );
     assertValidPfx(pfx, String(filial.certificado_senha));
 
-    const municipioIbge =
-      filial.endereco_cidade != null
-        ? String(filial.endereco_cidade).replace(/\D/g, "").padStart(7, "0")
-        : "";
+    const municipioDigits = String(filial.endereco_cidade ?? "").replace(
+      /\D/g,
+      "",
+    );
+    if (municipioDigits.length !== 7) {
+      return jsonError(
+        "Cidade da filial sem código IBGE válido (7 dígitos). Abra Cadastros → Filiais e selecione a cidade novamente.",
+        400,
+      );
+    }
+    const municipioIbge = municipioDigits;
+
+    let cidadeNome =
+      body.emitente?.cidade != null ? String(body.emitente.cidade).trim() : "";
+    if (!cidadeNome) {
+      const { data: cidadeRow } = await admin
+        .from("cidades")
+        .select("descricao")
+        .eq("codigo", municipioIbge)
+        .maybeSingle();
+      cidadeNome =
+        cidadeRow?.descricao != null ? String(cidadeRow.descricao).trim() : "";
+    }
 
     const crt = tipoEmpresaToCrt(
       filial.tipo_empresa != null ? String(filial.tipo_empresa) : null,
@@ -299,7 +318,7 @@ export async function POST(req: Request) {
         fantasia: filial.fantasia,
         uf: filial.endereco_uf,
         municipioIbge,
-        cidade: body.emitente?.cidade || undefined,
+        cidade: cidadeNome || undefined,
         endereco: filial.endereco,
         numero: filial.endereco_numero,
         bairro: filial.endereco_bairro,

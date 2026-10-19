@@ -89,6 +89,31 @@ export function ibgeToUf(cUF) {
   return ''
 }
 
+/**
+ * Código IBGE do município (7 dígitos). Não completa com zeros à esquerda —
+ * isso gera cMunFG inválido e a SEFAZ rejeita com 225 (schema).
+ */
+export function normalizeMunicipioIbge(value, cUF) {
+  const digits = onlyDigits(value)
+  if (digits.length !== 7) {
+    throw new Error(
+      'Código IBGE do município do emitente inválido (precisa ter 7 dígitos). Confira a cidade da filial.',
+    )
+  }
+  if (digits === '0000000') {
+    throw new Error(
+      'Código IBGE do município do emitente não informado. Selecione a cidade na filial.',
+    )
+  }
+  const ufCode = onlyDigits(cUF).padStart(2, '0').slice(0, 2)
+  if (ufCode && digits.slice(0, 2) !== ufCode) {
+    throw new Error(
+      `Município IBGE ${digits} não pertence à UF do emitente (cUF ${ufCode}). Ajuste UF/cidade na filial.`,
+    )
+  }
+  return digits
+}
+
 export function mod11Chave(base43) {
   let sum = 0
   let weight = 2

@@ -5,6 +5,7 @@ import {
   ibgeToUf,
   money,
   nfceQrUrlBase,
+  normalizeMunicipioIbge,
   onlyDigits,
   pad,
   roundMoney,
@@ -392,12 +393,7 @@ export function buildInfNFeXml(input) {
   const cUF = ufToIbge(uf)
   if (!cUF) throw new Error(`UF do emitente inválida: ${uf}`)
 
-  const cMun = onlyDigits(emit.municipioIbge || '')
-  if (cMun.length !== 7) {
-    throw new Error(
-      'Informe o código IBGE do município do emitente (7 dígitos) na filial.',
-    )
-  }
+  const cMun = normalizeMunicipioIbge(emit.municipioIbge, cUF)
 
   const ie = onlyDigits(emit.ie || '')
   if (!ie) throw new Error('IE do emitente é obrigatória para NFC-e.')

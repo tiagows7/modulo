@@ -9,6 +9,7 @@ export {
   buildChaveAcesso,
   nfceAutorizacaoUrl,
   nfeAutorizacaoUrl,
+  normalizeMunicipioIbge,
   onlyDigits,
   ufToIbge,
 } from "./utils.mjs";
