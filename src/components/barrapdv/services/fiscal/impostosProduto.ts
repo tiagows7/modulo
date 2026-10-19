@@ -20,10 +20,16 @@ export type ImpostoProduto = {
   pRedIbs?: number | null
   pRedCbs?: number | null
   pMono?: number | null
+  gtin?: string | null
+  cest?: string | null
+  cProdANP?: string | null
+  descANP?: string | null
+  pIbptNac?: number | null
+  pIbptEst?: number | null
 }
 
 /**
- * Carrega NCM, CFOP, ICMS, PIS/COFINS e IBS/CBS dos produtos do cadastro.
+ * Carrega NCM, CFOP, ICMS, PIS/COFINS, IBS/CBS, CEST, ANP e IBPT dos produtos.
  * Chave = id do produto (UUID).
  */
 export async function carregarImpostosProdutos(
@@ -38,9 +44,12 @@ export async function carregarImpostosProdutos(
     .select(
       `
       id,
+      codigo_barras,
       aliquota_monofasica,
-      produto_ncm ( ibpt_ncm ),
+      produto_ncm ( ibpt_ncm, ibpt_aliq_nac, ibpt_aliq_est ),
       produto_cfop ( codigo ),
+      produto_cest ( codigo ),
+      produto_anp ( codigo, descricao ),
       categorias_icm (
         csosn,
         cst_icms,
@@ -74,6 +83,8 @@ export async function carregarImpostosProdutos(
     const r = row as Record<string, unknown>
     const ncmRel = one(r.produto_ncm as Record<string, unknown> | null)
     const cfopRel = one(r.produto_cfop as Record<string, unknown> | null)
+    const cestRel = one(r.produto_cest as Record<string, unknown> | null)
+    const anpRel = one(r.produto_anp as Record<string, unknown> | null)
     const icm = one(r.categorias_icm as Record<string, unknown> | null)
     const pis = one(r.produto_piscofins as Record<string, unknown> | null)
     const ibsCst = one(r.produto_ibscbs_cst as Record<string, unknown> | null)
@@ -87,6 +98,18 @@ export async function carregarImpostosProdutos(
       cfopRel?.codigo != null ? String(cfopRel.codigo).replace(/\D/g, '') : null
     const cfopCat =
       icm?.cfop_estado != null ? String(icm.cfop_estado).replace(/\D/g, '') : null
+    const cest =
+      cestRel?.codigo != null
+        ? String(cestRel.codigo).replace(/\D/g, '').slice(0, 7)
+        : null
+    const cProdANP =
+      anpRel?.codigo != null
+        ? String(anpRel.codigo).replace(/\D/g, '').slice(0, 9)
+        : null
+    const gtin =
+      r.codigo_barras != null
+        ? String(r.codigo_barras).replace(/\D/g, '')
+        : null
 
     map.set(String(r.id), {
       ncm: ncm || null,
@@ -117,6 +140,15 @@ export async function carregarImpostosProdutos(
       pRedCbs: ibsClass?.red_cbs != null ? Number(ibsClass.red_cbs) : null,
       pMono:
         r.aliquota_monofasica != null ? Number(r.aliquota_monofasica) : null,
+      gtin: gtin && gtin.length >= 8 ? gtin : null,
+      cest: cest && cest.length >= 7 ? cest.padStart(7, '0').slice(0, 7) : null,
+      cProdANP: cProdANP || null,
+      descANP:
+        anpRel?.descricao != null ? String(anpRel.descricao).slice(0, 95) : null,
+      pIbptNac:
+        ncmRel?.ibpt_aliq_nac != null ? Number(ncmRel.ibpt_aliq_nac) : null,
+      pIbptEst:
+        ncmRel?.ibpt_aliq_est != null ? Number(ncmRel.ibpt_aliq_est) : null,
     })
   }
 
@@ -156,5 +188,12 @@ export function aplicarImpostoNoItem(
     pRedIbs: item.pRedIbs ?? imposto.pRedIbs,
     pRedCbs: item.pRedCbs ?? imposto.pRedCbs,
     pMono: item.pMono ?? imposto.pMono,
+    gtin: item.gtin || item.codigo_barras || imposto.gtin || undefined,
+    codigo_barras: item.codigo_barras || imposto.gtin || undefined,
+    cest: item.cest || imposto.cest || undefined,
+    cProdANP: item.cProdANP || imposto.cProdANP || undefined,
+    descANP: item.descANP || imposto.descANP || undefined,
+    pIbptNac: item.pIbptNac ?? imposto.pIbptNac,
+    pIbptEst: item.pIbptEst ?? imposto.pIbptEst,
   }
 }

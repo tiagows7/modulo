@@ -48,8 +48,25 @@ export type TransmitItem = {
   pIbsUf?: number | null;
   pIbsMun?: number | null;
   pCbs?: number | null;
-  /** Alíquota monofásica % (quando aplicável) */
+  /**
+   * Alíquota monofásica ICMS (adRem — R$/unidade, como no ACBr).
+   * Também usada no IBS mono quando indGibscbsMono=1 (% sobre vProd).
+   */
   pMono?: number | null;
+  /** Código de barras / GTIN */
+  gtin?: string | null;
+  codigo_barras?: string | null;
+  /** CEST (7 dígitos) */
+  cest?: string | null;
+  /** Código ANP (combustível) */
+  cProdANP?: string | null;
+  /** Descrição ANP */
+  descANP?: string | null;
+  /** Alíquotas IBPT % (lei da transparência → vTotTrib) */
+  pIbptNac?: number | null;
+  pIbptEst?: number | null;
+  /** vTotTrib já calculado (opcional) */
+  vTotTrib?: number | null;
   pumpId?: string | number;
 };
 

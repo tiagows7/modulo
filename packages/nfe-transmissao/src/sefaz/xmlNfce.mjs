@@ -42,11 +42,36 @@ function resolveCrt(emit) {
   return 1
 }
 
-function buildIcmsXml(item, crt, vProd) {
+/** ICMS monofásico retido (adRem R$/unidade × quantidade), como no ACBr. */
+function calcMonoRet(item, qCom) {
+  const adRem = Number(item.pMono) || 0
+  if (adRem <= 0) return null
+  const q = Number(qCom) || 0
+  return {
+    qBCMonoRet: q,
+    adRemICMSRet: adRem,
+    vICMSMonoRet: roundMoney(q * adRem),
+  }
+}
+
+function buildIcmsXml(item, crt, vProd, qCom = 0) {
   const orig = onlyDigits(item.origem ?? '0').slice(0, 1) || '0'
   const simples = crt === 1 || crt === 2
+  const mono = calcMonoRet(item, qCom)
 
   if (simples) {
+    // Monofásico retido → ICMSSN500 com qBCMonoRet / adRem / vICMSMonoRet
+    if (mono) {
+      return [
+        `<ICMS><ICMSSN500>`,
+        `<orig>${orig}</orig>`,
+        `<CSOSN>500</CSOSN>`,
+        `<qBCMonoRet>${mono.qBCMonoRet.toFixed(4)}</qBCMonoRet>`,
+        `<adRemICMSRet>${money(mono.adRemICMSRet)}</adRemICMSRet>`,
+        `<vICMSMonoRet>${money(mono.vICMSMonoRet)}</vICMSMonoRet>`,
+        `</ICMSSN500></ICMS>`,
+      ].join('')
+    }
     const csosn = onlyDigits(item.csosn || '102').padStart(3, '0').slice(0, 3)
     if (csosn === '101') {
       const pCred = Number(item.pIcms) || 0
@@ -71,7 +96,19 @@ function buildIcmsXml(item, crt, vProd) {
     return `<ICMS><ICMSSN102><orig>${orig}</orig><CSOSN>${csosnOut}</CSOSN></ICMSSN102></ICMS>`
   }
 
-  // Regime Normal
+  // Regime Normal — CST 61 / alíquota monofásica
+  if (mono) {
+    return [
+      `<ICMS><ICMS61>`,
+      `<orig>${orig}</orig>`,
+      `<CST>61</CST>`,
+      `<qBCMonoRet>${mono.qBCMonoRet.toFixed(4)}</qBCMonoRet>`,
+      `<adRemICMSRet>${money(mono.adRemICMSRet)}</adRemICMSRet>`,
+      `<vICMSMonoRet>${money(mono.vICMSMonoRet)}</vICMSMonoRet>`,
+      `</ICMS61></ICMS>`,
+    ].join('')
+  }
+
   const cst = onlyDigits(item.cstIcms || '00').padStart(2, '0').slice(0, 2)
   const pIcms = Number(item.pIcms) || 0
   const pRed = Number(item.pRedBc) || 0
@@ -113,16 +150,34 @@ function buildIcmsXml(item, crt, vProd) {
   ].join('')
 }
 
-function calcIcmsItem(item, crt, vProd) {
+function calcIcmsItem(item, crt, vProd, qCom = 0) {
+  const mono = calcMonoRet(item, qCom)
+  if (mono) {
+    return { vBC: 0, vIcms: 0, ...mono }
+  }
+  const emptyMono = { qBCMonoRet: 0, adRemICMSRet: 0, vICMSMonoRet: 0 }
   const simples = crt === 1 || crt === 2
-  if (simples) return { vBC: 0, vIcms: 0 }
+  if (simples) return { vBC: 0, vIcms: 0, ...emptyMono }
   const cst = onlyDigits(item.cstIcms || '00').padStart(2, '0').slice(0, 2)
-  if (['40', '41', '50', '60'].includes(cst)) return { vBC: 0, vIcms: 0 }
+  if (['40', '41', '50', '60', '61'].includes(cst)) {
+    return { vBC: 0, vIcms: 0, ...emptyMono }
+  }
   const pIcms = Number(item.pIcms) || 0
   const pRed = Number(item.pRedBc) || 0
   const vBC =
     cst === '20' && pRed > 0 ? roundMoney(vProd * (1 - pRed / 100)) : vProd
-  return { vBC, vIcms: roundMoney((vBC * pIcms) / 100) }
+  return { vBC, vIcms: roundMoney((vBC * pIcms) / 100), ...emptyMono }
+}
+
+/** Lei da transparência (IBPT): vProd × (aliq nac + est) / 100 */
+function calcVTotTrib(item, vProd) {
+  if (item.vTotTrib != null && Number(item.vTotTrib) > 0) {
+    return roundMoney(item.vTotTrib)
+  }
+  const nac = Number(item.pIbptNac) || 0
+  const est = Number(item.pIbptEst) || 0
+  if (nac + est <= 0) return 0
+  return roundMoney((vProd * (nac + est)) / 100)
 }
 
 function buildPisCofinsXml(item, vProd) {
@@ -494,6 +549,9 @@ export function buildInfNFeXml(input) {
   let somaVCbs = 0
   let somaVIbsMono = 0
   let somaVCbsMono = 0
+  let somaQBCMonoRet = 0
+  let somaVIcmsMonoRet = 0
+  let somaVTotTrib = 0
   let temIbscbs = false
 
   const det = items
@@ -513,6 +571,11 @@ export function buildInfNFeXml(input) {
       }
       xProd = escapeXml(xProd)
       const ncm = onlyDigits(item.ncm || '00000000').padStart(8, '0').slice(0, 8)
+      const cestDig = onlyDigits(item.cest || '').slice(0, 7)
+      const cest =
+        cestDig.length === 7 && cestDig !== '0000000'
+          ? cestDig.padStart(7, '0')
+          : ''
       let cfop = onlyDigits(
         item.cfop || (item.kind === 'combustivel' ? '5656' : '5102'),
       ).slice(0, 4)
@@ -522,9 +585,23 @@ export function buildInfNFeXml(input) {
       const gtin = digitoVerificadorGtin(item.gtin || item.codigo_barras || '')
       const cEAN = gtin || 'SEM GTIN'
       const cEANTrib = cEAN
+      const cProdANP = onlyDigits(item.cProdANP || '').slice(0, 9)
+      const combXml =
+        cProdANP.length >= 9
+          ? [
+              `<comb>`,
+              `<cProdANP>${cProdANP}</cProdANP>`,
+              item.descANP
+                ? `<descANP>${escapeXml(String(item.descANP).slice(0, 95))}</descANP>`
+                : '',
+              `<UFCons>${uf}</UFCons>`,
+              `</comb>`,
+            ].join('')
+          : ''
 
-      const icms = buildIcmsXml(item, crt, vProd)
-      const icmsVal = calcIcmsItem(item, crt, vProd)
+      const icms = buildIcmsXml(item, crt, vProd, qCom)
+      const icmsVal = calcIcmsItem(item, crt, vProd, qCom)
+      const vTotTribItem = calcVTotTrib(item, vProd)
       const pisCofins = buildPisCofinsXml(item, vProd)
       const ibscbs = emitirIbscbs
         ? buildIbscbsXml(item, vProd, {
@@ -550,6 +627,9 @@ export function buildInfNFeXml(input) {
       somaVIcms += icmsVal.vIcms
       somaVPis += pisCofins.vPis
       somaVCofins += pisCofins.vCofins
+      somaQBCMonoRet += icmsVal.qBCMonoRet || 0
+      somaVIcmsMonoRet += icmsVal.vICMSMonoRet || 0
+      somaVTotTrib += vTotTribItem
       if (ibscbs.hasGrupo) {
         temIbscbs = true
         somaVBcIbscbs += ibscbs.vBC
@@ -568,6 +648,7 @@ export function buildInfNFeXml(input) {
         `<cEAN>${cEAN}</cEAN>`,
         `<xProd>${xProd}</xProd>`,
         `<NCM>${ncm}</NCM>`,
+        cest ? `<CEST>${cest}</CEST>` : '',
         `<CFOP>${cfop}</CFOP>`,
         `<uCom>${uCom}</uCom>`,
         `<qCom>${qCom.toFixed(4)}</qCom>`,
@@ -579,8 +660,10 @@ export function buildInfNFeXml(input) {
         `<vUnTrib>${money(vUn)}</vUnTrib>`,
         vDesc > 0 ? `<vDesc>${money(vDesc)}</vDesc>` : '',
         `<indTot>1</indTot>`,
+        combXml,
         `</prod>`,
         `<imposto>`,
+        vTotTribItem > 0 ? `<vTotTrib>${money(vTotTribItem)}</vTotTrib>` : '',
         icms,
         pisCofins.xml,
         ibscbs.xml,
@@ -615,27 +698,42 @@ export function buildInfNFeXml(input) {
       'NF-e precisa do código IBGE do município do destinatário (consulte o CNPJ).',
     )
   }
-  const destXmlEnder = isNfe
-    ? [
-        `<enderDest>`,
-        `<xLgr>${escapeXml(buyer.address || emit.endereco || 'S/N')}</xLgr>`,
-        `<nro>${escapeXml(buyer.number || emit.numero || 'S/N')}</nro>`,
-        `<xBairro>${escapeXml(buyer.neighborhood || emit.bairro || 'CENTRO')}</xBairro>`,
-        `<cMun>${destCMun}</cMun>`,
-        `<xMun>${escapeXml(buyer.city || emit.cidade || 'MUNICIPIO')}</xMun>`,
-        `<UF>${destUf}</UF>`,
-        `<CEP>${onlyDigits(buyer.cep || emit.cep || '').padStart(8, '0').slice(0, 8)}</CEP>`,
-        `<cPais>1058</cPais>`,
-        `<xPais>BRASIL</xPais>`,
-        onlyDigits(buyer.phone || '').length >= 6
-          ? `<fone>${onlyDigits(buyer.phone).slice(0, 14)}</fone>`
-          : '',
-        `</enderDest>`,
-      ].join('')
-    : ''
+  // NFC-e: enderDest quando há endereço informado (como no ACBr); NF-e: sempre
+  const temEnderBuyer = Boolean(
+    buyer.address || buyer.neighborhood || buyer.cep || buyer.city,
+  )
+  const cMunEnder =
+    destCMun.length === 7 ? destCMun : temEnderBuyer && !isNfe ? cMun : ''
+  const destXmlEnder =
+    isNfe || (temEnderBuyer && cMunEnder.length === 7)
+      ? [
+          `<enderDest>`,
+          `<xLgr>${escapeXml(buyer.address || emit.endereco || 'S/N')}</xLgr>`,
+          `<nro>${escapeXml(buyer.number || emit.numero || 'S/N')}</nro>`,
+          `<xBairro>${escapeXml(buyer.neighborhood || emit.bairro || 'CENTRO')}</xBairro>`,
+          `<cMun>${isNfe ? destCMun : cMunEnder}</cMun>`,
+          `<xMun>${escapeXml(buyer.city || emit.cidade || 'MUNICIPIO')}</xMun>`,
+          `<UF>${destUf || uf}</UF>`,
+          `<CEP>${onlyDigits(buyer.cep || emit.cep || '').padStart(8, '0').slice(0, 8)}</CEP>`,
+          `<cPais>1058</cPais>`,
+          `<xPais>BRASIL</xPais>`,
+          onlyDigits(buyer.phone || '').length >= 6
+            ? `<fone>${onlyDigits(buyer.phone).slice(0, 14)}</fone>`
+            : '',
+          `</enderDest>`,
+        ].join('')
+      : ''
   const dest =
     buyerDoc.length === 11
-      ? `<dest><CPF>${buyerDoc}</CPF><xNome>${destNome}</xNome><indIEDest>9</indIEDest></dest>`
+      ? [
+          `<dest>`,
+          `<CPF>${buyerDoc}</CPF>`,
+          `<xNome>${destNome}</xNome>`,
+          destXmlEnder,
+          `<indIEDest>9</indIEDest>`,
+          buyer.email ? `<email>${escapeXml(buyer.email)}</email>` : '',
+          `</dest>`,
+        ].join('')
       : buyerDoc.length === 14
         ? [
             `<dest>`,
@@ -758,6 +856,12 @@ export function buildInfNFeXml(input) {
     `<vST>0.00</vST>`,
     `<vFCPST>0.00</vFCPST>`,
     `<vFCPSTRet>0.00</vFCPSTRet>`,
+    somaVIcmsMonoRet > 0
+      ? [
+          `<qBCMonoRet>${somaQBCMonoRet.toFixed(4)}</qBCMonoRet>`,
+          `<vICMSMonoRet>${money(somaVIcmsMonoRet)}</vICMSMonoRet>`,
+        ].join('')
+      : '',
     `<vProd>${money(total)}</vProd>`,
     `<vFrete>0.00</vFrete>`,
     `<vSeg>0.00</vSeg>`,
@@ -769,6 +873,7 @@ export function buildInfNFeXml(input) {
     `<vCOFINS>${money(somaVCofins)}</vCOFINS>`,
     `<vOutro>0.00</vOutro>`,
     `<vNF>${money(total)}</vNF>`,
+    somaVTotTrib > 0 ? `<vTotTrib>${money(somaVTotTrib)}</vTotTrib>` : '',
     `</ICMSTot>`,
     ibscbsTot,
     // ACBr Delphi: Total.vNFTot := vNF + IBS + CBS

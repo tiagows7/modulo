@@ -195,9 +195,12 @@ export async function POST(req: Request) {
           .select(
             `
             id,
+            codigo_barras,
             aliquota_monofasica,
-            produto_ncm ( ibpt_ncm ),
+            produto_ncm ( ibpt_ncm, ibpt_aliq_nac, ibpt_aliq_est ),
             produto_cfop ( codigo ),
+            produto_cest ( codigo ),
+            produto_anp ( codigo, descricao ),
             categorias_icm (
               csosn, cst_icms, aliquota_estado, percentual_reduzido, cfop_estado
             ),
@@ -217,104 +220,124 @@ export async function POST(req: Request) {
           const r = row as Record<string, unknown>;
           const one = <T,>(v: T | T[] | null | undefined): T | null =>
             v == null ? null : Array.isArray(v) ? v[0] ?? null : v;
-          const ncmRel = one(r.produto_ncm as never);
-          const cfopRel = one(r.produto_cfop as never);
-          const icm = one(r.categorias_icm as never);
-          const pis = one(r.produto_piscofins as never);
-          const ibsCst = one(r.produto_ibscbs_cst as never);
-          const ibsClass = one(r.produto_ibscbs_classtrib as never);
+          const ncmRel = one(r.produto_ncm as never) as {
+            ibpt_ncm?: string | number;
+            ibpt_aliq_nac?: number;
+            ibpt_aliq_est?: number;
+          } | null;
+          const cfopRel = one(r.produto_cfop as never) as {
+            codigo?: string;
+          } | null;
+          const cestRel = one(r.produto_cest as never) as {
+            codigo?: string;
+          } | null;
+          const anpRel = one(r.produto_anp as never) as {
+            codigo?: string;
+            descricao?: string;
+          } | null;
+          const icm = one(r.categorias_icm as never) as {
+            csosn?: string;
+            cst_icms?: string;
+            aliquota_estado?: number;
+            percentual_reduzido?: number;
+            cfop_estado?: string;
+          } | null;
+          const pis = one(r.produto_piscofins as never) as {
+            codigo?: string;
+            percentual_pis?: number;
+            percentual_cofins?: number;
+          } | null;
+          const ibsCst = one(r.produto_ibscbs_cst as never) as {
+            cst?: string | number;
+            ind_gibscbs?: number;
+            ind_gibscbsmono?: number;
+            ind_gred?: number;
+          } | null;
+          const ibsClass = one(r.produto_ibscbs_classtrib as never) as {
+            codigo?: string;
+            red_ibs?: number;
+            red_cbs?: number;
+          } | null;
+          const ncm =
+            ncmRel?.ibpt_ncm != null
+              ? String(ncmRel.ibpt_ncm).replace(/\D/g, "")
+              : null;
+          const cest =
+            cestRel?.codigo != null
+              ? String(cestRel.codigo).replace(/\D/g, "").slice(0, 7)
+              : null;
+          const cProdANP =
+            anpRel?.codigo != null
+              ? String(anpRel.codigo).replace(/\D/g, "").slice(0, 9)
+              : null;
+          const gtin =
+            r.codigo_barras != null
+              ? String(r.codigo_barras).replace(/\D/g, "")
+              : null;
           map.set(String(r.id), {
-            ncm:
-              ncmRel && (ncmRel as { ibpt_ncm?: string }).ibpt_ncm
-                ? String((ncmRel as { ibpt_ncm: string }).ibpt_ncm).replace(
-                    /\D/g,
-                    "",
-                  )
-                : null,
+            ncm: ncm || null,
             cfop:
-              (cfopRel && (cfopRel as { codigo?: string }).codigo
-                ? String((cfopRel as { codigo: string }).codigo)
+              (cfopRel?.codigo
+                ? String(cfopRel.codigo).replace(/\D/g, "")
                 : null) ||
-              (icm && (icm as { cfop_estado?: string }).cfop_estado
-                ? String((icm as { cfop_estado: string }).cfop_estado)
+              (icm?.cfop_estado
+                ? String(icm.cfop_estado).replace(/\D/g, "")
                 : null),
-            csosn: icm
-              ? String((icm as { csosn?: string }).csosn || "").replace(/\D/g, "") ||
+            csosn: icm?.csosn
+              ? String(icm.csosn).replace(/\D/g, "") || null
+              : null,
+            cstIcms: icm?.cst_icms
+              ? String(icm.cst_icms).replace(/\D/g, "") || null
+              : null,
+            pIcms: icm?.aliquota_estado != null ? Number(icm.aliquota_estado) : null,
+            pRedBc:
+              icm?.percentual_reduzido != null
+                ? Number(icm.percentual_reduzido)
+                : null,
+            cstPis: pis?.codigo
+              ? String(pis.codigo).replace(/\D/g, "") || null
+              : null,
+            pPis: pis?.percentual_pis != null ? Number(pis.percentual_pis) : null,
+            cstCofins: pis?.codigo
+              ? String(pis.codigo).replace(/\D/g, "") || null
+              : null,
+            pCofins:
+              pis?.percentual_cofins != null
+                ? Number(pis.percentual_cofins)
+                : null,
+            cstIbscbs: ibsCst?.cst != null
+              ? String(ibsCst.cst).replace(/\D/g, "").padStart(3, "0").slice(0, 3) ||
                 null
               : null,
-            cstIcms: icm
-              ? String((icm as { cst_icms?: string }).cst_icms || "").replace(
-                  /\D/g,
-                  "",
-                ) || null
-              : null,
-            pIcms: icm
-              ? Number((icm as { aliquota_estado?: number }).aliquota_estado) ||
-                null
-              : null,
-            pRedBc: icm
-              ? Number(
-                  (icm as { percentual_reduzido?: number }).percentual_reduzido,
-                ) || null
-              : null,
-            cstPis: pis
-              ? String((pis as { codigo?: string }).codigo || "").replace(
-                  /\D/g,
-                  "",
-                ) || null
-              : null,
-            pPis: pis
-              ? Number((pis as { percentual_pis?: number }).percentual_pis) ||
-                null
-              : null,
-            cstCofins: pis
-              ? String((pis as { codigo?: string }).codigo || "").replace(
-                  /\D/g,
-                  "",
-                ) || null
-              : null,
-            pCofins: pis
-              ? Number(
-                  (pis as { percentual_cofins?: number }).percentual_cofins,
-                ) || null
-              : null,
-            cstIbscbs: ibsCst
-              ? String((ibsCst as { cst?: string | number }).cst ?? "")
-                  .replace(/\D/g, "")
-                  .padStart(3, "0")
-                  .slice(0, 3) || null
-              : null,
-            cClassTrib: ibsClass
-              ? String((ibsClass as { codigo?: string }).codigo || "")
+            cClassTrib: ibsClass?.codigo
+              ? String(ibsClass.codigo)
                   .replace(/\D/g, "")
                   .padStart(6, "0")
                   .slice(0, 6) || null
               : null,
             indGibscbs:
-              ibsCst && (ibsCst as { ind_gibscbs?: number }).ind_gibscbs != null
-                ? Number((ibsCst as { ind_gibscbs: number }).ind_gibscbs)
-                : null,
+              ibsCst?.ind_gibscbs != null ? Number(ibsCst.ind_gibscbs) : null,
             indGibscbsMono:
-              ibsCst &&
-              (ibsCst as { ind_gibscbsmono?: number }).ind_gibscbsmono != null
-                ? Number((ibsCst as { ind_gibscbsmono: number }).ind_gibscbsmono)
+              ibsCst?.ind_gibscbsmono != null
+                ? Number(ibsCst.ind_gibscbsmono)
                 : null,
-            indGred:
-              ibsCst && (ibsCst as { ind_gred?: number }).ind_gred != null
-                ? Number((ibsCst as { ind_gred: number }).ind_gred)
-                : null,
-            pRedIbs:
-              ibsClass && (ibsClass as { red_ibs?: number }).red_ibs != null
-                ? Number((ibsClass as { red_ibs: number }).red_ibs)
-                : null,
-            pRedCbs:
-              ibsClass && (ibsClass as { red_cbs?: number }).red_cbs != null
-                ? Number((ibsClass as { red_cbs: number }).red_cbs)
-                : null,
+            indGred: ibsCst?.ind_gred != null ? Number(ibsCst.ind_gred) : null,
+            pRedIbs: ibsClass?.red_ibs != null ? Number(ibsClass.red_ibs) : null,
+            pRedCbs: ibsClass?.red_cbs != null ? Number(ibsClass.red_cbs) : null,
             pMono:
               r.aliquota_monofasica != null
                 ? Number(r.aliquota_monofasica)
                 : null,
+            gtin: gtin && gtin.length >= 8 ? gtin : null,
+            cest: cest && cest.length >= 7 ? cest.padStart(7, "0").slice(0, 7) : null,
+            cProdANP: cProdANP || null,
+            descANP: anpRel?.descricao
+              ? String(anpRel.descricao).slice(0, 95)
+              : null,
+            pIbptNac:
+              ncmRel?.ibpt_aliq_nac != null ? Number(ncmRel.ibpt_aliq_nac) : null,
+            pIbptEst:
+              ncmRel?.ibpt_aliq_est != null ? Number(ncmRel.ibpt_aliq_est) : null,
           });
         }
         items = items.map((item) =>
