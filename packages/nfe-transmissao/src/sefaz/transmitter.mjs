@@ -99,7 +99,8 @@ export function createSefazTransmitter(cert) {
 
       if (status !== 'authorized') {
         const err = new Error(
-          `SEFAZ recusou a ${tipo} (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}`,
+          `SEFAZ recusou a ${tipo} (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}` +
+            ` [cUF=${built.cUF} cMunFG=${built.cMun}${built.emitiuIbscbs ? ' IBSCBS=sim' : ''}]`,
         )
         err.document = document
         err.sefaz = ret

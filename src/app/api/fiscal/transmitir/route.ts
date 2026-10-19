@@ -147,19 +147,37 @@ export async function POST(req: Request) {
         400,
       );
     }
-    const municipioIbge = municipioDigits;
 
-    let cidadeNome =
-      body.emitente?.cidade != null ? String(body.emitente.cidade).trim() : "";
-    if (!cidadeNome) {
-      const { data: cidadeRow } = await admin
-        .from("cidades")
-        .select("descricao")
-        .eq("codigo", municipioIbge)
-        .maybeSingle();
-      cidadeNome =
-        cidadeRow?.descricao != null ? String(cidadeRow.descricao).trim() : "";
+    const ufFilial = String(filial.endereco_uf || "")
+      .trim()
+      .toUpperCase();
+    const { data: cidadeRow } = await admin
+      .from("cidades")
+      .select("codigo, descricao, uf")
+      .eq("codigo", municipioDigits)
+      .maybeSingle();
+    if (!cidadeRow) {
+      return jsonError(
+        `Código IBGE ${municipioDigits} não encontrado na tabela de cidades. Selecione novamente a cidade da filial.`,
+        400,
+      );
     }
+    if (
+      ufFilial &&
+      cidadeRow.uf &&
+      String(cidadeRow.uf).toUpperCase() !== ufFilial
+    ) {
+      return jsonError(
+        `Cidade IBGE ${municipioDigits} (${cidadeRow.descricao}) é de ${cidadeRow.uf}, mas a UF da filial é ${ufFilial}.`,
+        400,
+      );
+    }
+    const municipioIbge = String(cidadeRow.codigo).replace(/\D/g, "");
+    const cidadeNome =
+      (body.emitente?.cidade != null
+        ? String(body.emitente.cidade).trim()
+        : "") ||
+      (cidadeRow.descricao != null ? String(cidadeRow.descricao).trim() : "");
 
     const crt = tipoEmpresaToCrt(
       filial.tipo_empresa != null ? String(filial.tipo_empresa) : null,

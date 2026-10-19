@@ -208,6 +208,31 @@ function defaultAliqIbscbs(item) {
 }
 
 /**
+ * IBS/CBS (NT 2025.002) — ENCAT adiou ativação do schema:
+ * homologação 26/10/2026 · produção 16/11/2026.
+ * Emitir antes disso gera rejeição 225 (schema) em várias SEFAZ.
+ * Force com NFE_EMITIR_IBSCBS=1 ou desligue com =0.
+ */
+export function shouldEmitIbscbs(tpAmb, now = new Date()) {
+  const force = String(
+    process.env.NFE_EMITIR_IBSCBS || process.env.NFCE_EMITIR_IBSCBS || '',
+  )
+    .trim()
+    .toLowerCase()
+  if (force === '0' || force === 'false' || force === 'off') return false
+  if (force === '1' || force === 'true' || force === 'on') return true
+
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth() + 1
+  const d = now.getUTCDate()
+  const ymd = y * 10000 + m * 100 + d
+  // Homologação (tpAmb=2): a partir de 2026-10-26
+  // Produção (tpAmb=1): a partir de 2026-11-16
+  if (tpAmb === 1) return ymd >= 20261116
+  return ymd >= 20261026
+}
+
+/**
  * Monta grupo IBSCBS (NT 2025.002) a partir do cadastro do produto.
  * Se o produto não tiver CST/cClassTrib, retorna vazio.
  */
@@ -421,6 +446,7 @@ export function buildInfNFeXml(input) {
   }
   const serie = Number(input.serie) || 1
   const tpAmb = input.ambiente === 1 ? 1 : 2
+  const emitirIbscbs = shouldEmitIbscbs(tpAmb)
   const dhEmi = new Date()
   const cNF = pad(Math.floor(Math.random() * 1e8), 8)
   const chave = buildChaveAcesso({
@@ -496,7 +522,19 @@ export function buildInfNFeXml(input) {
       const icms = buildIcmsXml(item, crt, vProd)
       const icmsVal = calcIcmsItem(item, crt, vProd)
       const pisCofins = buildPisCofinsXml(item, vProd)
-      const ibscbs = buildIbscbsXml(item, vProd)
+      const ibscbs = emitirIbscbs
+        ? buildIbscbsXml(item, vProd)
+        : {
+            xml: '',
+            vBC: 0,
+            vIbsUf: 0,
+            vIbsMun: 0,
+            vIbs: 0,
+            vCbs: 0,
+            vIbsMono: 0,
+            vCbsMono: 0,
+            hasGrupo: false,
+          }
       somaVBc += icmsVal.vBC
       somaVIcms += icmsVal.vIcms
       somaVPis += pisCofins.vPis
@@ -752,7 +790,9 @@ export function buildInfNFeXml(input) {
     modelo,
     tipo,
     cUF,
+    cMun,
     uf,
+    emitiuIbscbs: temIbscbs,
     xmlInfNFe: infNFe,
     xmlInfNFeSupl,
     qrCode,
