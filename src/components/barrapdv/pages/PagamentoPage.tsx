@@ -109,6 +109,7 @@ export function PagamentoPage() {
   const [done, setDone] = useState(false)
   const [lastFiscalDoc, setLastFiscalDoc] = useState<FiscalDocument | null>(null)
   const [fiscalBusy, setFiscalBusy] = useState(false)
+  const [fiscalStatus, setFiscalStatus] = useState('Autorizando nota na SEFAZ…')
   const [showVehicleSearch, setShowVehicleSearch] = useState(false)
   const [vehicleQuery, setVehicleQuery] = useState('')
   const [consultingCnpj, setConsultingCnpj] = useState(false)
@@ -628,10 +629,13 @@ export function PagamentoPage() {
     }
 
     setFiscalBusy(true)
+    setFiscalStatus('Montando documento fiscal…')
     try {
+      setFiscalStatus('Enviando nota para a SEFAZ. Aguarde…')
       const result = await emitirDocumentoFiscal()
       const doc = result.document
       setLastFiscalDoc(doc)
+      setFiscalStatus('Nota autorizada. Finalizando venda…')
 
       const combustivelIds = cart
         .filter((item) => item.kind === 'combustivel')
@@ -650,6 +654,7 @@ export function PagamentoPage() {
         }
       }
 
+      setFiscalBusy(false)
       const sendInfo = result.send?.ok ? `\nEnvio NF-e: ${result.send.sentTo}` : ''
       const querImprimir = await showConfirm({
         title: 'Imprimir cupom',
@@ -680,12 +685,16 @@ export function PagamentoPage() {
       saleCoveredRef.current = false
       navigate('/venda')
     } catch (err) {
+      const raw =
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível emitir NFC-e / NF-e.'
+      const message = /unable to get local issuer certificate/i.test(raw)
+        ? 'Falha TLS com a SEFAZ (cadeia de certificado). Tente novamente; se persistir, verifique o .pfx da filial.'
+        : raw
       showAlert({
         title: 'Falha fiscal',
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Não foi possível emitir NFC-e / NF-e.',
+        message,
       })
     } finally {
       setFiscalBusy(false)
@@ -1548,10 +1557,25 @@ export function PagamentoPage() {
             onClick={() => void fecharVenda()}
             disabled={tefBusy || fiscalBusy}
           >
-            {fiscalBusy ? 'Emitindo nota…' : 'Fechar venda'}
+            Fechar venda
           </button>
         </div>
       </section>
+
+      {fiscalBusy ? (
+        <div
+          className="wait-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fiscal-wait-title"
+        >
+          <div className="wait-card">
+            <div className="wait-spinner" aria-hidden />
+            <h2 id="fiscal-wait-title">Autorizando nota</h2>
+            <p>{fiscalStatus.toUpperCase()}</p>
+          </div>
+        </div>
+      ) : null}
 
       {consultingDiscountCoupon ? (
         <div
