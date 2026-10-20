@@ -11,12 +11,15 @@
  *   POST /fiscal/emit
  *   POST /fiscal/send
  *   POST /fiscal/print
+ *   POST /fiscal/save-xml
  *   GET  /fiscal/documents
  *   GET  /fiscal/documents/:id
  */
 import http from 'node:http'
 import { URL } from 'node:url'
 import { randomBytes } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { buildEscPosReceipt } from './escpos-receipt.mjs'
 import {
   getDefaultPrinterName,
@@ -31,6 +34,13 @@ const MODE = process.env.FISCAL_MODE || 'mock'
 const DIRECT_PRINT = String(process.env.FISCAL_DIRECT_PRINT ?? '1') !== '0'
 /** Preferir a fila saudável; "ELGIN i8" às vezes fica em PendingDeletion. */
 const PRINTER_NAME = process.env.FISCAL_PRINTER_NAME || 'ELGIN i8 (copy 1)'
+/**
+ * Pasta local dos XML autorizados (análise / contingência).
+ * Padrão: <cwd>/xml-fiscal  · override: FISCAL_XML_DIR
+ */
+const XML_DIR = path.resolve(
+  process.env.FISCAL_XML_DIR || path.join(process.cwd(), 'xml-fiscal'),
+)
 
 const EMITTER = {
   razaoSocial: 'POSTO DEMO PDV LTDA',
@@ -108,6 +118,37 @@ function buildChave(tipo, numero, serieNumero = 1) {
 function findDoc(idOrChave) {
   const key = String(idOrChave || '').trim()
   return documents.find((d) => d.id === key || d.chave === key) || null
+}
+
+/**
+ * Grava XML autorizado em disco (NFC-e / NF-e).
+ * @returns {{ ok: boolean, path: string, dir: string, bytes: number }}
+ */
+function saveXmlToDisk({ xml, chave, tipo, numero }) {
+  const content = String(xml || '').trim()
+  if (!content) {
+    const err = new Error('XML vazio — nada a gravar.')
+    err.status = 400
+    throw err
+  }
+  const kind = tipo === 'NF-e' ? 'NF-e' : 'NFC-e'
+  const dir = path.join(XML_DIR, kind)
+  fs.mkdirSync(dir, { recursive: true })
+  const chaveDig = onlyDigits(chave) || `sem-chave-${Date.now()}`
+  const n = pad(Number(numero) || 0, 6)
+  const fileName = `${chaveDig}-nfeProc.xml`
+  const filePath = path.join(dir, fileName)
+  fs.writeFileSync(filePath, content, 'utf8')
+  return {
+    ok: true,
+    path: filePath,
+    dir,
+    bytes: Buffer.byteLength(content, 'utf8'),
+    fileName,
+    tipo: kind,
+    numero: n,
+    chave: chaveDig,
+  }
 }
 
 function sendJson(res, data, status = 200) {
@@ -212,6 +253,7 @@ const server = http.createServer(async (req, res) => {
         mode: MODE,
         directPrint: DIRECT_PRINT,
         printerName: printer,
+        xmlDir: XML_DIR,
         message:
           MODE === 'mock'
             ? 'Ponte fiscal mock — emissão/envio simulados; impressão RAW disponível.'
@@ -338,6 +380,21 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
+    if (req.method === 'POST' && url.pathname === '/fiscal/save-xml') {
+      const body = await readBody(req)
+      const saved = saveXmlToDisk({
+        xml: body.xml,
+        chave: body.chave,
+        tipo: body.tipo,
+        numero: body.numero,
+      })
+      sendJson(res, {
+        ...saved,
+        message: `XML gravado em ${saved.path}`,
+      })
+      return
+    }
+
     if (req.method === 'GET' && url.pathname === '/fiscal/documents') {
       const tipo = url.searchParams.get('tipo')
       const q = (url.searchParams.get('q') || '').toLowerCase()
@@ -388,7 +445,8 @@ server.listen(BRIDGE_PORT, '127.0.0.1', () => {
   console.log(`[Fiscal Bridge] http://127.0.0.1:${BRIDGE_PORT}`)
   console.log(`[Fiscal Bridge] Modo: ${MODE}`)
   console.log(`[Fiscal Bridge] Impressão direta: ${DIRECT_PRINT ? 'SIM' : 'NÃO'} → ${printerLabel}`)
+  console.log(`[Fiscal Bridge] XML local: ${XML_DIR}`)
   console.log(
-    '[Fiscal Bridge] Endpoints: /health · /fiscal/printers · POST /fiscal/emit|send|print · GET /fiscal/documents',
+    '[Fiscal Bridge] Endpoints: /health · /fiscal/printers · POST /fiscal/emit|send|print|save-xml · GET /fiscal/documents',
   )
 })

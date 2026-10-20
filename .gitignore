@@ -53,5 +53,8 @@ next-env.d.ts
 # database backups (dados sensíveis)
 /backups/
 
+# XML NFC-e/NF-e gravados pela ponte fiscal local
+/xml-fiscal/
+
 # schema concatenado (gerado por npm run db:schema)
 /scripts/rebuild/ALL_SCHEMA.sql

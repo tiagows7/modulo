@@ -12,6 +12,12 @@ export const FISCAL_CONFIG = {
   mode: 'live' as 'mock' | 'live',
   bridgeUrl: 'http://127.0.0.1:39102',
   /**
+   * true = após autorizar, envia o XML à ponte para gravar em disco
+   * (`xml-fiscal/NFC-e|NF-e/` no PC que roda `npm run fiscal-bridge`).
+   * O XML continua também no banco.
+   */
+  saveXmlLocal: true,
+  /**
    * true = envia ESC/POS RAW pela ponte :39102 (sem diálogo do Windows),
    * igual ao ACBr. Exige `npm run fiscal-bridge` rodando.
    */

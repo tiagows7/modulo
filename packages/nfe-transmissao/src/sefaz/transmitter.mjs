@@ -99,14 +99,13 @@ export function createSefazTransmitter(cert) {
 
       if (status !== 'authorized') {
         let hint = ` [cUF=${built.cUF} cMunFG=${built.cMun}${built.emitiuIbscbs ? ' IBSCBS=sim' : ''}]`
-        // 225 em cMunFG com IBSCBS costuma ser schema RTC ainda não ativo na UF
         if (
           String(ret.cStat) === '225' &&
           built.emitiuIbscbs &&
           /cMunFG/i.test(String(ret.xMotivo || ''))
         ) {
           hint +=
-            ' — provável schema IBS/CBS ainda não ativo (homolog 26/10/2026, prod 16/11/2026); use NFE_EMITIR_IBSCBS=0 ou aguarde o cronograma ENCAT'
+            ' — se o schema IBS/CBS rejeitar, desligue temporariamente com NFE_EMITIR_IBSCBS=0'
         }
         const err = new Error(
           `SEFAZ recusou a ${tipo} (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}${hint}`,

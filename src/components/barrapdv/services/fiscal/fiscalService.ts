@@ -358,7 +358,54 @@ class FiscalService {
       message = `${message} (aviso: não gravou no banco — ${detail})`
     }
 
+    if (FISCAL_CONFIG.saveXmlLocal && document.xml) {
+      try {
+        const saved = await this.saveXmlLocal(document)
+        if (saved?.path) {
+          message = `${message} XML local: ${saved.path}`
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : 'falha ao gravar XML'
+        console.warn('[fiscal] XML local:', detail)
+        message = `${message} (aviso: XML não gravou no disco — ${detail})`
+      }
+    }
+
     return { document, message }
+  }
+
+  /**
+   * Grava o XML autorizado no PC via ponte fiscal (:39102).
+   * Pasta padrão: `<cwd>/xml-fiscal/NFC-e|NF-e/` (override: FISCAL_XML_DIR).
+   */
+  async saveXmlLocal(
+    doc: Pick<FiscalDocument, 'xml' | 'chave' | 'tipo' | 'numero'>,
+  ): Promise<{ ok: boolean; path?: string; message?: string } | null> {
+    if (!doc.xml?.trim()) return null
+    const res = await fetch(`${this.bridgeUrl}/fiscal/save-xml`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        xml: doc.xml,
+        chave: doc.chave,
+        tipo: doc.tipo,
+        numero: doc.numero,
+      }),
+    })
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      path?: string
+      message?: string
+      error?: string
+    }
+    if (!res.ok) {
+      throw new Error(body.error || `Falha ao gravar XML local (${res.status})`)
+    }
+    return {
+      ok: body.ok !== false,
+      path: body.path,
+      message: body.message,
+    }
   }
 
   /**
