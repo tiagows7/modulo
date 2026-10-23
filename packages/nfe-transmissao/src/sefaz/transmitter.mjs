@@ -72,6 +72,9 @@ export function createSefazTransmitter(cert) {
           ? 'denied'
           : 'error'
 
+      // Sempre guarda o XML assinado (autorizado = nfeProc; rejeitado = NFe) para análise local
+      const xmlOut = ret.xml || nfeAssinado
+
       const document = {
         id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         tipo,
@@ -92,20 +95,24 @@ export function createSefazTransmitter(cert) {
         hora,
         items: (input.items || []).map((i) => ({ ...i })),
         payments: (input.payments || []).map((p) => ({ ...p })),
-        xml: ret.xml,
+        xml: xmlOut,
         digVal: ret.digVal,
         error: status === 'authorized' ? null : `${ret.cStat} — ${ret.xMotivo}`,
       }
 
       if (status !== 'authorized') {
         let hint = ` [cUF=${built.cUF} cMunFG=${built.cMun}${built.emitiuIbscbs ? ' IBSCBS=sim' : ''}]`
-        if (
-          String(ret.cStat) === '225' &&
-          built.emitiuIbscbs &&
-          /cMunFG/i.test(String(ret.xMotivo || ''))
-        ) {
-          hint +=
-            ' — se o schema IBS/CBS rejeitar, desligue temporariamente com NFE_EMITIR_IBSCBS=0'
+        if (String(ret.cStat) === '225') {
+          if (/Algorithm/i.test(String(ret.xMotivo || ''))) {
+            hint +=
+              ' — confira CanonicalizationMethod/SignatureMethod (MOC exige C14N 20010315 + rsa-sha1)'
+          } else if (
+            built.emitiuIbscbs &&
+            /cMunFG|IBSCBS|gIBSCBS/i.test(String(ret.xMotivo || ''))
+          ) {
+            hint +=
+              ' — se o schema IBS/CBS rejeitar, desligue temporariamente com NFE_EMITIR_IBSCBS=0'
+          }
         }
         const err = new Error(
           `SEFAZ recusou a ${tipo} (${ret.cStat}): ${ret.xMotivo || 'sem motivo'}${hint}`,

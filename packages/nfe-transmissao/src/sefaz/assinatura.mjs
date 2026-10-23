@@ -47,8 +47,14 @@ export function extractPfxPem(pfx, passphrase) {
   }
 }
 
+/** Algoritmos fixos do schema xmldsig da NF-e/NFC-e (MOC) — exclusive C14N gera 225 em Algorithm. */
+const C14N = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315'
+const RSA_SHA1 = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1'
+const SHA1 = 'http://www.w3.org/2000/09/xmldsig#sha1'
+const ENVELOPED = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature'
+
 /**
- * Assina o XML da NFC-e (enveloped, RSA-SHA1, C14N exclusive).
+ * Assina o XML da NFC-e (enveloped, RSA-SHA1, C14N inclusivo do MOC).
  * Entrada: fragmento <infNFe ...>...</infNFe>
  * Saída: <NFe xmlns="...">infNFe + Signature</NFe>
  */
@@ -65,17 +71,14 @@ export function assinarNFeXml(xmlInfNFe, pfx, passphrase) {
   const sig = new SignedXml({
     privateKey: privateKeyPem,
     publicCert: certificatePem,
-    signatureAlgorithm: 'http://www.w3.org/2000/09/xmldsig#rsa-sha1',
-    canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+    signatureAlgorithm: RSA_SHA1,
+    canonicalizationAlgorithm: C14N,
   })
 
   sig.addReference({
     xpath: "//*[local-name(.)='infNFe']",
-    transforms: [
-      'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
-      'http://www.w3.org/2001/10/xml-exc-c14n#',
-    ],
-    digestAlgorithm: 'http://www.w3.org/2000/09/xmldsig#sha1',
+    transforms: [ENVELOPED, C14N],
+    digestAlgorithm: SHA1,
     uri: referenceUri,
     isEmptyUri: false,
   })

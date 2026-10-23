@@ -303,6 +303,25 @@ class FiscalService {
         receitas?: ReceitaFiscalLinha[]
       }
       if (!res.ok) {
+        // Mesmo rejeitada, grava XML assinado no disco para análise
+        if (FISCAL_CONFIG.saveXmlLocal && body.document?.xml) {
+          try {
+            const saved = await this.saveXmlLocal({
+              ...body.document,
+              tipo: body.document.tipo || tipo,
+              numero: body.document.numero || String(numeracao.numero),
+              chave: body.document.chave || '',
+            })
+            if (saved?.path) {
+              console.warn('[fiscal] XML rejeitado gravado em', saved.path)
+            }
+          } catch (saveErr) {
+            console.warn(
+              '[fiscal] XML rejeitado não gravou:',
+              saveErr instanceof Error ? saveErr.message : saveErr,
+            )
+          }
+        }
         throw new Error(body.error || `Falha ao emitir na SEFAZ (${res.status})`)
       }
       if (!body.document) {
