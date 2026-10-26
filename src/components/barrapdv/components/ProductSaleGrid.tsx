@@ -33,6 +33,7 @@ export function ProductSaleGrid({ embedded = false }: Props) {
   const { isLoja } = usePdvModo()
   const [query, setQuery] = useState('')
   const [scan, setScan] = useState('')
+  const [qtyInput, setQtyInput] = useState('')
   const [added, setAdded] = useState<string | null>(null)
   const [preview, setPreview] = useState<PreviewItem | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -78,6 +79,15 @@ export function ProductSaleGrid({ embedded = false }: Props) {
   function flashAdded(name: string) {
     setAdded(name)
     window.setTimeout(() => setAdded(null), 900)
+  }
+
+  /** Quantidade do campo (lista Produtos). Vazio/inválido → 1. */
+  function resolveListQty() {
+    const raw = qtyInput.trim().replace(',', '.')
+    if (!raw) return 1
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return 1
+    return Math.round(n * 1000) / 1000
   }
 
   function addDbProduct(product: ProdutoVenda, qty: number) {
@@ -148,7 +158,7 @@ export function ProductSaleGrid({ embedded = false }: Props) {
     enabled: !embedded,
     onEnter: (id) => {
       const product = filteredDb.find((p) => p.id === id)
-      if (product) addDbProduct(product, 1)
+      if (product) addDbProduct(product, resolveListQty())
     },
   })
 
@@ -231,6 +241,19 @@ export function ProductSaleGrid({ embedded = false }: Props) {
   return (
     <div className="products-layout">
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="field" style={{ margin: 0, width: 110, flex: '0 0 auto' }}>
+          <label htmlFor="prod-qty">Quantidade</label>
+          <input
+            id="prod-qty"
+            type="text"
+            inputMode="decimal"
+            value={qtyInput}
+            onChange={(e) => setQtyInput(e.target.value.replace(/[^\d.,]/g, ''))}
+            placeholder="1"
+            autoComplete="off"
+            title="Informe antes de selecionar o produto. Em branco = 1."
+          />
+        </div>
         <div className="field" style={{ margin: 0, flex: 1, minWidth: 180 }}>
           <label htmlFor="search">Filtrar lista</label>
           <input
@@ -259,7 +282,7 @@ export function ProductSaleGrid({ embedded = false }: Props) {
               className={`product-card${selectedId === p.id ? ' selected' : ''}`}
               onClick={() => {
                 setSelectedId(p.id)
-                addDbProduct(p, 1)
+                addDbProduct(p, resolveListQty())
               }}
             >
               <div>
