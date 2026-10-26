@@ -101,6 +101,8 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
   )
   const itemsGross = round2(doc.items.reduce((sum, item) => sum + lineGross(item), 0))
   const fantasia = (em.nomeFantasia || em.razaoSocial || '').trim()
+  const isHomolog = ambiente === 'Homologação'
+  const homologBanner = 'CUPOM EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL'
   // <<CENTER>> / <<LEFT>> = alinhamento ESC/POS na ponte fiscal
   const lines: string[] = [
     '<<CENTER>>',
@@ -112,6 +114,12 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
     'DANFE NFC-e',
     'Documento Auxiliar da Nota Fiscal',
     'de Consumidor Eletronica',
+  ]
+  if (isHomolog) {
+    lines.push(RULE_SMALL)
+    lines.push(homologBanner)
+  }
+  lines.push(
     RULE_SMALL,
     '<<LEFT>>',
     `NFC-e n. ${doc.numero}  Serie ${doc.serie}  ${doc.emissao} ${doc.hora}`,
@@ -122,7 +130,7 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
     RULE_SMALL,
     'CONSUMIDOR',
     doc.cliente || 'Consumidor nao identificado',
-  ]
+  )
 
   if (doc.buyerDocument) lines.push(`CPF/CNPJ: ${doc.buyerDocument}`)
 
@@ -170,6 +178,11 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
   lines.push(`Valor approx.: ${money(tribApprox)}`)
   lines.push(RULE_SMALL)
   lines.push('CUPOM NFC-e')
+  if (isHomolog) {
+    lines.push('<<CENTER>>')
+    lines.push(homologBanner)
+    lines.push('<<LEFT>>')
+  }
   lines.push(`Ref. venda: ${doc.saleRef}`)
   lines.push('')
   lines.push('<<NORMAL>>')
@@ -288,6 +301,14 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
       color: #333;
     }
     .badge { text-align: center; font-weight: 700; margin-top: 6px; font-size: 8px; }
+    .homolog {
+      text-align: center;
+      font-weight: 700;
+      font-size: 8px;
+      line-height: 1.25;
+      margin: 4px 0;
+      text-transform: uppercase;
+    }
     .header { text-align: center; font-size: 8px; }
     .header h1 { margin-bottom: 4px; font-size: 10px; }
     .header h2 { font-size: 9px; }
@@ -307,6 +328,11 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
     <hr class="rule" />
     <h2>DANFE NFC-e</h2>
     <div class="muted">Documento Auxiliar da Nota Fiscal<br />de Consumidor Eletrônica</div>
+    ${
+      ambiente === 'Homologação'
+        ? `<div class="homolog">CUPOM EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL</div>`
+        : ''
+    }
   </div>
   <hr class="rule" />
   <div class="meta">
@@ -351,6 +377,11 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
     Valor approx.: ${money(tribApprox)}
   </div>
   <div class="badge">CUPOM NFC-e</div>
+  ${
+    ambiente === 'Homologação'
+      ? `<div class="homolog">CUPOM EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL</div>`
+      : ''
+  }
   <div class="muted" style="margin-top:6px;text-align:center">Ref. ${escapeHtml(doc.saleRef)}</div>
   <div style="height:12px"></div>
 </body>
