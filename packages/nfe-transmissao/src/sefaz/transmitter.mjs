@@ -110,6 +110,9 @@ export function createSefazTransmitter(cert) {
         if (String(ret.cStat) === '410') {
           hint +=
             ' — Web Service não atende esta UF (RS deve usar sefazrs, não SVRS)'
+        } else if (String(ret.cStat) === '464') {
+          hint +=
+            ' — hash do QR-Code diverge (confira CSC/idCSC de homologação na filial)'
         } else if (String(ret.cStat) === '225') {
           if (/Algorithm/i.test(String(ret.xMotivo || ''))) {
             hint +=

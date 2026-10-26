@@ -433,13 +433,15 @@ function buildIbscbsXml(item, vProd, extras = {}) {
 }
 
 /**
- * Hash CSC do QR Code NFC-e (versão 2).
- * SHA-1(chave|2|tpAmb|idCSC|CSC) em hex minúsculo.
+ * Hash CSC do QR Code NFC-e (versão 2 / MOC DANFE).
+ * SHA-1( chave|2|tpAmb|idCSC + CSC ) — CSC colado sem "|".
+ * Retorno em hex maiúsculo (40 chars), como no manual.
  */
 export function hashCscQr({ chave, tpAmb, idCsc, csc }) {
   const id = onlyDigits(String(idCsc || '')).replace(/^0+/, '') || '1'
-  const raw = `${chave}|2|${tpAmb}|${id}|${String(csc || '').trim()}`
-  return createHash('sha1').update(raw, 'utf8').digest('hex')
+  const base = `${chave}|2|${tpAmb}|${id}`
+  const raw = `${base}${String(csc || '').trim()}`
+  return createHash('sha1').update(raw, 'utf8').digest('hex').toUpperCase()
 }
 
 export function buildQrCodeUrl({

@@ -133,22 +133,20 @@ export async function autorizarNfce({
     throw mapTlsError(err)
   }
 
-  const cStat = tag(responseXml, 'cStat') || tag(responseXml, 'cStat')
-  const xMotivo = tag(responseXml, 'xMotivo')
-  const nProt = tag(responseXml, 'nProt')
-  const digVal = tag(responseXml, 'digVal')
-  const chNFe = tag(responseXml, 'chNFe')
-  const protCStat = (() => {
-    const prot = tag(responseXml, 'infProt') || ''
-    const m = /<(?:\w+:)?cStat[^>]*>([^<]+)</i.exec(
-      responseXml.includes('infProt') ? responseXml : prot,
-    )
-    // Prefer protocol status when present
-    const all = [...responseXml.matchAll(/<(?:\w+:)?cStat[^>]*>([^<]+)</gi)].map(
-      (x) => x[1],
-    )
-    return all.length > 1 ? all[all.length - 1] : all[0] || cStat
-  })()
+  // retEnviNFe (lote) e infProt (nota) têm cStat/xMotivo distintos —
+  // preferir sempre o protocolo da NF-e quando existir.
+  const infProtMatch = /<(?:\w+:)?infProt\b[\s\S]*?<\/(?:\w+:)?infProt>/i.exec(
+    responseXml,
+  )
+  const infProtXml = infProtMatch ? infProtMatch[0] : ''
+  const loteCStat = tag(responseXml, 'cStat')
+  const loteMotivo = tag(responseXml, 'xMotivo')
+  const protCStat = (infProtXml ? tag(infProtXml, 'cStat') : '') || loteCStat
+  const xMotivo =
+    (infProtXml ? tag(infProtXml, 'xMotivo') : '') || loteMotivo || ''
+  const nProt = tag(infProtXml || responseXml, 'nProt')
+  const digVal = tag(infProtXml || responseXml, 'digVal')
+  const chNFe = tag(infProtXml || responseXml, 'chNFe')
 
   const authorized = protCStat === '100' || protCStat === '150'
   const denied = ['110', '301', '302', '303'].includes(String(protCStat))
