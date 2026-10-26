@@ -921,16 +921,26 @@ export function buildInfNFeXml(input) {
   }
 }
 
+/**
+ * dhEmi no fuso do Brasil (America/Sao_Paulo).
+ * Em Vercel o process fica em UTC e getTimezoneOffset() gerava +00:00.
+ */
 function formatDhEmi(d) {
   const pad2 = (n) => String(n).padStart(2, '0')
-  const off = -d.getTimezoneOffset()
-  const sign = off >= 0 ? '+' : '-'
-  const abs = Math.abs(off)
-  const oh = pad2(Math.floor(abs / 60))
-  const om = pad2(abs % 60)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d)
+  const get = (type) => parts.find((p) => p.type === type)?.value || '00'
+  // Offset oficial SP/RS (sem horário de verão desde 2019): -03:00
   return (
-    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` +
-    `T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}` +
-    `${sign}${oh}:${om}`
+    `${get('year')}-${get('month')}-${get('day')}` +
+    `T${get('hour')}:${get('minute')}:${get('second')}-03:00`
   )
 }

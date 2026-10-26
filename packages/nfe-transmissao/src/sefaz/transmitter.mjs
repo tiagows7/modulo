@@ -36,9 +36,13 @@ export function createSefazTransmitter(cert) {
         cert.pfx,
         cert.passphrase,
       )
-      // infNFeSupl fica fora do nó assinado
+      // Schema TNFe / ACBr: infNFe → infNFeSupl → Signature (supl fora do assinado)
       if (built.xmlInfNFeSupl && !nfeAssinado.includes('<infNFeSupl')) {
-        if (nfeAssinado.includes('</NFe>')) {
+        if (/<Signature[\s>]/i.test(nfeAssinado)) {
+          nfeAssinado = nfeAssinado.replace(/<Signature[\s>]/i, (tag) =>
+            `${built.xmlInfNFeSupl}${tag}`,
+          )
+        } else if (nfeAssinado.includes('</NFe>')) {
           nfeAssinado = nfeAssinado.replace(
             '</NFe>',
             `${built.xmlInfNFeSupl}</NFe>`,
