@@ -106,7 +106,11 @@ export function createSefazTransmitter(cert) {
 
       if (status !== 'authorized') {
         let hint = ` [cUF=${built.cUF} cMunFG=${built.cMun}${built.emitiuIbscbs ? ' IBSCBS=sim' : ''}]`
-        if (String(ret.cStat) === '225') {
+        if (ret.url) hint += ` url=${ret.url}`
+        if (String(ret.cStat) === '410') {
+          hint +=
+            ' — Web Service não atende esta UF (RS deve usar sefazrs, não SVRS)'
+        } else if (String(ret.cStat) === '225') {
           if (/Algorithm/i.test(String(ret.xMotivo || ''))) {
             hint +=
               ' — confira CanonicalizationMethod/SignatureMethod (MOC exige C14N 20010315 + rsa-sha1)'

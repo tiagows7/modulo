@@ -32,7 +32,11 @@ export const UF_IBGE = {
   TO: '17',
 }
 
-/** UFs atendidas pelo SVRS para NFC-e. */
+/**
+ * UFs atendidas pelo SVRS para NFC-e.
+ * RS NÃO entra aqui: emitente gaúcho usa SEFAZ/RS (sefazrs), não SVRS.
+ * Enviar cUF=43 no SVRS gera rejeição 410.
+ */
 const UF_SVRS = new Set([
   'AC',
   'AL',
@@ -47,7 +51,6 @@ const UF_SVRS = new Set([
   'SC',
   'SE',
   'TO',
-  'RS',
 ])
 
 export function onlyDigits(value) {
@@ -162,6 +165,12 @@ export function nfceAutorizacaoUrl(uf, tpAmb) {
   const sigla = String(uf || '').trim().toUpperCase()
   const homolog = tpAmb === 2
 
+  // RS: autorizador próprio (sefazrs) — NÃO usar SVRS (rejeição 410)
+  if (sigla === 'RS') {
+    return homolog
+      ? 'https://nfce-homologacao.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
+      : 'https://nfce.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
+  }
   if (sigla === 'SP') {
     return homolog
       ? 'https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx'
@@ -203,7 +212,7 @@ export function nfceAutorizacaoUrl(uf, tpAmb) {
       : 'https://nfce.sefaz.am.gov.br/nfce-services/services/NfeAutorizacao4'
   }
 
-  // SVRS e demais via SVRS
+  // Demais UFs do SVRS
   if (UF_SVRS.has(sigla) || !sigla) {
     return homolog
       ? 'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx'
