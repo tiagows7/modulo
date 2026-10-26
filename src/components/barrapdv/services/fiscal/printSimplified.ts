@@ -1,5 +1,8 @@
-import { FISCAL_CONFIG } from './config'
 import { printHtmlDocument } from './printHtml'
+import {
+  resolvePrintAmbiente,
+  resolvePrintEmitente,
+} from './printEmitente'
 import type { FiscalDocument, FiscalPrintModel } from './types'
 
 function escapeHtml(value: string) {
@@ -25,7 +28,8 @@ function formatChaveGroups(chave: string) {
  * Texto térmico / DANFE modelo simplificado (NF-e).
  */
 export function buildSimplifiedDanfeText(doc: FiscalDocument): string {
-  const em = FISCAL_CONFIG.emitter
+  const em = resolvePrintEmitente(doc)
+  const ambiente = resolvePrintAmbiente(doc)
   const lines: string[] = [
     em.nomeFantasia || em.razaoSocial,
     em.razaoSocial,
@@ -37,7 +41,7 @@ export function buildSimplifiedDanfeText(doc: FiscalDocument): string {
     `${doc.tipo}  Nº ${doc.numero}  Série ${doc.serie}`,
     `Emissão ${doc.emissao} ${doc.hora}`,
     `Protocolo ${doc.protocol || '-'}`,
-    `Ambiente: ${FISCAL_CONFIG.ambiente}`,
+    `Ambiente: ${ambiente}`,
     '--------------------------------',
     `Destinatário: ${doc.cliente}`,
   ]
@@ -83,7 +87,8 @@ export function buildSimplifiedDanfeHtml(
   model: FiscalPrintModel = 'simplified',
 ): string {
   void model
-  const em = FISCAL_CONFIG.emitter
+  const em = resolvePrintEmitente(doc)
+  const ambiente = resolvePrintAmbiente(doc)
   const itemsRows = doc.items
     .map((item) => {
       const total = item.qty * item.price
@@ -149,7 +154,7 @@ export function buildSimplifiedDanfeHtml(
     <strong>NF-e nº ${escapeHtml(doc.numero)} — Série ${escapeHtml(doc.serie)}</strong>
     <span>Emissão ${escapeHtml(doc.emissao)} ${escapeHtml(doc.hora)}</span>
     <span>Protocolo ${escapeHtml(doc.protocol || '-')}</span>
-    <span>Ambiente: ${escapeHtml(FISCAL_CONFIG.ambiente)}</span>
+    <span>Ambiente: ${escapeHtml(ambiente)}</span>
   </div>
   <hr class="rule" />
   <div>

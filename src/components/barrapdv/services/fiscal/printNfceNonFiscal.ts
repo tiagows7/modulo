@@ -1,5 +1,9 @@
 import QRCode from 'qrcode'
-import { FISCAL_CONFIG } from './config'
+import {
+  parseQrCodeFromXml,
+  resolvePrintAmbiente,
+  resolvePrintEmitente,
+} from './printEmitente'
 import type { FiscalDocument } from './types'
 
 function escapeHtml(value: string) {
@@ -45,15 +49,17 @@ function lineNet(item: { qty: number; price: number; discount?: number }) {
 
 /**
  * Conteúdo do QR Code NFC-e (consulta pública).
- * Formato aproximado NT 2015.002 — hash CSC real fica para integração SEFAZ.
+ * Preferência: URL já gravada no XML (hash CSC correto da autorização).
  */
 export function buildNfceQrPayload(doc: FiscalDocument): string {
+  const fromXml = parseQrCodeFromXml(doc.xml)
+  if (fromXml) return fromXml
+
+  const em = resolvePrintEmitente(doc)
   const chave = onlyDigits(doc.chave)
-  const uf = (FISCAL_CONFIG.emitter.uf || 'SP').toUpperCase()
-  const ambiente = FISCAL_CONFIG.ambiente === 'Produção' ? '1' : '2'
+  const uf = (em.uf || 'SP').toUpperCase()
+  const ambiente = resolvePrintAmbiente(doc) === 'Produção' ? '1' : '2'
   const idToken = onlyDigits(doc.tokenId || '1') || '1'
-  // p = chave|versao|ambiente|cIdToken|hashCSC  (hash vazio no mock;
-  // tokenNfce será usado no hash quando houver transmissão live)
   const p = `${chave}|2|${ambiente}|${idToken}|`
 
   const byUf: Record<string, string> = {
@@ -88,7 +94,8 @@ async function buildNfceQrDataUrl(payload: string, size = 160): Promise<string |
  * Equivalente ao DANFE NFC-e via ACBr DANFeESCPOS no Delphi.
  */
 export function buildNfceNonFiscalText(doc: FiscalDocument): string {
-  const em = FISCAL_CONFIG.emitter
+  const em = resolvePrintEmitente(doc)
+  const ambiente = resolvePrintAmbiente(doc)
   const discountTotal = round2(
     doc.items.reduce((sum, item) => sum + (item.discount ?? 0), 0),
   )
@@ -111,7 +118,7 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
     'CHAVE DE ACESSO',
     formatChaveGroups(doc.chave),
     `Protocolo ${doc.protocol || '-'}`,
-    `Ambiente: ${FISCAL_CONFIG.ambiente}`,
+    `Ambiente: ${ambiente}`,
     RULE_SMALL,
     'CONSUMIDOR',
     doc.cliente || 'Consumidor nao identificado',
@@ -174,7 +181,8 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
  * HTML do cupom completo NFC-e (80mm) para impressoras não-fiscais.
  */
 export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<string> {
-  const em = FISCAL_CONFIG.emitter
+  const em = resolvePrintEmitente(doc)
+  const ambiente = resolvePrintAmbiente(doc)
   const discountTotal = round2(
     doc.items.reduce((sum, item) => sum + (item.discount ?? 0), 0),
   )
@@ -306,7 +314,7 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
     <strong>CHAVE DE ACESSO</strong>
     <div class="chave">${escapeHtml(formatChaveGroups(doc.chave))}</div>
     <span>Protocolo ${escapeHtml(doc.protocol || '-')}</span>
-    <span>Ambiente: ${escapeHtml(FISCAL_CONFIG.ambiente)}</span>
+    <span>Ambiente: ${escapeHtml(ambiente)}</span>
   </div>
   <hr class="rule" />
   <div class="block">
