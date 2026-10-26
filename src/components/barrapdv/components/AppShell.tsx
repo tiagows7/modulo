@@ -11,7 +11,6 @@ import { syncPdvModoLocal } from '../config/pdvConfig'
 const navItemsPosto = [
   { to: '/venda', label: 'Venda', icon: IconPump },
   { to: '/produtos', label: 'Produtos', icon: IconStore },
-  { to: '/pagamento', label: 'Pagar', icon: IconPay },
   { to: '/abastecidas', label: 'Abast.', icon: IconPump },
   { to: '/cancelamento', label: 'Cancel.', icon: IconCancel },
   { to: '/adm', label: 'ADM', icon: IconAdm },
@@ -20,7 +19,6 @@ const navItemsPosto = [
 const navItemsLoja = [
   { to: '/venda', label: 'Venda', icon: IconStore },
   { to: '/produtos', label: 'Produtos', icon: IconStore },
-  { to: '/pagamento', label: 'Pagar', icon: IconPay },
   { to: '/cancelamento', label: 'Cancel.', icon: IconCancel },
   { to: '/adm', label: 'ADM', icon: IconAdm },
 ]
@@ -41,16 +39,6 @@ function IconStore() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M4 9h16l-1.2 10.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 9Z" />
       <path d="M8 9V6a4 4 0 0 1 8 0v3" />
-    </svg>
-  )
-}
-
-function IconPay() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="6" width="18" height="12" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M7 15h4" />
     </svg>
   )
 }

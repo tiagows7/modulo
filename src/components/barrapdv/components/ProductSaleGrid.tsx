@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePdvModo } from '../hooks/usePdvModo'
 import { useAlert } from '../context/AlertContext'
 import { useCart } from '../context/CartContext'
@@ -26,6 +27,7 @@ type PreviewItem = {
 
 /** Grade / pesquisa de produtos (PDV loja). */
 export function ProductSaleGrid({ embedded = false }: Props) {
+  const navigate = useNavigate()
   const { addItem } = useCart()
   const { showAlert } = useAlert()
   const { isLoja } = usePdvModo()
@@ -98,6 +100,8 @@ export function ProductSaleGrid({ embedded = false }: Props) {
       codigo: product.codigo_barras || product.codigo,
     })
     flashAdded(product.descricao)
+    // Menu Produtos → volta para a tela de venda após incluir o item
+    if (!embedded) navigate('/venda')
   }
 
   async function submitScan() {
