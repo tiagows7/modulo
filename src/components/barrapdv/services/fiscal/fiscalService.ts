@@ -173,6 +173,21 @@ class FiscalService {
         const row = data as Record<string, unknown> | null
         if (row) {
           ambiente = normalizeAmbienteFiscal(row[col])
+          const municipioIbge = (() => {
+            const dig = String(row.endereco_cidade ?? '').replace(/\D/g, '')
+            return dig.length === 7 ? dig : null
+          })()
+          let cidadeNome: string | null = null
+          if (municipioIbge) {
+            const { data: cidadeRow } = await supabase
+              .from('cidades')
+              .select('descricao')
+              .eq('codigo', municipioIbge)
+              .maybeSingle()
+            if (cidadeRow?.descricao != null) {
+              cidadeNome = String(cidadeRow.descricao).trim() || null
+            }
+          }
           emitente = {
             cnpj: row.cnpj != null ? String(row.cnpj) : emitente.cnpj,
             ie:
@@ -187,11 +202,8 @@ class FiscalService {
               row.fantasia != null ? String(row.fantasia) : emitente.fantasia,
             uf:
               row.endereco_uf != null ? String(row.endereco_uf) : emitente.uf,
-            municipioIbge: (() => {
-              const dig = String(row.endereco_cidade ?? '').replace(/\D/g, '')
-              return dig.length === 7 ? dig : null
-            })(),
-            cidade: emitente.cidade,
+            municipioIbge,
+            cidade: cidadeNome,
             endereco:
               row.endereco != null ? String(row.endereco) : emitente.endereco,
             numero:

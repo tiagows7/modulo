@@ -173,11 +173,12 @@ export async function POST(req: Request) {
       );
     }
     const municipioIbge = String(cidadeRow.codigo).replace(/\D/g, "");
+    // Nome oficial = tabela cidades (IBGE). Não usar default/client ("São Paulo" etc.).
     const cidadeNome =
+      (cidadeRow.descricao != null ? String(cidadeRow.descricao).trim() : "") ||
       (body.emitente?.cidade != null
         ? String(body.emitente.cidade).trim()
-        : "") ||
-      (cidadeRow.descricao != null ? String(cidadeRow.descricao).trim() : "");
+        : "");
 
     const crt = tipoEmpresaToCrt(
       filial.tipo_empresa != null ? String(filial.tipo_empresa) : null,
