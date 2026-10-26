@@ -670,10 +670,13 @@ export function PagamentoPage() {
           openDialog: false,
           direct: true,
         })
-        showAlert({
-          title: printResult.ok ? 'Cupom impresso' : 'Cupom',
-          message: printResult.message,
-        })
+        // Sucesso: não mostra “enviado para impressora X”; só alerta se falhar.
+        if (!printResult.ok) {
+          showAlert({
+            title: 'Cupom',
+            message: printResult.message,
+          })
+        }
       }
 
       // Final da rotina: inicia nova venda automaticamente (sem perguntar).
