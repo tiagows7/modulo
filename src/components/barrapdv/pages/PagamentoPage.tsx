@@ -246,12 +246,8 @@ export function PagamentoPage() {
     [payLines],
   )
   const remaining = roundMoney(Math.max(0, total - paidTotal))
-  const cashChange = useMemo(() => {
-    return payLines.reduce((sum, line) => {
-      if (line.methodId !== 'dinheiro') return sum
-      return sum + Math.max(0, line.cashReceived - line.amount)
-    }, 0)
-  }, [payLines])
+  /** Troco = documentos lançados − total da venda (ex.: cliente deu a mais em dinheiro). */
+  const troco = roundMoney(Math.max(0, paidTotal - total))
 
   /** Quando o pago cobre o total, aciona Fechar venda automaticamente (uma vez por cobertura). */
   const saleCoveredRef = useRef(false)
@@ -1457,10 +1453,10 @@ export function PagamentoPage() {
               <span>Restante</span>
               <strong>{formatCurrency(remaining)}</strong>
             </div>
-            {cashChange > 0 ? (
-              <div className="pay-summary-row pay-summary-meta">
+            {troco > 0 ? (
+              <div className="pay-summary-row pay-summary-net">
                 <span>Troco</span>
-                <strong>{formatCurrency(cashChange)}</strong>
+                <strong>{formatCurrency(troco)}</strong>
               </div>
             ) : null}
           </div>

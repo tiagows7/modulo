@@ -168,6 +168,11 @@ export function buildNfceNonFiscalText(doc: FiscalDocument): string {
       lines.push(`  ${p.label || p.methodId}: ${money(p.amount)}`)
       if (extra) lines.push(`    ${extra}`)
     }
+    const pago = round2(doc.payments.reduce((s, p) => s + Number(p.amount || 0), 0))
+    const troco = round2(Math.max(0, pago - doc.valor))
+    if (troco > 0.009) {
+      lines.push(`TROCO: ${money(troco)}`)
+    }
     lines.push(RULE_SMALL)
   }
 
@@ -369,7 +374,21 @@ export async function buildNfceNonFiscalHtml(doc: FiscalDocument): Promise<strin
       : ''
   }
   <div class="total"><span>TOTAL A PAGAR</span><span>${money(doc.valor)}</span></div>
-  ${payRows ? `<hr class="rule" /><div><strong>FORMA DE PAGAMENTO</strong>${payRows}</div>` : ''}
+  ${
+    payRows
+      ? (() => {
+          const pago = round2(
+            doc.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
+          )
+          const troco = round2(Math.max(0, pago - doc.valor))
+          return `<hr class="rule" /><div><strong>FORMA DE PAGAMENTO</strong>${payRows}${
+            troco > 0.009
+              ? `<div class="total" style="margin-top:4px"><span>TROCO</span><span>${money(troco)}</span></div>`
+              : ''
+          }</div>`
+        })()
+      : ''
+  }
   <hr class="rule" />
   <div class="qr-block">${qrBlock}</div>
   <div class="trib">

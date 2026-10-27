@@ -66,6 +66,11 @@ export function buildSimplifiedDanfeText(doc: FiscalDocument): string {
     for (const p of doc.payments) {
       lines.push(`  ${p.label || p.methodId}: ${money(p.amount)}`)
     }
+    const pago = Math.round(
+      doc.payments.reduce((s, p) => s + Number(p.amount || 0), 0) * 100,
+    ) / 100
+    const troco = Math.round(Math.max(0, pago - doc.valor) * 100) / 100
+    if (troco > 0.009) lines.push(`TROCO ${money(troco)}`)
   }
 
   lines.push('--------------------------------')
@@ -176,7 +181,22 @@ export function buildSimplifiedDanfeHtml(
   </table>
   <hr class="rule" />
   <div class="total"><span>TOTAL</span><span>${money(doc.valor)}</span></div>
-  ${payRows ? `<hr class="rule" /><div>${payRows}</div>` : ''}
+  ${
+    payRows
+      ? (() => {
+          const pago =
+            Math.round(
+              doc.payments.reduce((s, p) => s + Number(p.amount || 0), 0) * 100,
+            ) / 100
+          const troco = Math.round(Math.max(0, pago - doc.valor) * 100) / 100
+          return `<hr class="rule" /><div>${payRows}${
+            troco > 0.009
+              ? `<div class="total" style="margin-top:4px"><span>TROCO</span><span>${money(troco)}</span></div>`
+              : ''
+          }</div>`
+        })()
+      : ''
+  }
   <hr class="rule" />
   <div><strong>Chave de acesso</strong></div>
   <div class="chave">${escapeHtml(formatChaveGroups(doc.chave))}</div>
