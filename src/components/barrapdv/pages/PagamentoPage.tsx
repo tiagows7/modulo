@@ -1572,6 +1572,31 @@ export function PagamentoPage() {
             <div className="wait-spinner" aria-hidden />
             <h2 id="fiscal-wait-title">Autorizando nota</h2>
             <p>{fiscalStatus.toUpperCase()}</p>
+            <div
+              style={{
+                marginTop: 16,
+                paddingTop: 12,
+                borderTop: '1px solid rgba(255,255,255,0.18)',
+                textAlign: 'center',
+                lineHeight: 1.45,
+              }}
+            >
+              <div style={{ opacity: 0.85, fontSize: 13 }}>
+                Total {formatCurrency(total)} · Pago {formatCurrency(paidTotal)}
+              </div>
+              {troco > 0 ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 22,
+                    fontWeight: 700,
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  TROCO {formatCurrency(troco)}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
