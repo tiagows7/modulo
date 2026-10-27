@@ -676,6 +676,12 @@ export function buildInfNFeXml(input) {
     .join('')
 
   const payments = Array.isArray(input.payments) ? input.payments : []
+  const somaPagamentos =
+    payments.length > 0
+      ? payments.reduce((s, p) => s + Number(p.amount || 0), 0)
+      : total
+  // SEFAZ 866/869: se Σ vPag > vNF, obrigatório informar vTroco = Σ vPag − vNF
+  const vTroco = Math.round((somaPagamentos - total) * 100) / 100
   const detPag =
     payments.length > 0
       ? payments
@@ -685,6 +691,8 @@ export function buildInfNFeXml(input) {
           })
           .join('')
       : `<detPag><tPag>01</tPag><vPag>${money(total)}</vPag></detPag>`
+  const vTrocoXml =
+    vTroco > 0.009 ? `<vTroco>${money(vTroco)}</vTroco>` : ''
 
   const destIe = onlyDigits(buyer.ie || '')
   const indIEDest = destIe ? '1' : '9'
@@ -887,7 +895,7 @@ export function buildInfNFeXml(input) {
       : '',
     `</total>`,
     `<transp><modFrete>9</modFrete></transp>`,
-    `<pag>${detPag}</pag>`,
+    `<pag>${detPag}${vTrocoXml}</pag>`,
     `<infAdic><infCpl>${escapeXml(`Pedido ${input.saleRef || ''}`)}</infCpl></infAdic>`,
     `<infRespTec>`,
     `<CNPJ>${cnpj}</CNPJ>`,
