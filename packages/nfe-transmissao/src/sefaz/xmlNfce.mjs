@@ -688,9 +688,12 @@ export function buildInfNFeXml(input) {
 
   const destIe = onlyDigits(buyer.ie || '')
   const indIEDest = destIe ? '1' : '9'
+  // SEFAZ 598: em homologação o xNome do destinatário (NFC-e ou NF-e) é fixo.
+  const destNomeHomolog =
+    'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
   const destNome =
-    isNfe && tpAmb === 2
-      ? 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
+    tpAmb === 2
+      ? destNomeHomolog
       : escapeXml(buyer.name || (isNfe ? 'DESTINATARIO' : 'CONSUMIDOR'))
   const destMun = onlyDigits(buyer.municipioIbge || '')
   const destCMun =
@@ -740,7 +743,7 @@ export function buildInfNFeXml(input) {
         ? [
             `<dest>`,
             `<CNPJ>${buyerDoc}</CNPJ>`,
-            `<xNome>${isNfe && tpAmb === 2 ? destNome : escapeXml(buyer.name || 'DESTINATARIO')}</xNome>`,
+            `<xNome>${destNome}</xNome>`,
             destXmlEnder,
             `<indIEDest>${indIEDest}</indIEDest>`,
             destIe ? `<IE>${destIe}</IE>` : '',
