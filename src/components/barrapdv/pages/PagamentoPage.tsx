@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../context/AlertContext'
 import { useCart } from '../context/CartContext'
@@ -875,6 +875,44 @@ export function PagamentoPage() {
     setVehicleQuery('')
   }
 
+  /** Enter nos campos do cliente avança para o próximo (textarea: use Ctrl+Enter). */
+  function onCustomerFormEnter(e: KeyboardEvent<HTMLElement>) {
+    if (e.key !== 'Enter') return
+    const target = e.target as HTMLElement | null
+    if (!target) return
+    if (target instanceof HTMLTextAreaElement && !e.ctrlKey) return
+    if (target instanceof HTMLButtonElement) return
+    if (
+      !(target instanceof HTMLInputElement) &&
+      !(target instanceof HTMLTextAreaElement) &&
+      !(target instanceof HTMLSelectElement)
+    ) {
+      return
+    }
+
+    e.preventDefault()
+    const root = e.currentTarget
+    const fields = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]):not([type="button"]):not([type="submit"]), textarea:not([disabled]), select:not([disabled])',
+      ),
+    ).filter((el) => {
+      const style = window.getComputedStyle(el)
+      return style.display !== 'none' && style.visibility !== 'hidden'
+    })
+    const idx = fields.indexOf(target)
+    if (idx < 0) return
+    const next = fields[idx + 1]
+    if (next) {
+      next.focus()
+      if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
+        next.select?.()
+      }
+      return
+    }
+    confirmarIdentificacao()
+  }
+
   function confirmarIdentificacao() {
     if (!customer.name.trim() && !customer.document.trim() && !customer.customerCode.trim()) {
       showAlert({
@@ -951,7 +989,7 @@ export function PagamentoPage() {
 
   if (step === 'cliente') {
     return (
-      <div className="customer-layout">
+      <div className="customer-layout" onKeyDown={onCustomerFormEnter}>
         {showVehicleSearch && (
           <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="vehicle-search-title">
             <div className="modal-card vehicle-search-modal">
