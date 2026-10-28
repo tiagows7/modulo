@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../context/AlertContext'
 import { useCart } from '../context/CartContext'
@@ -875,44 +875,6 @@ export function PagamentoPage() {
     setVehicleQuery('')
   }
 
-  /** Enter nos campos do cliente avança para o próximo (textarea: use Ctrl+Enter). */
-  function onCustomerFormEnter(e: KeyboardEvent<HTMLElement>) {
-    if (e.key !== 'Enter') return
-    const target = e.target as HTMLElement | null
-    if (!target) return
-    if (target instanceof HTMLTextAreaElement && !e.ctrlKey) return
-    if (target instanceof HTMLButtonElement) return
-    if (
-      !(target instanceof HTMLInputElement) &&
-      !(target instanceof HTMLTextAreaElement) &&
-      !(target instanceof HTMLSelectElement)
-    ) {
-      return
-    }
-
-    e.preventDefault()
-    const root = e.currentTarget
-    const fields = Array.from(
-      root.querySelectorAll<HTMLElement>(
-        'input:not([disabled]):not([type="hidden"]):not([type="button"]):not([type="submit"]), textarea:not([disabled]), select:not([disabled])',
-      ),
-    ).filter((el) => {
-      const style = window.getComputedStyle(el)
-      return style.display !== 'none' && style.visibility !== 'hidden'
-    })
-    const idx = fields.indexOf(target)
-    if (idx < 0) return
-    const next = fields[idx + 1]
-    if (next) {
-      next.focus()
-      if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
-        next.select?.()
-      }
-      return
-    }
-    confirmarIdentificacao()
-  }
-
   function confirmarIdentificacao() {
     if (!customer.name.trim() && !customer.document.trim() && !customer.customerCode.trim()) {
       showAlert({
@@ -921,6 +883,79 @@ export function PagamentoPage() {
       })
       return
     }
+    setStep('pagamento')
+  }
+
+  const confirmarIdentificacaoRef = useRef(confirmarIdentificacao)
+  confirmarIdentificacaoRef.current = confirmarIdentificacao
+  const showVehicleSearchRef = useRef(showVehicleSearch)
+  showVehicleSearchRef.current = showVehicleSearch
+
+  /** Enter nos inputs do cliente (captura no document — mais confiável no PDV). */
+  useEffect(() => {
+    if (step !== 'cliente') return
+
+    function fieldList(root: ParentNode | null) {
+      if (!root) return [] as HTMLElement[]
+      return Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'input:not([disabled]):not([type="hidden"]):not([type="button"]):not([type="submit"]), textarea:not([disabled]), select:not([disabled])',
+        ),
+      ).filter((el) => {
+        if (el.closest('.modal-overlay')) return false
+        const style = window.getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      })
+    }
+
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key !== 'Enter') return
+      if (e.isComposing) return
+      if (showVehicleSearchRef.current) return
+      const target = e.target
+      if (!(target instanceof HTMLElement)) return
+      if (!target.closest('.customer-layout')) return
+      if (target.closest('.modal-overlay')) return
+      if (target instanceof HTMLButtonElement) return
+      if (target instanceof HTMLTextAreaElement && !e.ctrlKey) return
+      if (
+        !(target instanceof HTMLInputElement) &&
+        !(target instanceof HTMLTextAreaElement) &&
+        !(target instanceof HTMLSelectElement)
+      ) {
+        return
+      }
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const fields = fieldList(document.querySelector('.customer-layout'))
+      const idx = fields.indexOf(target)
+      if (idx < 0) return
+      const next = fields[idx + 1]
+      if (next) {
+        next.focus()
+        if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
+          try {
+            next.select()
+          } catch {
+            /* ignore */
+          }
+        }
+        return
+      }
+      confirmarIdentificacaoRef.current()
+    }
+
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [step])
+
+  /** Desiste de identificar: limpa dados e volta ao pagamento. */
+  function voltarSemIdentificar() {
+    setCustomer(emptyCustomer)
+    setShowVehicleSearch(false)
+    setVehicleQuery('')
     setStep('pagamento')
   }
 
@@ -989,7 +1024,7 @@ export function PagamentoPage() {
 
   if (step === 'cliente') {
     return (
-      <div className="customer-layout" onKeyDown={onCustomerFormEnter}>
+      <div className="customer-layout">
         {showVehicleSearch && (
           <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="vehicle-search-title">
             <div className="modal-card vehicle-search-modal">
@@ -1044,7 +1079,7 @@ export function PagamentoPage() {
         <section className="panel customer-panel">
           <div className="panel-header">
             <h2>Identificar cliente</h2>
-            <button type="button" className="btn btn-ghost" onClick={() => setStep('pagamento')}>
+            <button type="button" className="btn btn-ghost" onClick={voltarSemIdentificar}>
               Voltar
             </button>
           </div>
@@ -1199,6 +1234,9 @@ export function PagamentoPage() {
             </div>
 
             <div className="customer-actions">
+              <button type="button" className="btn btn-ghost btn-lg" onClick={voltarSemIdentificar}>
+                Voltar
+              </button>
               <button type="button" className="btn btn-secondary btn-lg" onClick={limparCliente}>
                 Limpar dados
               </button>
@@ -1206,6 +1244,9 @@ export function PagamentoPage() {
                 Confirmar cliente
               </button>
             </div>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              Enter avança o campo · no último confirma · Voltar desiste sem gravar o cliente
+            </p>
           </div>
         </section>
 
